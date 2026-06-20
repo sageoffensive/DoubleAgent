@@ -6,6 +6,15 @@ The extension is distributed as a single Jython-compatible Python file:
 
 - `double-agent-v2.1.py`
 
+## Why DoubleAgent?
+
+DoubleAgent is built around two complementary agent roles:
+
+- A passive observation agent watches in-scope Burp Proxy traffic, reviews requests and responses, and turns likely security signals into triaged findings without actively probing the target.
+- An active verification agent takes the prioritized findings, sends controlled test traffic through Burp, verifies impact, removes false positives, and records reproducible evidence.
+
+That split keeps broad traffic review cheap and continuous while reserving active testing for the issues most likely to matter.
+
 ## Features
 
 - AI-assisted analysis of in-scope Burp Proxy traffic
