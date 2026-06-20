@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Burp Suite Python Extension: Double Agent (formerly Eternals Burp Agent)
+# Burp Suite Python Extension: Double Agent
 # Name: two AI agents - one for passive scanning, one for active scanning
 # Version: 2.1
 # Release Date: 2026-05-29
@@ -398,7 +398,7 @@ class AgentAPIHandler(BaseHTTPRequestHandler):
                 {"method": "GET", "path": "/api/agent/queue/<id>", "auth": True,
                  "returns": "full queue item with findings[] array including active_test_recipe objects (for source=findings), flow_requests[] array (for source=flow_analysis), source field, user_context, browser_verify, next_action, and target_curl preview when curl_proxy is recommended"},
                 {"method": "GET", "path": "/api/agent/queue/<id>/curl?refresh_auth=true&step=<optional>", "auth": True,
-                 "description": "Generate ready-to-run target curl command(s) for a queue item. Commands always include -x http://127.0.0.1:8080 and X-Eternals-Agent-Note. With refresh_auth=true, auth/latest is applied automatically and stale captured auth headers are replaced.",
+                 "description": "Generate ready-to-run target curl command(s) for a queue item. Commands always include -x http://127.0.0.1:8080 and X-Double-Agent-Note. With refresh_auth=true, auth/latest is applied automatically and stale captured auth headers are replaced.",
                  "returns": "{queue_id, refresh_auth, proxy_required, commands: [{command, method, url, auth, scope_guard, safety_gate, requires_confirmation, warnings}], usage}"},
                 {"method": "POST", "path": "/api/agent/queue/<id>/claim", "auth": True,
                  "body": "none",
@@ -428,7 +428,7 @@ class AgentAPIHandler(BaseHTTPRequestHandler):
                  "body": {"mode": "completed|all - default completed"},
                  "returns": "{status: ok, removed, remaining}"},
                 {"method": "POST", "path": "/api/agent/request", "auth": True,
-                 "description": "Fallback/convenience path: fire an HTTP request through Burp's HTTP stack and return structured JSON. For normal manual testing, lower token use, and visible Proxy history notes, use native target curl with -x http://127.0.0.1:8080 and X-Eternals-Agent-Note.",
+                 "description": "Fallback/convenience path: fire an HTTP request through Burp's HTTP stack and return structured JSON. For normal manual testing, lower token use, and visible Proxy history notes, use native target curl with -x http://127.0.0.1:8080 and X-Double-Agent-Note.",
                  "body": {
                      "host": "required string - hostname only e.g. example.com",
                      "port": "int - default 443",
@@ -474,8 +474,8 @@ class AgentAPIHandler(BaseHTTPRequestHandler):
                 "For queue items with next_action.recommended_transport=curl_proxy, call /api/agent/queue/<id>/curl?refresh_auth=true and use the generated command instead of hand-building curl.",
                 "If next_action.scope_guard or command scope_guard says requires_confirmation, stop and ask the user before active testing. Never test hosts marked in_scope=false.",
                 "If safety_gate.requires_confirmation is true, ask the user before sending the request. This applies to destructive methods and sensitive paths such as payment, password, delete, upload, transfer, or order flows.",
-                "For visible Burp Proxy history notes, send tests through the proxy with header X-Eternals-Agent-Note: Agent: <finding/work item> - <test purpose> - <expected result>. The extension copies it into the Proxy history comment and strips the header before the target sees it.",
-                "When using /api/agent/request, always include a short comment/note describing what the request is testing. If the note must be visible in the main Proxy history table, prefer a proxied request with X-Eternals-Agent-Note.",
+                "For visible Burp Proxy history notes, send tests through the proxy with header X-Double-Agent-Note: Agent: <finding/work item> - <test purpose> - <expected result>. The extension copies it into the Proxy history comment and strips the header before the target sees it.",
+                "When using /api/agent/request, always include a short comment/note describing what the request is testing. If the note must be visible in the main Proxy history table, prefer a proxied request with X-Double-Agent-Note.",
                 "For HTTP/2-only or HTTP/2-sensitive behavior, use /api/agent/request/http2 so the PortSwigger MCP send_http2_request tool preserves pseudo-headers and protocol semantics.",
                 "For blind/OOB test cases, generate a payload with /api/agent/collaborator, inject it safely, then poll /api/agent/collaborator/interactions?payload=<payload> for proof before reporting.",
                 "Keep assessment under ~2000 chars; each test_results[*].detail under ~500 chars. Store exact reproducible evidence through /api/agent/queue/<id>/result before reporting in chat.",
@@ -1751,7 +1751,7 @@ class AgentAPIHandler(BaseHTTPRequestHandler):
             "warnings": warnings,
             "next_steps": [
                 "Use /api/agent/queue/<id>/curl?refresh_auth=true for target HTTP requests.",
-                "Run generated target curl commands as-is; they include -x http://127.0.0.1:8080 and X-Eternals-Agent-Note.",
+                "Run generated target curl commands as-is; they include -x http://127.0.0.1:8080 and X-Double-Agent-Note.",
                 "Local Double Agent API calls stay direct and do not use the Burp proxy flag."
             ]
         })
@@ -2028,7 +2028,7 @@ class AgentAPIHandler(BaseHTTPRequestHandler):
             name_l = name.lower()
             if name_l in skip:
                 continue
-            if name_l == "x-eternals-agent-note":
+            if name_l == "x-double-agent-note":
                 continue
             if replacing_auth and self._auth_header_name(name):
                 continue
@@ -2041,7 +2041,7 @@ class AgentAPIHandler(BaseHTTPRequestHandler):
                 headers.append(parsed_line)
 
         if note:
-            headers.append({"name": "X-Eternals-Agent-Note", "value": note})
+            headers.append({"name": "X-Double-Agent-Note", "value": note})
         return headers
 
     def _workspace_directory(self):
@@ -3058,7 +3058,7 @@ class BurpExtender(_BurpExtenderBase):
 
         # Configuration file path (in user's home directory)
         import os
-        self.config_file = os.path.join(os.path.expanduser("~"), ".eternals_ai_config.json")
+        self.config_file = os.path.join(os.path.expanduser("~"), ".double_agent_ai_config.json")
         self.PROJECT_ROOT_DIR = os.environ.get("DOUBLE_AGENT_PROJECT_ROOT", "/Users/seang/PENTESTS")
         self.PROJECT_WORKSPACE_DIR = os.environ.get("DOUBLE_AGENT_PROJECT_DIR", os.path.join(self.PROJECT_ROOT_DIR, "GPT"))
         self.PORTSWIGGER_MCP_URL = os.environ.get("PORTSWIGGER_MCP_URL", "http://127.0.0.1:9876/")
@@ -3779,7 +3779,7 @@ class BurpExtender(_BurpExtenderBase):
 
         self.agentCopyTokenBtn = JButton("Copy")
         self.agentCopyTokenBtn.setToolTipText("Copy 'Double Agent API Token: <token>' to clipboard")
-        self.agentCopyTokenBtn.addActionListener(lambda e: self._copyEternalsApiToken())
+        self.agentCopyTokenBtn.addActionListener(lambda e: self._copyDoubleAgentApiToken())
         agentTokenPanel.add(self.agentCopyTokenBtn)
 
         centerPanel.add(agentTokenPanel, BorderLayout.NORTH)
@@ -4001,13 +4001,13 @@ class BurpExtender(_BurpExtenderBase):
 
                 _apply_tab_colors()
 
-                if tabbed.getClientProperty("eternals_tab_color_listener") is None:
+                if tabbed.getClientProperty("double_agent_tab_color_listener") is None:
                     class TabColorSyncListener(ChangeListener):
                         def stateChanged(self_inner, e):
                             _apply_tab_colors()
 
                     tabbed.addChangeListener(TabColorSyncListener())
-                    tabbed.putClientProperty("eternals_tab_color_listener", True)
+                    tabbed.putClientProperty("double_agent_tab_color_listener", True)
             except:
                 pass
 
@@ -4980,7 +4980,7 @@ class BurpExtender(_BurpExtenderBase):
                 "REPRODUCE finding #%d (\"%s\").\n\n"
                 "Build and send this exact HTTP request using native curl through "
                 "Burp Proxy. The curl command MUST include -x http://127.0.0.1:8080. Add header "
-                "X-Eternals-Agent-Note: Agent: reproduce finding #%d - replay captured request - expect original behavior. "
+                "X-Double-Agent-Note: Agent: reproduce finding #%d - replay captured request - expect original behavior. "
                 "The extension copies that header into the visible Proxy history note and strips it before upstream. "
                 "Use POST /api/agent/request only as a fallback/convenience path. Use the request shown in this work "
                 "item's `findings[0].request_data` or `request_data` field as the source of truth.\n"
@@ -5939,7 +5939,7 @@ class BurpExtender(_BurpExtenderBase):
             "7. MANDATORY CURL RULE: every curl request to a target application MUST include -x http://127.0.0.1:8080. Local Double Agent API calls to " + url + " are exempt. Before running any target curl, check the command and add the proxy flag if missing.\n"
             "8. For queue items, do not hand-build target curl first. Call /api/agent/queue/<id>/curl?refresh_auth=true and run the generated command exactly unless you have a specific reason to modify it.\n"
             "9. Respect generated scope_guard and safety_gate. If either requires confirmation, stop and ask the user before active testing. Never test hosts marked in_scope=false.\n"
-            "10. When sending test requests through Burp Proxy, add header: X-Eternals-Agent-Note: Agent: <finding/work item> - <test purpose> - <expected result>. The extension copies this into the visible Proxy history comment and strips the header before upstream. If using /api/agent/request, include comment or note as the same text, but prefer the proxy header when the user needs to see notes in Proxy history.\n"
+            "10. When sending test requests through Burp Proxy, add header: X-Double-Agent-Note: Agent: <finding/work item> - <test purpose> - <expected result>. The extension copies this into the visible Proxy history comment and strips the header before upstream. If using /api/agent/request, include comment or note as the same text, but prefer the proxy header when the user needs to see notes in Proxy history.\n"
             "   For HTTP/2-only or HTTP/2-sensitive behavior, use /api/agent/request/http2 so the PortSwigger MCP send_http2_request tool preserves pseudo-headers and protocol semantics.\n"
             "   For blind/OOB tests, generate a Collaborator payload, inject it safely, then poll /api/agent/collaborator/interactions?payload=<payload> before reporting.\n"
             "11. ACTIVE HANDOFF: If a finding has active_test_recipe, follow its hypothesis, mutation_hint, expected signals, max_requests, needs_second_user, and safety_notes before inventing a new plan.\n"
@@ -6103,7 +6103,7 @@ class BurpExtender(_BurpExtenderBase):
     # Keys that MUST be per-project only (findings, FP state, agent queue).
     # These will never read from global extension storage, so switching Burp
     # projects starts with a clean slate.
-    _PROJECT_ONLY_KEYS = ("eternals_findings", "eternals_agent_queue")
+    _PROJECT_ONLY_KEYS = ("double_agent_findings", "double_agent_agent_queue")
 
     def _project_key(self):
         """Stable identifier for the current Burp session, used to namespace
@@ -6117,14 +6117,14 @@ class BurpExtender(_BurpExtenderBase):
                 # If the project already has one, reuse it; otherwise mint a new one.
                 marker = None
                 try:
-                    marker = self.callbacks.loadProjectSetting("eternals_project_marker")
+                    marker = self.callbacks.loadProjectSetting("double_agent_project_marker")
                 except Exception:
                     marker = None
                 if not marker:
                     import uuid as _uuid
                     marker = _uuid.uuid4().hex[:12]
                     try:
-                        self.callbacks.saveProjectSetting("eternals_project_marker", marker)
+                        self.callbacks.saveProjectSetting("double_agent_project_marker", marker)
                     except Exception:
                         pass
                 self._project_key_cache = marker
@@ -6136,7 +6136,7 @@ class BurpExtender(_BurpExtenderBase):
         """Path to the disk fallback file for a project-only key."""
         try:
             import os
-            base = os.path.join(os.path.expanduser("~"), ".eternals")
+            base = os.path.join(os.path.expanduser("~"), ".double_agent")
             if not os.path.isdir(base):
                 try:
                     os.makedirs(base)
@@ -6153,12 +6153,12 @@ class BurpExtender(_BurpExtenderBase):
     # =========================================================================
 
     _SIDECAR_FILE_NAME = "double-agent.json"
-    _ETERNALS_FILE_NAME = "eternals.json"  # legacy import name
+    _DOUBLE_AGENT_FILE_NAME = "double_agent.json"
 
-    def _eternals_file_name(self):
+    def _double_agent_file_name(self):
         """Stable sidecar filename in the extension working directory.
 
-        Earlier builds used eternals_<project-marker>.json. That breaks for
+        Earlier builds used double_agent_<project-marker>.json. That breaks for
         temporary Burp projects because the marker can change every extension
         load, making persisted findings look lost. Keep one durable file in
         the working directory and use the old names only as import candidates.
@@ -6178,7 +6178,7 @@ class BurpExtender(_BurpExtenderBase):
             pass
         return ""
 
-    def _eternals_directory_candidates(self):
+    def _double_agent_directory_candidates(self):
         """Ordered directories where the sidecar may live."""
         try:
             import os
@@ -6212,7 +6212,7 @@ class BurpExtender(_BurpExtenderBase):
             pass
         try:
             candidates.append(os.path.join(os.path.expanduser("~"), ".double-agent"))
-            candidates.append(os.path.join(os.path.expanduser("~"), ".eternals"))  # legacy import dir
+            candidates.append(os.path.join(os.path.expanduser("~"), ".double_agent"))  # legacy import dir
         except Exception:
             pass
 
@@ -6250,7 +6250,7 @@ class BurpExtender(_BurpExtenderBase):
             return True
         return False
 
-    def _eternals_file_path(self):
+    def _double_agent_file_path(self):
         """Return the absolute path to the durable Double Agent sidecar.
 
         Preference order:
@@ -6265,8 +6265,8 @@ class BurpExtender(_BurpExtenderBase):
         """
         try:
             import os
-            fname = self._eternals_file_name()
-            for d in self._eternals_directory_candidates():
+            fname = self._double_agent_file_name()
+            for d in self._double_agent_directory_candidates():
                 try:
                     if not os.path.isdir(d):
                         os.makedirs(d)
@@ -6286,7 +6286,7 @@ class BurpExtender(_BurpExtenderBase):
         except Exception:
             return None
 
-    def _persist_eternals_file(self):
+    def _persist_double_agent_file(self):
         """Write findings + agent queue + fp suppression to double-agent.json
         atomically (write to temp, rename). Holds both data locks while
         snapshotting the in-memory state, then releases them before the
@@ -6294,7 +6294,7 @@ class BurpExtender(_BurpExtenderBase):
         """
         try:
             import os, tempfile
-            path = self._eternals_file_path()
+            path = self._double_agent_file_path()
             if not path:
                 return False
 
@@ -6348,13 +6348,13 @@ class BurpExtender(_BurpExtenderBase):
                     pass
                 raise
 
-            if not getattr(self, "_eternals_file_logged_path", False):
+            if not getattr(self, "_double_agent_file_logged_path", False):
                 try:
                     self.stdout.println("[PERSIST] double-agent.json -> %s (%d finding(s), %d queue item(s), %d bytes)" % (
                         path, len(findings_copy), len(queue_items), len(payload)))
                 except Exception:
                     pass
-                self._eternals_file_logged_path = True
+                self._double_agent_file_logged_path = True
             elif self.VERBOSE:
                 try:
                     self.stdout.println("[PERSIST] double-agent.json updated (%d finding(s), %d bytes)" % (
@@ -6372,7 +6372,7 @@ class BurpExtender(_BurpExtenderBase):
     def _legacy_sidecar_paths(self, primary_path):
         """Legacy sidecar files to import if double-agent.json is missing.
 
-        Older builds wrote eternals.json or eternals_<project-marker>.json.
+        Older builds wrote double_agent.json or double_agent_<project-marker>.json.
         Temporary Burp projects could change the marker on every load, so scan
         the working directories for old names instead of relying on the current
         marker.
@@ -6381,14 +6381,14 @@ class BurpExtender(_BurpExtenderBase):
             import os
             candidates = []
             primary_abs = os.path.abspath(primary_path) if primary_path else ""
-            for d in self._eternals_directory_candidates():
+            for d in self._double_agent_directory_candidates():
                 try:
                     if not os.path.isdir(d):
                         continue
-                    names = [self._ETERNALS_FILE_NAME]
+                    names = [self._DOUBLE_AGENT_FILE_NAME]
                     try:
                         for name in os.listdir(d):
-                            if name.startswith("eternals_") and name.endswith(".json"):
+                            if name.startswith("double_agent_") and name.endswith(".json"):
                                 names.append(name)
                     except Exception:
                         pass
@@ -6542,13 +6542,13 @@ class BurpExtender(_BurpExtenderBase):
             pass
         return False
 
-    def _read_eternals_file(self):
+    def _read_double_agent_file(self):
         """Read double-agent.json from disk if it exists. Returns the parsed dict
         or None. Tolerates the file being missing or malformed.
         """
         try:
             import os
-            path = self._eternals_file_path()
+            path = self._double_agent_file_path()
             paths = []
             if path:
                 paths.append(path)
@@ -6770,11 +6770,11 @@ class BurpExtender(_BurpExtenderBase):
 
     def save_agent_queue(self):
         """Persist agent queue. double-agent.json (in working dir) is the source
-        of truth - it stores findings + queue together via _persist_eternals_file."""
+        of truth - it stores findings + queue together via _persist_double_agent_file."""
         try:
             if self.callbacks is None:
                 return
-            self._persist_eternals_file()
+            self._persist_double_agent_file()
         except Exception as e:
             self.stderr.println("[AGENT] Save queue error: %s" % self._safe_ascii_text(e))
 
@@ -6787,17 +6787,17 @@ class BurpExtender(_BurpExtenderBase):
 
             data = None
             # If load_findings already cached the sidecar doc, reuse it.
-            doc = getattr(self, "_eternals_doc_cache", None)
+            doc = getattr(self, "_double_agent_doc_cache", None)
             if not doc:
-                doc = self._read_eternals_file()
+                doc = self._read_double_agent_file()
             if doc and isinstance(doc, dict):
                 aq = doc.get("agent_queue") or {}
                 if aq:
                     data = aq
-            self._eternals_doc_cache = None  # one-shot
+            self._double_agent_doc_cache = None  # one-shot
 
             if data is None:
-                raw = self._load_setting("eternals_agent_queue")
+                raw = self._load_setting("double_agent_agent_queue")
                 if not raw:
                     if getattr(self, "_findings_load_cleanup_pending_save", False):
                         self._findings_load_cleanup_pending_save = False
@@ -6814,7 +6814,7 @@ class BurpExtender(_BurpExtenderBase):
                     "findings": [],
                     "agent_queue": data,
                 }
-                if not self._persistence_doc_matches_current_context(project_doc, "Burp project storage eternals_agent_queue"):
+                if not self._persistence_doc_matches_current_context(project_doc, "Burp project storage double_agent_agent_queue"):
                     return
 
             with self.agent_queue_lock:
@@ -7474,9 +7474,9 @@ class BurpExtender(_BurpExtenderBase):
 
     def save_findings(self):
         """Persist findings to double-agent.json in the working directory.
-        double-agent.json is the source of truth - see _persist_eternals_file."""
+        double-agent.json is the source of truth - see _persist_double_agent_file."""
         try:
-            self._persist_eternals_file()
+            self._persist_double_agent_file()
         except Exception as e:
             self.stderr.println("[FINDINGS] Save error: %s" % self._safe_ascii_text(e))
 
@@ -7486,11 +7486,11 @@ class BurpExtender(_BurpExtenderBase):
         Source priority:
           1. double-agent.json in the working directory (primary, source of truth)
           2. Burp project storage (legacy compressed or plain-JSON)
-          3. ~/.double-agent/ sidecar fallback or ~/.eternals/ legacy files
+          3. ~/.double-agent/ sidecar fallback or ~/.double_agent/ legacy files
         """
         try:
             data = None
-            doc = self._read_eternals_file()
+            doc = self._read_double_agent_file()
             if doc and isinstance(doc, dict) and ("findings" in doc or "agent_queue" in doc):
                 # double-agent.json carries findings + agent_queue together; queue is
                 # restored separately by load_agent_queue from the same doc.
@@ -7499,10 +7499,10 @@ class BurpExtender(_BurpExtenderBase):
                     "fp_suppressed": doc.get("fp_suppressed", []),
                     "passive_scan_cache": doc.get("passive_scan_cache", {}),
                 }
-                self._eternals_doc_cache = doc
+                self._double_agent_doc_cache = doc
 
             if data is None:
-                raw = self._load_setting("eternals_findings")
+                raw = self._load_setting("double_agent_findings")
                 if not raw:
                     return
                 decoded = self._decompress_payload(raw)
@@ -7513,7 +7513,7 @@ class BurpExtender(_BurpExtenderBase):
                     "findings": data.get("findings", []),
                     "agent_queue": {"items": []},
                 }
-                if not self._persistence_doc_matches_current_context(project_doc, "Burp project storage eternals_findings"):
+                if not self._persistence_doc_matches_current_context(project_doc, "Burp project storage double_agent_findings"):
                     return
 
             findings = data.get("findings", [])
@@ -8480,7 +8480,7 @@ class BurpExtender(_BurpExtenderBase):
             if self.save_config():
                 self.stdout.println("[SETTINGS] OK Configuration persisted to disk")
             self.save_findings()
-            self.stdout.println("[SETTINGS] Findings sidecar: %s" % self._safe_ascii_text(self._eternals_file_path(), 2000))
+            self.stdout.println("[SETTINGS] Findings sidecar: %s" % self._safe_ascii_text(self._double_agent_file_path(), 2000))
 
             # Refresh stats immediately so model and pricing fields reflect new settings
             self._ui_dirty = True
@@ -9025,7 +9025,7 @@ class BurpExtender(_BurpExtenderBase):
             agent_status = self._safe_ascii_text(f.get("agent_status", "untouched"), 100)
             agent_priority = self._safe_ascii_text(f.get("agent_priority", ""), 100)
             agent_rationale = self._safe_ascii_text(f.get("agent_rationale", ""), 2000)
-            source = self._safe_ascii_text(f.get("source", "eternals_passive"), 200)
+            source = self._safe_ascii_text(f.get("source", "double_agent_passive"), 200)
 
             lines.append("### %d. [%s] %s" % (idx, sev, title))
             lines.append("")
@@ -9100,7 +9100,7 @@ class BurpExtender(_BurpExtenderBase):
         except Exception as e:
             self.stderr.println("[REPORT] Refresh error: %s" % self._safe_ascii_text(e))
 
-    def _copyEternalsApiToken(self):
+    def _copyDoubleAgentApiToken(self):
         """Copy 'Double Agent API Token: <token>' (the full label + value) to the clipboard."""
         try:
             from java.awt import Toolkit
@@ -9157,7 +9157,7 @@ class BurpExtender(_BurpExtenderBase):
         except Exception as e:
             self.stderr.println("[REPORT] Save error: %s" % self._safe_ascii_text(e))
 
-    def add_finding(self, url, title, severity, confidence, detail="", cwe="", evidence="", remediation="", owasp="", ai_confidence=0, request_data=None, response_data=None, source="eternals_passive", raw_ai_confidence=None, agent_status="untouched", agent_priority="", agent_rationale="", active_test_recipe=None):
+    def add_finding(self, url, title, severity, confidence, detail="", cwe="", evidence="", remediation="", owasp="", ai_confidence=0, request_data=None, response_data=None, source="double_agent_passive", raw_ai_confidence=None, agent_status="untouched", agent_priority="", agent_rationale="", active_test_recipe=None):
         with self.findings_lock_ui:
             fp_keys = self._get_fp_keys_for_finding(url, title, source)
             if any(fp_key in self.fp_suppressed for fp_key in fp_keys):
@@ -9611,22 +9611,22 @@ class BurpExtender(_BurpExtenderBase):
         if context in http_contexts:
             messages = invocation.getSelectedMessages()
             if messages and len(messages) > 0:
-                eternals_menu = JMenu("Double Agent")
+                double_agent_menu = JMenu("Double Agent")
 
                 passive_item = JMenuItem("Passive Scan")
                 passive_item.addActionListener(lambda x, msgs=messages: self.analyzeFromContextMenu(msgs))
-                eternals_menu.add(passive_item)
+                double_agent_menu.add(passive_item)
 
                 active_item = JMenuItem("Active Scan with Agent")
                 active_item.addActionListener(lambda x, msgs=messages: self._activeScanContextDialog(msgs))
-                eternals_menu.add(active_item)
+                double_agent_menu.add(active_item)
 
                 if len(messages) > 1:
                     flow_item = JMenuItem("Analyze Flow")
                     flow_item.addActionListener(lambda x, msgs=messages: self._analyzeFlowContextDialog(msgs))
-                    eternals_menu.add(flow_item)
+                    double_agent_menu.add(flow_item)
 
-                menu_list.add(eternals_menu)
+                menu_list.add(double_agent_menu)
 
         return menu_list if menu_list.size() > 0 else None
 
@@ -10471,7 +10471,7 @@ class BurpExtender(_BurpExtenderBase):
                 pass
 
             # Skip our own findings - they already came in via add_finding()
-            if issue_name.startswith("(Double Agent)") or issue_name.startswith("(Eternals)"):
+            if issue_name.startswith("(Double Agent)"):
                 return
 
             # Skip false positives explicitly marked by user
@@ -10626,7 +10626,7 @@ class BurpExtender(_BurpExtenderBase):
         return False
 
     def _apply_agent_note_header(self, messageInfo):
-        """Move X-Eternals-Agent-Note into Burp's history comment and strip it upstream."""
+        """Move X-Double-Agent-Note into Burp's history comment and strip it upstream."""
         try:
             request_bytes = messageInfo.getRequest()
             if not request_bytes:
@@ -10636,7 +10636,7 @@ class BurpExtender(_BurpExtenderBase):
             headers = list(req.getHeaders())
             clean_headers = []
             note = ""
-            header_name = "x-eternals-agent-note:"
+            header_name = "x-double-agent-note:"
 
             for header in headers:
                 header_s = str(header)
@@ -10663,7 +10663,7 @@ class BurpExtender(_BurpExtenderBase):
             body = request_bytes[req.getBodyOffset():]
             messageInfo.setRequest(self.helpers.buildHttpMessage(clean_headers, body))
             if self.VERBOSE:
-                self.stdout.println("[AGENT NOTE] Added Proxy history note and stripped X-Eternals-Agent-Note header")
+                self.stdout.println("[AGENT NOTE] Added Proxy history note and stripped X-Double-Agent-Note header")
             return True
         except Exception as e:
             try:
@@ -11650,7 +11650,7 @@ class BurpExtender(_BurpExtenderBase):
                 
                 full_detail = "".join(detail_parts)
                 issue_title = title
-                if not str(issue_title).startswith("(Double Agent)") and not str(issue_title).startswith("(Eternals)"):
+                if not str(issue_title).startswith("(Double Agent)"):
                     issue_title = "(Double Agent) " + str(issue_title)
 
                 issue = CustomScanIssue(messageInfo.getHttpService(), req.getUrl(),

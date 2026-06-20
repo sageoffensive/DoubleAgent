@@ -132,7 +132,7 @@ Local DoubleAgent API calls to `127.0.0.1:8777` do not use the Burp proxy.
 For visible Proxy history notes, target test requests should include:
 
 ```text
-X-Eternals-Agent-Note: Agent: <finding/work item> - <test purpose> - <expected result>
+X-Double-Agent-Note: Agent: <finding/work item> - <test purpose> - <expected result>
 ```
 
 The extension copies that note into Burp Proxy history and strips the header before sending upstream.
