@@ -23,7 +23,7 @@ That split keeps broad traffic review cheap and continuous while reserving activ
 - Generated curl commands that route target traffic through Burp Proxy on `127.0.0.1:8080`
 - Browser verification workflow for items that require BrowserOS MCP
 - Support for Ollama, OpenAI, Claude, Gemini, Bedrock, and DeepSeek
-- Project folder support for `scope.md`, `target.md`, `findings.md`, and persisted `double-agent.json`
+- Project folder support for `scope.md`, `target.md`, `findings.md`, `creds.md`, and persisted `double-agent.json`
 
 ## Requirements
 
@@ -65,12 +65,13 @@ Recommended files:
 - `scope.md`: required target scope and testing rules
 - `target.md`: target notes, known auth context, roles, app map, and constraints
 - `findings.md`: optional notes/report context
+- `creds.md`: authorized test account details, roles, and login notes for the current assessment
 
 DoubleAgent also persists state in:
 
 - `double-agent.json`
 
-Do not put API keys, credentials, cookies, or private notes you do not want persisted in the repository.
+Do not commit `creds.md`, API keys, cookies, or private target notes to a public repository.
 
 ## Configure AI
 
@@ -188,6 +189,7 @@ The agent should ask before state-changing browser actions such as deletes, paym
 - Keep target curl traffic proxied through Burp using `-x http://127.0.0.1:8080`.
 - Keep provider keys out of git and project files.
 - Do not commit `double-agent.json` if it contains target-specific data.
+- Do not commit `creds.md`; keep authorized account details local to the assessment.
 - Always confirm scope before active testing.
 
 ## Troubleshooting

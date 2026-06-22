@@ -460,7 +460,7 @@ class AgentAPIHandler(BaseHTTPRequestHandler):
                 "Treat obvious false positives conservatively: explain why they are likely false positives, then deprioritize them unless the user asks for proof.",
                 "After triage, update findings through /api/findings/triage so Agent Status, Agent Priority, and Agent Rationale are visible in Burp.",
                 "Use active_test_recipe as the active-agent handoff: follow the hypothesis, mutation_hint, expected_vulnerable_signal, expected_safe_signal, max_requests, needs_second_user, and safety_notes before inventing a new plan.",
-                "Before testing a queued item, call /api/agent/preflight?host=<target-host>, read findings.md and target.md if present, then follow the item's next_action. If the same endpoint and technique were already tested, report 'already covered' and move on without retesting.",
+                "Before testing a queued item, call /api/agent/preflight?host=<target-host>, read creds.md, findings.md, and target.md if present, then follow the item's next_action. If creds.md is missing and the test needs authentication or role context, ask the user to provide authorized test account details before continuing. If the same endpoint and technique were already tested, report 'already covered' and move on without retesting.",
                 "Low severity plus low confidence findings should be deferred unless they are unique, user-requested, or can be confirmed with one or two targeted requests.",
                 "Ask the user before destructive actions (password change, account delete, payment, etc).",
                 "Before asking the user for fresh auth, call /api/agent/auth/latest for the target host and try recommended_auth.raw_header_lines from Burp history.",
@@ -1724,7 +1724,8 @@ class AgentAPIHandler(BaseHTTPRequestHandler):
             "workspace_files": {
                 "scope.md": self._workspace_file_status("scope.md", 300),
                 "target.md": self._workspace_file_status("target.md", 300),
-                "findings.md": self._workspace_file_status("findings.md", 300)
+                "findings.md": self._workspace_file_status("findings.md", 300),
+                "creds.md": self._workspace_file_status("creds.md", 300)
             },
             "queue": {"total": total, "pending": pending, "claimed": claimed}
         }
@@ -1743,6 +1744,8 @@ class AgentAPIHandler(BaseHTTPRequestHandler):
             warnings.append("Burp Proxy listener 127.0.0.1:8080 is not reachable; target curl will not be captured.")
         if not checks["workspace_files"]["scope.md"].get("present"):
             warnings.append("scope.md is missing; active testing should wait for explicit scope confirmation.")
+        if not checks["workspace_files"]["creds.md"].get("present"):
+            warnings.append("creds.md is missing; auth-required tests should ask the user for authorized test account details before continuing.")
         if include_auth and not checks.get("auth_latest", {}).get("usable"):
             warnings.append("No usable auth material found in Burp history for %s." % host_filter)
         self._send_json(200, {
@@ -5972,7 +5975,7 @@ class BurpExtender(_BurpExtenderBase):
             "Submit results:  POST " + url + "/api/agent/queue/<id>/result\n"
             "\n"
             "=== RULES (MANDATORY) ===\n"
-            "1. READ scope.md, target.md, findings.md FIRST. Skip if already covered.\n"
+            "1. READ scope.md, target.md, findings.md, and creds.md FIRST. If creds.md is missing and the test needs authentication or role context, ask the user for authorized test account details before continuing. Skip if already covered.\n"
             "2. TRIAGE before testing. Triage means a passive classification pass over existing finding data, not exploitation and not title-only sorting. Use /api/findings fields: URL, title, severity/confidence, detail_preview, evidence_preview, CWE/OWASP, has_request_data, has_response_data, and relationships to other findings.\n"
             "   Status meanings: valid=likely reportable and worth validating, including real low-risk issues when priority=P4; needs_investigation=plausible but evidence incomplete; false_positive=not a real security issue or contradicted by evidence; duplicate=same endpoint/parameter/root cause/evidence as another finding and will be deleted; already_covered=same endpoint+technique already tested/covered and will be deleted; not_important=false positive, zero-risk, or non-actionable noise and is hidden from normal findings/report views; untouched=not reviewed.\n"
             "   For every triage update, provide a concrete rationale tied to actual finding data. For duplicate deletion, include duplicate_of or duplicate_evidence_match plus matching endpoint/parameter/root cause/evidence. Mark FPs with status=false_positive,set_fp=true; defer Low+Tentative unless easy to confirm.\n"
@@ -6015,8 +6018,9 @@ class BurpExtender(_BurpExtenderBase):
             "  Note: '✗ Failed to connect' immediately after launch is normal; do NOT re-register.\n"
             "\n"
             "STEP 5 - Read project context files:\n"
-            "  cat scope.md 2>/dev/null; cat target.md 2>/dev/null; cat findings.md 2>/dev/null\n"
+            "  cat scope.md 2>/dev/null; cat target.md 2>/dev/null; cat findings.md 2>/dev/null; cat creds.md 2>/dev/null\n"
             "  If scope.md is MISSING -> STOP and ask user for scope before any testing.\n"
+            "  If creds.md is MISSING and the work needs authentication or role context -> STOP and ask the user for authorized test account details before continuing.\n"
             "\n"
             "STEP 6 - Pull and triage current findings:\n"
             "  curl -s -H 'Authorization: Bearer " + token + "' " + url + "/api/findings\n"
@@ -8096,7 +8100,7 @@ class BurpExtender(_BurpExtenderBase):
         gbc.gridy = row
         gbc.gridwidth = 3
         workspaceHelp = JTextArea(
-            "Double Agent asks for this folder when the extension loads. It saves double-agent.json and reads scope.md, target.md, and findings.md from this project folder."
+            "Double Agent asks for this folder when the extension loads. It saves double-agent.json and reads scope.md, target.md, findings.md, and creds.md from this project folder."
         )
         workspaceHelp.setEditable(False)
         workspaceHelp.setBackground(advancedPanel.getBackground())
