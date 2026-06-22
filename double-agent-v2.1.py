@@ -5874,7 +5874,7 @@ class BurpExtender(_BurpExtenderBase):
             "5. AUTH 401/403: Call /api/agent/auth/latest?host=<host>&include_related=true and use recommended_auth.raw_header_lines, including Cookie headers from source_hosts. Empty Bearer alone does NOT mean the session is expired. If no usable auth appears, ask the user for tokens. Never guess logins.\n"
         )
         text = re.sub(
-            r"\nSTEP 2 - Check BrowserOS app is installed .*?\nSTEP 5 - Read project context files:",
+            r"\nSTEP 2 - BrowserOS setup .*?\nSTEP 5 - Read project context files:",
             "\nSTEP 2 - Read project context files:",
             text,
             flags=re.S
@@ -6003,15 +6003,26 @@ class BurpExtender(_BurpExtenderBase):
             "STEP 1 - Verify Burp API is up:\n"
             "  curl -s " + url + "/api/health && curl -s " + url + "/api/docs\n"
             "\n"
-            "STEP 2 - Check BrowserOS app is installed (do NOT use mdfind, do NOT search):\n"
-            "  ls /Applications/BrowserOS.app >/dev/null 2>&1 && echo INSTALLED || echo NOT_INSTALLED\n"
-            "  - INSTALLED -> proceed to STEP 3\n"
-            "  - NOT_INSTALLED -> ASK user: 'BrowserOS not installed. Install via: brew install --cask browseros ?'\n"
-            "      If yes: run that command, then proceed. If no: report 'curl-only mode' and SKIP steps 3-4.\n"
+            "STEP 2 - BrowserOS setup (desktop/browser-capable agents only):\n"
+            "  macOS:\n"
+            "    Check install (do NOT use mdfind, do NOT search):\n"
+            "      ls /Applications/BrowserOS.app >/dev/null 2>&1 && echo INSTALLED || echo NOT_INSTALLED\n"
+            "    - INSTALLED -> proceed to STEP 3\n"
+            "    - NOT_INSTALLED -> ASK user: 'BrowserOS not installed. Install via: brew install --cask browseros ?'\n"
+            "        If yes: run that command, then proceed. If no: report 'curl-only mode' and SKIP steps 3-4.\n"
+            "  Kali Linux:\n"
+            "    Use the BrowserOS installation method supplied by the user or official project documentation, then launch it with Burp proxy 127.0.0.1:8080. If BrowserOS is unavailable, report 'curl-only mode' and SKIP steps 3-4.\n"
+            "  Other OSes:\n"
+            "    Use the BrowserOS installation method supplied by the user or official project documentation, then launch it with Burp proxy 127.0.0.1:8080. If BrowserOS is unavailable, report 'curl-only mode' and SKIP steps 3-4.\n"
             "\n"
             "STEP 3 - Launch BrowserOS in Burp proxy mode:\n"
-            "  pkill -f BrowserOS 2>/dev/null; sleep 1; open -na 'BrowserOS' --args --proxy-server=127.0.0.1:8080\n"
-            "  sleep 4 && pgrep -if browseros >/dev/null && echo RUNNING || echo NOT_RUNNING\n"
+            "  macOS:\n"
+            "    pkill -f BrowserOS 2>/dev/null; sleep 1; open -na 'BrowserOS' --args --proxy-server=127.0.0.1:8080\n"
+            "    sleep 4 && pgrep -if browseros >/dev/null && echo RUNNING || echo NOT_RUNNING\n"
+            "  Kali Linux:\n"
+            "    Launch BrowserOS using the installed command/package with proxy server 127.0.0.1:8080, then verify the process is running.\n"
+            "  Other OSes:\n"
+            "    Launch BrowserOS using the installed command/package with proxy server 127.0.0.1:8080, then verify the process is running.\n"
             "  - RUNNING -> report 'BrowserOS launched in proxy mode.'\n"
             "  - NOT_RUNNING -> report 'BrowserOS failed to launch, falling back to curl-only mode.'\n"
             "\n"
