@@ -158,11 +158,27 @@ The extension copies that note into Burp Proxy history and strips the header bef
 
 Some work items may set `browser_verify=true`. For those, the agent should use BrowserOS MCP instead of curl.
 
+### macOS
+
+Install BrowserOS if needed:
+
+```bash
+brew install --cask browseros
+```
+
 Launch BrowserOS through Burp Proxy:
 
 ```bash
 open -na 'BrowserOS' --args --proxy-server=127.0.0.1:8080
 ```
+
+### Kali Linux
+
+Install BrowserOS using the package or instructions supplied by the BrowserOS project, then launch it with Burp Proxy set to `127.0.0.1:8080`.
+
+### Other OSes
+
+Install BrowserOS using the package or instructions supplied by the BrowserOS project, then launch it with Burp Proxy set to `127.0.0.1:8080`.
 
 If using Claude Code MCP, register BrowserOS once:
 
