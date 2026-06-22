@@ -3668,28 +3668,14 @@ class BurpExtender(_BurpExtenderBase):
         agentServerPanel.add(self.agentStopBtn)
 
         self.agentCopyEndpointBtn = JButton("Copy Agent Prompt")
-        def _copyEndpoint(e):
-            try:
-                url = "http://%s:%d" % (self.agent_server_host, self.agent_server_port)
-                token = self.agent_server_token or "(server not running - start it first)"
-                text = self._build_agent_bootstrap_prompt(url, token)
-                from java.awt import Toolkit
-                from java.awt.datatransfer import StringSelection
-                Toolkit.getDefaultToolkit().getSystemClipboard().setContents(StringSelection(text), None)
-                self.log_to_console("[AGENT] Bootstrap prompt copied to clipboard")
-                # Visual feedback: change button text temporarily
-                original_text = self.agentCopyEndpointBtn.getText()
-                self.agentCopyEndpointBtn.setText("Copied")
-                from javax.swing import Timer
-                def _restore_text(event):
-                    self.agentCopyEndpointBtn.setText(original_text)
-                t = Timer(2000, _restore_text)
-                t.setRepeats(False)
-                t.start()
-            except Exception as ex:
-                self.stderr.println("[AGENT] Copy error: %s" % self._safe_ascii_text(ex))
-        self.agentCopyEndpointBtn.addActionListener(_copyEndpoint)
+        self.agentCopyEndpointBtn.setToolTipText("Copy the browser-capable agent prompt.")
+        self.agentCopyEndpointBtn.addActionListener(lambda e: self._copy_agent_bootstrap_prompt(True, self.agentCopyEndpointBtn))
         agentServerPanel.add(self.agentCopyEndpointBtn)
+
+        self.agentCopySshPromptBtn = JButton("Copy SSH Prompt")
+        self.agentCopySshPromptBtn.setToolTipText("Copy a headless SSH prompt with browser instructions removed.")
+        self.agentCopySshPromptBtn.addActionListener(lambda e: self._copy_agent_bootstrap_prompt(False, self.agentCopySshPromptBtn))
+        agentServerPanel.add(self.agentCopySshPromptBtn)
 
         agentPanel.add(agentServerPanel, BorderLayout.NORTH)
 
@@ -3794,7 +3780,7 @@ class BurpExtender(_BurpExtenderBase):
             "Agent AI integration\n"
             "---------------------\n"
             "1. Click 'Start Server' above to expose the local API on port 8777.\n"
-            "2. Click 'Copy Agent Prompt' and paste it into your agent chat to bootstrap it.\n"
+            "2. Click 'Copy Agent Prompt' for desktop/browser workflows, or 'Copy SSH Prompt' for headless SSH environments.\n"
             "   (Or use the 'Copy' button next to the token to share just the token line.)\n"
             "3. The agent calls GET /api/findings to triage automatically. You don't have to push work.\n"
             "4. To explicitly queue work: select findings -> right-click -> 'Send to Agent',\n"
@@ -5847,6 +5833,65 @@ class BurpExtender(_BurpExtenderBase):
         except Exception as e:
             self.stderr.println("[AGENT API] Stop error: %s" % self._safe_ascii_text(e))
             return False
+
+    def _copy_agent_bootstrap_prompt(self, include_browseros, button):
+        try:
+            url = "http://%s:%d" % (self.agent_server_host, self.agent_server_port)
+            token = self.agent_server_token or "(server not running - start it first)"
+            if include_browseros:
+                text = self._build_agent_bootstrap_prompt(url, token)
+                log_msg = "[AGENT] Browser-capable bootstrap prompt copied to clipboard"
+            else:
+                text = self._build_agent_ssh_bootstrap_prompt(url, token)
+                log_msg = "[AGENT] SSH bootstrap prompt copied to clipboard"
+            from java.awt import Toolkit
+            from java.awt.datatransfer import StringSelection
+            Toolkit.getDefaultToolkit().getSystemClipboard().setContents(StringSelection(text), None)
+            self.log_to_console(log_msg)
+            original_text = button.getText()
+            button.setText("Copied")
+            from javax.swing import Timer
+            def _restore_text(event):
+                button.setText(original_text)
+            t = Timer(2000, _restore_text)
+            t.setRepeats(False)
+            t.start()
+        except Exception as ex:
+            self.stderr.println("[AGENT] Copy error: %s" % self._safe_ascii_text(ex))
+
+    def _build_agent_ssh_bootstrap_prompt(self, url, token):
+        """Build a headless/SSH agent prompt without browser-specific instructions."""
+        text = self._build_agent_bootstrap_prompt(url, token)
+        text = text.replace(
+            "5. AUTH 401/403: Call /api/agent/auth/latest?host=<host>&include_related=true and use recommended_auth.raw_header_lines, including Cookie headers from source_hosts. Empty Bearer alone does NOT mean the live browser session is expired. If no usable auth appears but BrowserOS has a live session, refresh the relevant BrowserOS page or perform one same-site action in the proxied browser, then call auth/latest again BEFORE asking the user for tokens. Never guess logins.\n",
+            "5. AUTH 401/403: Call /api/agent/auth/latest?host=<host>&include_related=true and use recommended_auth.raw_header_lines, including Cookie headers from source_hosts. Empty Bearer alone does NOT mean the session is expired. If no usable auth appears, ask the user for tokens. Never guess logins.\n"
+        )
+        text = re.sub(
+            r"\nSTEP 2 - Check BrowserOS app is installed .*?\nSTEP 5 - Read project context files:",
+            "\nSTEP 2 - Read project context files:",
+            text,
+            flags=re.S
+        )
+        text = text.replace("STEP 6 - Pull and triage current findings:", "STEP 3 - Pull and triage current findings:")
+        text = text.replace("STEP 7 - Run API preflight (no target traffic):", "STEP 4 - Run API preflight (no target traffic):")
+        text = text.replace("STEP 8 - Report ready, then WAIT for user to send 'q' or queue work:", "STEP 5 - Report ready, then WAIT for user to send 'q' or queue work:")
+        text = text.replace(
+            "  Format: 'Ready. BrowserOS [running/curl-only], MCP [registered/n/a], scope loaded, N findings triaged. Send q to start.'\n",
+            "  Format: 'Ready. SSH/curl-only mode, scope loaded, N findings triaged. Send q to start.'\n"
+        )
+        text = text.replace(
+            "2. CHECK browser_verify field:\n"
+            "   - TRUE: Use BrowserOS MCP ONLY (see BROWSER VERIFICATION below). No curl.\n"
+            "   - FALSE: Call GET /api/agent/queue/<id>/curl?refresh_auth=true. Run the generated curl command exactly. Do not run target curl without the -x proxy flag; use /api/agent/request with comment/note only as fallback/convenience.\n",
+            "2. If browser_verify=true, this SSH prompt is curl-only/headless; report that browser verification needs a desktop/browser-capable agent or manual user evidence. Otherwise call GET /api/agent/queue/<id>/curl?refresh_auth=true and run the generated curl command exactly. Do not run target curl without the -x proxy flag; use /api/agent/request with comment/note only as fallback/convenience.\n"
+        )
+        text = re.sub(
+            r"\n=== BROWSER VERIFICATION \(browser_verify=TRUE\) ===\n.*?\n=== TESTING METHODOLOGY ===\n",
+            "\n=== TESTING METHODOLOGY ===\n",
+            text,
+            flags=re.S
+        )
+        return text
 
     def _build_agent_bootstrap_prompt(self, url, token):
         """Build a complete self-contained prompt that teaches any agent session how to use the API."""

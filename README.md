@@ -120,6 +120,11 @@ Copy the token from the `Agent AI` tab.
 
 In the `Agent AI` tab, copy the generated agent prompt and paste it into your AI agent session.
 
+Use:
+
+- `Copy Agent Prompt` for desktop workflows where browser verification is available.
+- `Copy SSH Prompt` for headless SSH environments. This prompt removes browser setup and browser-verification instructions and keeps the workflow curl/API focused.
+
 The prompt tells the agent how to:
 
 - Read `/api/docs`
