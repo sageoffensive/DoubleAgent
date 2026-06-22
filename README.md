@@ -174,7 +174,15 @@ open -na 'BrowserOS' --args --proxy-server=127.0.0.1:8080
 
 ### Kali Linux
 
-Install BrowserOS using the package or instructions supplied by the BrowserOS project, then launch it with Burp Proxy set to `127.0.0.1:8080`.
+Minimal headless setup:
+
+```bash
+ss -ltn | grep ':8080 '
+test -x /usr/lib/browseros/browseros || sudo apt install /home/pentester/Downloads/BrowserOS_v*_amd64.deb
+nohup /usr/lib/browseros/browseros --no-sandbox --proxy-server=http://127.0.0.1:8080 --remote-debugging-port=9100 --disable-gpu --ignore-certificate-errors --headless=new --incognito --no-first-run --user-data-dir=/tmp/browseros-profile >/tmp/browseros.log 2>&1 &
+nohup /usr/lib/browseros/BrowserOSServer/default/resources/bin/browseros_server --cdp-port 9100 --server-port 9200 >/tmp/browseros-mcp.log 2>&1 &
+claude mcp add --transport http browseros http://127.0.0.1:9200/mcp --scope user
+```
 
 ### Other OSes
 
