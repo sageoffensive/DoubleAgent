@@ -67,6 +67,8 @@ Recommended files:
 - `findings.md`: optional notes/report context
 - `creds.md`: authorized test account details, roles, and login notes for the current assessment
 
+The generated agent prompts check for all four files at startup. If any are missing, the agent should stop and ask the user for the missing scope, target context, prior findings, or authorized account details before continuing.
+
 DoubleAgent also persists state in:
 
 - `double-agent.json`

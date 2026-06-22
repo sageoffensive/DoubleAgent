@@ -1743,7 +1743,11 @@ class AgentAPIHandler(BaseHTTPRequestHandler):
         if not checks["burp_proxy_listener"].get("reachable"):
             warnings.append("Burp Proxy listener 127.0.0.1:8080 is not reachable; target curl will not be captured.")
         if not checks["workspace_files"]["scope.md"].get("present"):
-            warnings.append("scope.md is missing; active testing should wait for explicit scope confirmation.")
+            warnings.append("scope.md is missing; ask the user for explicit target scope before active testing.")
+        if not checks["workspace_files"]["target.md"].get("present"):
+            warnings.append("target.md is missing; ask the user for target context, app notes, roles, and constraints before active testing.")
+        if not checks["workspace_files"]["findings.md"].get("present"):
+            warnings.append("findings.md is missing; ask the user for existing findings or confirmation that no prior findings exist before continuing.")
         if not checks["workspace_files"]["creds.md"].get("present"):
             warnings.append("creds.md is missing; auth-required tests should ask the user for authorized test account details before continuing.")
         if include_auth and not checks.get("auth_latest", {}).get("usable"):
@@ -5975,7 +5979,7 @@ class BurpExtender(_BurpExtenderBase):
             "Submit results:  POST " + url + "/api/agent/queue/<id>/result\n"
             "\n"
             "=== RULES (MANDATORY) ===\n"
-            "1. READ scope.md, target.md, findings.md, and creds.md FIRST. If creds.md is missing and the test needs authentication or role context, ask the user for authorized test account details before continuing. Skip if already covered.\n"
+            "1. READ scope.md, target.md, findings.md, and creds.md FIRST. If any are missing, ask the user for the missing context before continuing: scope.md=target scope and exclusions; target.md=app notes, roles, workflows, and constraints; findings.md=existing findings or confirmation there are none; creds.md=authorized test account details. Skip work that is already covered.\n"
             "2. TRIAGE before testing. Triage means a passive classification pass over existing finding data, not exploitation and not title-only sorting. Use /api/findings fields: URL, title, severity/confidence, detail_preview, evidence_preview, CWE/OWASP, has_request_data, has_response_data, and relationships to other findings.\n"
             "   Status meanings: valid=likely reportable and worth validating, including real low-risk issues when priority=P4; needs_investigation=plausible but evidence incomplete; false_positive=not a real security issue or contradicted by evidence; duplicate=same endpoint/parameter/root cause/evidence as another finding and will be deleted; already_covered=same endpoint+technique already tested/covered and will be deleted; not_important=false positive, zero-risk, or non-actionable noise and is hidden from normal findings/report views; untouched=not reviewed.\n"
             "   For every triage update, provide a concrete rationale tied to actual finding data. For duplicate deletion, include duplicate_of or duplicate_evidence_match plus matching endpoint/parameter/root cause/evidence. Mark FPs with status=false_positive,set_fp=true; defer Low+Tentative unless easy to confirm.\n"
@@ -6019,8 +6023,10 @@ class BurpExtender(_BurpExtenderBase):
             "\n"
             "STEP 5 - Read project context files:\n"
             "  cat scope.md 2>/dev/null; cat target.md 2>/dev/null; cat findings.md 2>/dev/null; cat creds.md 2>/dev/null\n"
-            "  If scope.md is MISSING -> STOP and ask user for scope before any testing.\n"
-            "  If creds.md is MISSING and the work needs authentication or role context -> STOP and ask the user for authorized test account details before continuing.\n"
+            "  If scope.md is MISSING -> STOP and ask the user for target scope and exclusions before any testing.\n"
+            "  If target.md is MISSING -> STOP and ask the user for target context, app notes, roles, workflows, and constraints.\n"
+            "  If findings.md is MISSING -> STOP and ask the user for existing findings or confirmation that no prior findings exist.\n"
+            "  If creds.md is MISSING -> STOP and ask the user for authorized test account details before continuing.\n"
             "\n"
             "STEP 6 - Pull and triage current findings:\n"
             "  curl -s -H 'Authorization: Bearer " + token + "' " + url + "/api/findings\n"
