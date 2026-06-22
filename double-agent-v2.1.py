@@ -3680,7 +3680,7 @@ class BurpExtender(_BurpExtenderBase):
         agentServerPanel.add(self.agentCopyEndpointBtn)
 
         self.agentCopySshPromptBtn = JButton("Copy SSH Prompt")
-        self.agentCopySshPromptBtn.setToolTipText("Copy a headless SSH prompt with browser instructions removed.")
+        self.agentCopySshPromptBtn.setToolTipText("Copy a headless SSH prompt that keeps BrowserOS instructions.")
         self.agentCopySshPromptBtn.addActionListener(lambda e: self._copy_agent_bootstrap_prompt(False, self.agentCopySshPromptBtn))
         agentServerPanel.add(self.agentCopySshPromptBtn)
 
@@ -5867,36 +5867,31 @@ class BurpExtender(_BurpExtenderBase):
             self.stderr.println("[AGENT] Copy error: %s" % self._safe_ascii_text(ex))
 
     def _build_agent_ssh_bootstrap_prompt(self, url, token):
-        """Build a headless/SSH agent prompt without browser-specific instructions."""
+        """Build a headless/SSH agent prompt that keeps BrowserOS verification."""
         text = self._build_agent_bootstrap_prompt(url, token)
         text = text.replace(
-            "5. AUTH 401/403: Call /api/agent/auth/latest?host=<host>&include_related=true and use recommended_auth.raw_header_lines, including Cookie headers from source_hosts. Empty Bearer alone does NOT mean the live browser session is expired. If no usable auth appears but BrowserOS has a live session, refresh the relevant BrowserOS page or perform one same-site action in the proxied browser, then call auth/latest again BEFORE asking the user for tokens. Never guess logins.\n",
-            "5. AUTH 401/403: Call /api/agent/auth/latest?host=<host>&include_related=true and use recommended_auth.raw_header_lines, including Cookie headers from source_hosts. Empty Bearer alone does NOT mean the session is expired. If no usable auth appears, ask the user for tokens. Never guess logins.\n"
+            "STEP 2 - BrowserOS setup (visible desktop mode; do NOT use headless):",
+            "STEP 2 - BrowserOS setup (SSH/headless mode):"
         )
-        text = re.sub(
-            r"\nSTEP 2 - BrowserOS setup .*?\nSTEP 5 - Read project context files:",
-            "\nSTEP 2 - Read project context files:",
-            text,
-            flags=re.S
+        text = text.replace(
+            "STEP 3 - Launch BrowserOS in visible Burp proxy mode:",
+            "STEP 3 - Launch BrowserOS in headless Burp proxy mode:"
         )
-        text = text.replace("STEP 6 - Pull and triage current findings:", "STEP 3 - Pull and triage current findings:")
-        text = text.replace("STEP 7 - Run API preflight (no target traffic):", "STEP 4 - Run API preflight (no target traffic):")
-        text = text.replace("STEP 8 - Report ready, then WAIT for user to send 'q' or queue work:", "STEP 5 - Report ready, then WAIT for user to send 'q' or queue work:")
+        text = text.replace(
+            "    Use the BrowserOS installation method supplied by the user or official project documentation, then launch it visibly with Burp proxy 127.0.0.1:8080.",
+            "    Use the BrowserOS installation method supplied by the user or official project documentation, then launch it headlessly with Burp proxy 127.0.0.1:8080."
+        )
+        text = text.replace(
+            "    Launch BrowserOS visibly using the installed command/package with proxy server 127.0.0.1:8080, then verify the process is running.",
+            "    Launch BrowserOS headlessly using the installed command/package with proxy server 127.0.0.1:8080, then verify the process is running."
+        )
         text = text.replace(
             "  Format: 'Ready. BrowserOS [running/curl-only], MCP [registered/n/a], scope loaded, N findings triaged. Send q to start.'\n",
-            "  Format: 'Ready. SSH/curl-only mode, scope loaded, N findings triaged. Send q to start.'\n"
+            "  Format: 'Ready. SSH/headless BrowserOS [running/curl-only], MCP [registered/n/a], scope loaded, N findings triaged. Send q to start.'\n"
         )
         text = text.replace(
-            "2. CHECK browser_verify field:\n"
-            "   - TRUE: Use BrowserOS MCP ONLY (see BROWSER VERIFICATION below). No curl.\n"
-            "   - FALSE: Call GET /api/agent/queue/<id>/curl?refresh_auth=true. Run the generated curl command exactly. Do not run target curl without the -x proxy flag; use /api/agent/request with comment/note only as fallback/convenience.\n",
-            "2. If browser_verify=true, this SSH prompt is curl-only/headless; report that browser verification needs a desktop/browser-capable agent or manual user evidence. Otherwise call GET /api/agent/queue/<id>/curl?refresh_auth=true and run the generated curl command exactly. Do not run target curl without the -x proxy flag; use /api/agent/request with comment/note only as fallback/convenience.\n"
-        )
-        text = re.sub(
-            r"\n=== BROWSER VERIFICATION \(browser_verify=TRUE\) ===\n.*?\n=== TESTING METHODOLOGY ===\n",
-            "\n=== TESTING METHODOLOGY ===\n",
-            text,
-            flags=re.S
+            "    nohup /usr/lib/browseros/browseros --no-sandbox --proxy-server=http://127.0.0.1:8080 --remote-debugging-port=9100 --disable-gpu --ignore-certificate-errors --incognito --no-first-run --user-data-dir=/tmp/browseros-profile >/tmp/browseros.log 2>&1 &\n",
+            "    nohup /usr/lib/browseros/browseros --no-sandbox --proxy-server=http://127.0.0.1:8080 --remote-debugging-port=9100 --disable-gpu --ignore-certificate-errors --headless=new --incognito --no-first-run --user-data-dir=/tmp/browseros-profile >/tmp/browseros.log 2>&1 &\n"
         )
         return text
 
@@ -6003,7 +5998,7 @@ class BurpExtender(_BurpExtenderBase):
             "STEP 1 - Verify Burp API is up:\n"
             "  curl -s " + url + "/api/health && curl -s " + url + "/api/docs\n"
             "\n"
-            "STEP 2 - BrowserOS setup (desktop/browser-capable agents only):\n"
+            "STEP 2 - BrowserOS setup (visible desktop mode; do NOT use headless):\n"
             "  macOS:\n"
             "    Check install (do NOT use mdfind, do NOT search):\n"
             "      ls /Applications/BrowserOS.app >/dev/null 2>&1 && echo INSTALLED || echo NOT_INSTALLED\n"
@@ -6016,18 +6011,18 @@ class BurpExtender(_BurpExtenderBase):
             "    test -x /usr/lib/browseros/browseros && echo INSTALLED || echo NOT_INSTALLED\n"
             "    - NOT_INSTALLED -> report 'curl-only mode' and SKIP steps 3-4.\n"
             "  Other OSes:\n"
-            "    Use the BrowserOS installation method supplied by the user or official project documentation, then launch it with Burp proxy 127.0.0.1:8080. If BrowserOS is unavailable, report 'curl-only mode' and SKIP steps 3-4.\n"
+            "    Use the BrowserOS installation method supplied by the user or official project documentation, then launch it visibly with Burp proxy 127.0.0.1:8080. If BrowserOS is unavailable, report 'curl-only mode' and SKIP steps 3-4.\n"
             "\n"
-            "STEP 3 - Launch BrowserOS in Burp proxy mode:\n"
+            "STEP 3 - Launch BrowserOS in visible Burp proxy mode:\n"
             "  macOS:\n"
             "    pkill -f BrowserOS 2>/dev/null; sleep 1; open -na 'BrowserOS' --args --proxy-server=127.0.0.1:8080\n"
             "    sleep 4 && pgrep -if browseros >/dev/null && echo RUNNING || echo NOT_RUNNING\n"
             "  Kali Linux:\n"
-            "    nohup /usr/lib/browseros/browseros --no-sandbox --proxy-server=http://127.0.0.1:8080 --remote-debugging-port=9100 --disable-gpu --ignore-certificate-errors --headless=new --incognito --no-first-run --user-data-dir=/tmp/browseros-profile >/tmp/browseros.log 2>&1 &\n"
+            "    nohup /usr/lib/browseros/browseros --no-sandbox --proxy-server=http://127.0.0.1:8080 --remote-debugging-port=9100 --disable-gpu --ignore-certificate-errors --incognito --no-first-run --user-data-dir=/tmp/browseros-profile >/tmp/browseros.log 2>&1 &\n"
             "    sleep 4 && curl -s http://127.0.0.1:9100/json/version >/dev/null && echo RUNNING || echo NOT_RUNNING\n"
             "    nohup /usr/lib/browseros/BrowserOSServer/default/resources/bin/browseros_server --cdp-port 9100 --server-port 9200 >/tmp/browseros-mcp.log 2>&1 &\n"
             "  Other OSes:\n"
-            "    Launch BrowserOS using the installed command/package with proxy server 127.0.0.1:8080, then verify the process is running.\n"
+            "    Launch BrowserOS visibly using the installed command/package with proxy server 127.0.0.1:8080, then verify the process is running.\n"
             "  - RUNNING -> report 'BrowserOS launched in proxy mode.'\n"
             "  - NOT_RUNNING -> report 'BrowserOS failed to launch, falling back to curl-only mode.'\n"
             "\n"
@@ -6035,7 +6030,7 @@ class BurpExtender(_BurpExtenderBase):
             "  claude mcp list 2>/dev/null | grep -i browseros\n"
             "  - If ANY line with 'browseros' appears (even '✗ Failed to connect' is OK — server may still be binding) -> registered, skip.\n"
             "  - If NO line on macOS/other default BrowserOS -> claude mcp add --transport http browseros http://127.0.0.1:9000/mcp --scope user\n"
-            "  - If NO line on Kali headless setup -> claude mcp add --transport http browseros http://127.0.0.1:9200/mcp --scope user\n"
+            "  - If NO line on Kali setup -> claude mcp add --transport http browseros http://127.0.0.1:9200/mcp --scope user\n"
             "  Note: '✗ Failed to connect' immediately after launch is normal; do NOT re-register.\n"
             "\n"
             "STEP 5 - Read project context files:\n"

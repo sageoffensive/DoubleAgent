@@ -125,8 +125,8 @@ In the `Agent AI` tab, copy the generated agent prompt and paste it into your AI
 
 Use:
 
-- `Copy Agent Prompt` for desktop workflows where browser verification is available.
-- `Copy SSH Prompt` for headless SSH environments. This prompt removes browser setup and browser-verification instructions and keeps the workflow curl/API focused.
+- `Copy Agent Prompt` for desktop workflows. BrowserOS launches visibly so the user can watch the session.
+- `Copy SSH Prompt` for SSH/headless environments. BrowserOS instructions stay enabled, but the launch command uses headless mode.
 
 The prompt tells the agent how to:
 
@@ -166,7 +166,7 @@ Install BrowserOS if needed:
 brew install --cask browseros
 ```
 
-Launch BrowserOS through Burp Proxy:
+Launch BrowserOS visibly through Burp Proxy:
 
 ```bash
 open -na 'BrowserOS' --args --proxy-server=127.0.0.1:8080
@@ -174,7 +174,7 @@ open -na 'BrowserOS' --args --proxy-server=127.0.0.1:8080
 
 ### Kali Linux
 
-Minimal headless setup:
+Minimal headless setup for SSH:
 
 ```bash
 ss -ltn | grep ':8080 '
