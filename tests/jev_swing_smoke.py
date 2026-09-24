@@ -13,7 +13,8 @@ from javax.swing import SwingUtilities, JTable, JPanel
 from javax.swing.table import DefaultTableModel
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, ROOT)
+BURP_SRC = os.path.join(ROOT, "burp", "src")
+sys.path.insert(0, BURP_SRC)
 import jev_duplicate_review as core
 
 
@@ -41,7 +42,7 @@ class Dialog(object):
 
 mod = types.ModuleType("jev_ui_probe")
 mod.JDialog = Dialog
-with open(os.path.join(ROOT, "double_agent_jev.py")) as source_file:
+with open(os.path.join(BURP_SRC, "double_agent_jev.py")) as source_file:
     source = source_file.read().replace("from javax.swing import JDialog, JPanel", "from javax.swing import JPanel")
 exec(compile(source, "double_agent_jev.py", "exec"), mod.__dict__)
 

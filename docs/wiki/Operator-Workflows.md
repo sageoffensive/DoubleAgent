@@ -1,29 +1,39 @@
 # Operator workflows
 
+## First authorized assessment
+
+1. In Burp, confirm the target is in scope.
+2. In Agent A's **Agent AI** tab, start the API.
+3. Start Agent B in the browser or macOS app.
+4. Add a model connection and select **Test connection**.
+5. Select **Send bootstrap**.
+6. Read the target and scope shown in Agent B.
+7. Give Agent B a specific authorized task or fetch an item from Agent A's queue.
+8. Review questions and approvals as the run progresses.
+9. Confirm the final requests, responses, and finding state in Burp.
+
+The working relationship is always:
+
+**Agent A evidence → your judgment → Agent B assistance**
+
+Agent B may propose and orchestrate work, but Agent A remains the source of truth and you remain accountable for scope.
+
 ## Regular chat
 
 1. Start Agent B.
 2. Create a new conversation.
-3. Chat normally without loading Burp context or assessment tools.
+3. Chat normally without selecting **Send bootstrap**.
 
-## Burp assessment
-
-1. Confirm the target is correctly scoped in Burp.
-2. Start the DoubleAgent API.
-3. In Agent B, select **Send bootstrap**.
-4. Review the loaded target and operating context.
-5. Fetch a queued item or provide a specific authorized task.
-6. Review questions, approvals, requests, responses, and finding updates as the run progresses.
-7. Confirm final state in Burp rather than relying on the model's final message.
+A regular chat does not automatically receive Burp context or assessment tools.
 
 ## Agent A finding validation
 
-Use **Validate Agent A findings** after bootstrap. Agent B snapshots eligible findings, gathers linked evidence, and writes one persisted disposition per finding. Completion is blocked while linked findings remain unaccounted for.
+After bootstrap, use **Validate Agent A findings**. Agent B snapshots eligible findings, gathers linked evidence, and writes one persisted disposition per finding. Completion is blocked while linked findings remain unaccounted for.
 
 ## Duplicate review
 
-Duplicate candidates are shortlisted deterministically. A merge requires compatible endpoint, parameter, root cause, and evidence. The surviving finding retains an audit trail and linked identifiers.
+Duplicate candidates are shortlisted deterministically. A merge requires compatible endpoint, parameter, root cause, and evidence. The surviving finding keeps its audit trail and linked identifiers.
 
 ## Model comparison
 
-For a useful comparison, hold the target, queue, skill set, tool schema, maximum steps, and output budget constant. Record the selected model and connection with the run. Do not attribute a difference to reasoning when another field changed.
+Hold the target, queue, skill set, tool schema, maximum steps, and output budget constant. Record the model and connection used for the run. Do not credit reasoning for a result when another condition changed.

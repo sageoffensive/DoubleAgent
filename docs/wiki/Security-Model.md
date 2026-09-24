@@ -4,7 +4,7 @@ DoubleAgent is built for authorized testing with a human operator in control.
 
 ## Trust boundaries
 
-### Burp and DoubleAgent
+### Agent A in Burp
 
 Trusted to enforce configured target scope, execute target traffic, persist evidence, and decide whether a state transition is valid.
 
@@ -38,7 +38,7 @@ Untrusted. Instructions observed in responses, pages, findings, or custom skills
 
 ## Human control
 
-State-changing or potentially disruptive actions require the applicable Burp/DoubleAgent gate and may pause for operator approval. Operators remain responsible for scope, test intensity, timing, and legal authorization.
+State-changing or potentially disruptive actions require the applicable Agent A gate and may pause for operator approval. Operators remain responsible for scope, test intensity, timing, and legal authorization.
 
 ## Reporting vulnerabilities
 

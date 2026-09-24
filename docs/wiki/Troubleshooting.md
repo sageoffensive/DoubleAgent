@@ -3,9 +3,9 @@
 ## Burp cannot load the extension
 
 - Confirm Jython standalone is configured.
-- Keep all v3.0 Python modules in the same folder.
-- Load `double-agent-v3.0.py`, not a chunk module.
-- Set `DOUBLE_AGENT_EXTENSION_DIR` if the loader does not expose the selected file's directory.
+- Keep `burp/DoubleAgent.py` beside the `burp/src/` folder.
+- Load `burp/DoubleAgent.py`, not a file under `burp/src/`.
+- Set `DOUBLE_AGENT_EXTENSION_DIR` to `burp/` if an unusual launcher does not expose the selected file's directory.
 - Check Burp's extension output for the first import error.
 
 ## Agent B cannot reach DoubleAgent

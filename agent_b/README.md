@@ -4,7 +4,7 @@ Agent B is a provider-neutral model harness for the Double Agent Burp extension.
 
 ## Start
 
-1. Load `double-agent-v3.0.py` in Burp and start its Agent API on `127.0.0.1:8777`.
+1. Load `burp/DoubleAgent.py` in Burp and start Agent A's API on `127.0.0.1:8777`.
 2. Double-click `run.command`, or run:
 
    ```sh

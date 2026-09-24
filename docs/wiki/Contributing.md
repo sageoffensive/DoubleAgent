@@ -10,6 +10,7 @@ Read the repository's `CONTRIBUTING.md`, `SECURITY.md`, and code of conduct befo
 - New conversations remain neutral until the operator explicitly loads Burp context.
 - Deterministic safety and evidence gates take precedence over model convenience.
 - Public defaults must not contain developer endpoints, paths, credentials, or target data.
+- Keep `burp/DoubleAgent.py` as the single public Burp loader; implementation modules belong under `burp/src/`.
 
 ## Validation
 

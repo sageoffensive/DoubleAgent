@@ -1,104 +1,73 @@
 <p align="center">
-  <img src="docs/images/doubleagent-hero.png" alt="DoubleAgent coordinated security testing" width="100%">
+  <img src="docs/images/doubleagent-hero.png" alt="Agent A in Burp passes evidence through the human hacker to Agent B, the AI teammate" width="100%">
 </p>
 
 <h1 align="center">DoubleAgent</h1>
 
 <p align="center">
-  Agentic web security testing with Burp Suite as the source of truth.
+  <strong>Agent A in Burp. A human hacker in control. Agent B as the teammate.</strong>
 </p>
 
 <p align="center">
-  <img alt="Version 3.0.0" src="https://img.shields.io/badge/version-3.0.0-ff9944">
+  <img alt="Version 3.0.1" src="https://img.shields.io/badge/version-3.0.1-ff9944">
   <img alt="License MIT" src="https://img.shields.io/badge/license-MIT-2ea44f">
   <img alt="Burp Suite" src="https://img.shields.io/badge/Burp%20Suite-Jython-f47b20">
   <img alt="Security local first" src="https://img.shields.io/badge/security-local--first-24292f">
 </p>
 
-DoubleAgent combines a Burp Suite extension with **Agent B**, a provider-neutral model harness. Burp owns scope, traffic, findings, evidence, approvals, and reporting. Agent B owns the model conversation and testing workflow. The model never receives a direct network path around Burp's controls.
+DoubleAgent is a two-part toolkit for authorized web security testing:
+
+1. **Agent A — the Burp extension** sees proxy traffic, enforces scope, runs requests, and owns findings and evidence.
+2. **The hacker — you** decides what is in scope, approves sensitive actions, and verifies the result.
+3. **Agent B — the teammate** plans and reasons with your chosen model, then asks Agent A to perform controlled work through Burp.
 
 > [!IMPORTANT]
-> DoubleAgent is intended only for systems you own or are explicitly authorized to test.
+> Use DoubleAgent only on systems you own or are explicitly authorized to test.
 
-## What v3.0 adds
-
-- A modular Jython extension that stays below JVM bytecode limits.
-- A dedicated Agent B desktop/web interface with explicit Burp bootstrap.
-- Provider-aware connections for OpenAI, Anthropic, Amazon Bedrock, and local/OpenAI-compatible servers.
-- No built-in model connections or developer endpoints on a fresh install.
-- Per-connection credentials, owner-only settings, transcript redaction, and no secret fields in public settings responses.
-- Evidence-backed finding validation, immutable finding IDs, optimistic version checks, and deterministic completion gates.
-- Duplicate-review workflows for Agent A findings with auditable merge decisions.
-- Native PortSwigger MCP discovery and tool transport over loopback.
-- Selectable methodology skills, persistent run traces, and reproducible test contracts.
-
-## Product tour
-
-### Operator workspace
-
-Agent B starts as a neutral chat. Burp context and assessment tools are loaded only when the operator selects **Send bootstrap**.
-
-![Agent B operator workspace](docs/images/agent-b-operator.png)
-
-### Provider-neutral model routing
-
-Connections are created explicitly and keep their own endpoint, model ID, credential, and capabilities.
-
-![Agent B model connections and skills](docs/images/agent-b-connections.png)
-
-## Architecture
+## How the team works
 
 ```mermaid
 flowchart LR
-    O[Operator] --> B[Burp Suite + DoubleAgent]
-    O --> A[Agent B]
-    A -->|Loopback API| B
-    A -->|Provider adapter| M[Selected model API]
-    B -->|Scoped requests| T[Authorized target]
-    B --> F[(Findings, evidence, audit trail)]
-    F --> A
+    A[Agent A<br/>Burp extension] -->|traffic, evidence, findings| H[Human hacker<br/>scope and decisions]
+    H -->|goals, review, approval| B[Agent B<br/>AI teammate]
+    B -->|controlled loopback tools| A
+    A -->|scope-checked requests| T[Authorized target]
 ```
 
-The separation is deliberate:
+Agent B does not bypass Burp. Target traffic remains under Agent A's scope and safety controls, and the human operator remains responsible for every assessment.
 
-- **DoubleAgent** is authoritative for target scope, requests, responses, findings, queue state, approvals, and report data.
-- **Agent B** manages model connections, conversations, methodology, planning, and tool-call orchestration.
-- **Model providers** see only the prompts and tool results required for the selected workflow. Credentials never cross between saved connections.
+## Quick start
 
-Read the [Security Model](docs/wiki/Security-Model.md) before connecting DoubleAgent to a real assessment.
+### 1. Install Agent A in Burp
 
-## Install
+1. Download and extract the latest `DoubleAgent` release bundle.
+2. Configure the Jython standalone 2.7.x JAR in **Burp → Extensions → Settings → Python Environment**.
+3. Open **Extensions → Installed → Add**, choose **Python**, and select:
 
-### Requirements
+   ```text
+   burp/DoubleAgent.py
+   ```
 
-- Burp Suite Professional or Community
-- Jython standalone 2.7.x configured in Burp
-- Python 3.10 or later for Agent B
-- macOS 13 or later for the optional native Agent B application
-- A model API connection you configure yourself
+4. Confirm the **Double Agent** tab appears, then start the Agent API.
 
-### 1. Install the Burp extension
-
-1. Download and extract the `DoubleAgent-v3.0.0` release bundle.
-2. Keep `double-agent-v3.0.py` and every sibling `double_agent_*.py` file together.
-3. In Burp, open **Extensions → Installed → Add**.
-4. Choose **Python** and select `double-agent-v3.0.py`.
-5. Confirm the **Double Agent** tab appears.
-
-If a loader does not expose the extension directory to Jython, set `DOUBLE_AGENT_EXTENSION_DIR` to the extracted folder before launching Burp.
+That is the only extension file you select. The implementation under `burp/src/` is loaded automatically.
 
 ### 2. Start Agent B
 
-From source:
+Choose either route.
+
+**Web interface — fastest from source**
 
 ```bash
 cd agent_b
 ./run.command
 ```
 
-Then open `http://127.0.0.1:4310`.
+Open [http://127.0.0.1:4310](http://127.0.0.1:4310).
 
-On macOS, you can instead download the Agent B application from the release assets or build it locally:
+**macOS application**
+
+Download `Agent-B-macOS-v3.0.1.zip` from the latest release, extract it, and move **Agent B.app** to Applications. Maintainers and developers can build it with:
 
 ```bash
 cd agent_b
@@ -106,39 +75,77 @@ cd agent_b
 open "dist/Agent B.app"
 ```
 
-### 3. Add a model connection
+### 3. Add your model
 
-Open **Settings → Add connection** and choose one of:
+In Agent B, open **Settings → Add connection**. Supported connection types are:
 
-- **OpenAI** — hosted Chat Completions with bearer authentication.
-- **Anthropic** — native Messages API with tool use.
-- **Amazon Bedrock** — Converse API with a Bedrock bearer key.
-- **Local / OpenAI-compatible** — Ollama, LM Studio, vLLM, oMLX, Splash, llama.cpp, and compatible servers.
+- OpenAI
+- Anthropic
+- Amazon Bedrock
+- Local/OpenAI-compatible servers such as Ollama, LM Studio, vLLM, oMLX, Splash, and llama.cpp
 
-Use **Test connection** before starting a run. A fresh installation contains no model connection and no API key.
+A fresh install contains no connection and no API key. Use **Test connection** before continuing.
 
-### 4. Connect Burp
+### 4. Bring the team together
 
-1. Start the DoubleAgent API from the **Agent AI** tab in Burp.
-2. In Agent B, select **Send bootstrap**.
-3. Confirm the connected target and scope before executing active tests.
+1. Confirm the authorized target and scope in Burp.
+2. Start Agent A's API from the **Agent AI** tab.
+3. In Agent B, select **Send bootstrap**.
+4. Review the imported target and scope before asking Agent B to test anything.
 
-See the [Installation](docs/wiki/Installation.md) and [Configuration](docs/wiki/Configuration.md) guides for a full walkthrough.
+The [Installation guide](docs/wiki/Installation.md) includes a complete walkthrough.
+
+## Product tour
+
+### Agent B workspace
+
+Agent B opens as a normal, neutral chat. Burp context and assessment tools are loaded only when you explicitly select **Send bootstrap**.
+
+![Agent B operator workspace](docs/images/agent-b-operator.png)
+
+### Bring your own model
+
+Each connection keeps its own provider, endpoint, model ID, credential, and capabilities.
+
+![Agent B model connections and skills](docs/images/agent-b-connections.png)
+
+## Simple repository layout
+
+```text
+burp/
+  DoubleAgent.py       # select this one file in Burp
+  src/                 # internal Jython modules
+agent_b/
+  run.command          # launch the web interface
+  build-macos-app.sh   # build Agent B.app
+docs/wiki/             # plain-language guides
+legacy/                # historical releases, not loaded by v3
+```
+
+The Burp implementation is split internally because large Jython modules can exceed JVM bytecode limits. Those chunks stay under `burp/src/` so users see one clear entry point without hiding the technical constraint.
 
 ## Security defaults
 
-- All control services bind to loopback by default.
-- Target traffic is executed through Burp and checked against Burp's scope and safety gates.
+- Control services bind to loopback by default.
+- Target traffic is executed through Burp and checked against Burp scope and safety gates.
 - New Agent B conversations do not automatically load target context.
-- Provider credentials are stored locally with owner-only permissions and omitted from API responses and transcripts.
-- The repository ignores assessment state, credentials, local databases, compiled output, and editor configuration.
-- Finding completion requires persisted, evidence-backed dispositions—not a model's prose claim.
+- Provider credentials are isolated per connection, stored locally with owner-only permissions, and omitted from API responses and transcripts.
+- Assessment state, credentials, local databases, compiled output, and editor configuration are ignored by Git.
+- A model's final message is not treated as proof: finding completion requires persisted, evidence-backed dispositions.
 
-Please report security issues privately using the process in [SECURITY.md](SECURITY.md).
+Read the [Security Model](docs/wiki/Security-Model.md) and report security issues privately through [SECURITY.md](SECURITY.md).
+
+## Documentation
+
+- [Wiki home](docs/wiki/Home.md)
+- [Installation](docs/wiki/Installation.md)
+- [Configuration](docs/wiki/Configuration.md)
+- [Architecture](docs/wiki/Architecture.md)
+- [Operator workflows](docs/wiki/Operator-Workflows.md)
+- [Troubleshooting](docs/wiki/Troubleshooting.md)
+- [Contributing](CONTRIBUTING.md)
 
 ## Development
-
-Run the validation suite before opening a pull request:
 
 ```bash
 node --check agent_b/static/app.js
@@ -146,19 +153,7 @@ python3 -m unittest discover -s tests -v
 (cd agent_b && python3 -m unittest discover -s tests -v)
 ```
 
-Build and verify the macOS application:
-
-```bash
-cd agent_b
-./build-macos-app.sh
-codesign --verify --deep --strict "dist/Agent B.app"
-```
-
-Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and the [documentation hub](docs/wiki/Home.md).
-
-## Project status
-
-DoubleAgent v3.0 is an active security tool. Treat model output as untrusted, keep a human operator in the loop, and preserve Burp's scope controls. The roadmap prioritizes reliable evidence, finding deduplication, provider interoperability, and reproducible evaluation.
+DoubleAgent v3 is under active development. The roadmap prioritizes reliable evidence, duplicate review, provider interoperability, and reproducible evaluation.
 
 ## License
 

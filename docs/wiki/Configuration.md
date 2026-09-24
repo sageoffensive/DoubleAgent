@@ -44,7 +44,7 @@ Use the exact model ID returned by the server's `/models` endpoint. Enable **Sup
 - Settings are written with owner-only permissions.
 - Agent B redacts bearer credentials before saving transcript events.
 
-## DoubleAgent connection
+## Agent A connection
 
 The default API URL is:
 
@@ -52,7 +52,7 @@ The default API URL is:
 http://127.0.0.1:8777
 ```
 
-Keep this endpoint on loopback. Agent B accepts only loopback DoubleAgent URLs.
+Keep this endpoint on loopback. Agent B accepts only loopback Agent A URLs.
 
 ## Methodology skills
 

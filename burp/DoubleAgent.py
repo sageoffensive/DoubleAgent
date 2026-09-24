@@ -1,39 +1,49 @@
 # -*- coding: utf-8 -*-
-# Burp Suite Python Extension: Double Agent v3.0
-# Small entry point: implementation is split across sibling modules to stay below
-# Jython/JVM per-method bytecode limits.
+# Burp Suite Python Extension: DoubleAgent v3
+# This is the only file an operator selects in Burp. The implementation lives
+# in ./src and remains split to stay below Jython/JVM bytecode limits.
 # MCP loopback transport uses Java-native, proxy-free, Unicode-safe SSE handshakes.
 import os as _bootstrap_os
 import sys as _bootstrap_sys
 
 # Burp executes Jython extensions with execfile() and may not define __file__.
-# Locate the sibling modules without baking a developer-specific path into the
-# release. DOUBLE_AGENT_EXTENSION_DIR remains available for unusual loaders.
-_extension_candidates = []
+# Locate the private source folder without baking a developer-specific path
+# into the release. DOUBLE_AGENT_EXTENSION_DIR may point to burp/, burp/src/,
+# or the repository root for unusual loaders.
+_loader_candidates = []
 _extension_filename = globals().get("__file__", "")
 if _extension_filename:
-    _extension_candidates.append(_bootstrap_os.path.dirname(
+    _loader_candidates.append(_bootstrap_os.path.dirname(
         _bootstrap_os.path.abspath(_extension_filename)
     ))
 _configured_extension_dir = _bootstrap_os.environ.get(
     "DOUBLE_AGENT_EXTENSION_DIR", "")
 if _configured_extension_dir:
-    _extension_candidates.append(_bootstrap_os.path.abspath(
+    _loader_candidates.append(_bootstrap_os.path.abspath(
         _bootstrap_os.path.expanduser(_configured_extension_dir)
     ))
 try:
     _frame_filename = _bootstrap_sys._getframe(0).f_code.co_filename
     if _frame_filename and not _frame_filename.startswith("<"):
-        _extension_candidates.append(_bootstrap_os.path.dirname(
+        _loader_candidates.append(_bootstrap_os.path.dirname(
             _bootstrap_os.path.abspath(_frame_filename)
         ))
 except Exception:
     pass
-_extension_candidates.extend(
+_loader_candidates.extend(
     _bootstrap_os.path.abspath(path or _bootstrap_os.curdir)
     for path in list(_bootstrap_sys.path)
 )
-_extension_candidates.append(_bootstrap_os.getcwd())
+_loader_candidates.append(_bootstrap_os.getcwd())
+
+_extension_candidates = []
+for _candidate in _loader_candidates:
+    for _module_candidate in (
+            _bootstrap_os.path.join(_candidate, "src"),
+            _bootstrap_os.path.join(_candidate, "burp", "src"),
+            _candidate):
+        if _module_candidate not in _extension_candidates:
+            _extension_candidates.append(_module_candidate)
 
 _extension_directory = ""
 for _candidate in _extension_candidates:
@@ -43,8 +53,8 @@ for _candidate in _extension_candidates:
         break
 if not _extension_directory:
     raise ImportError(
-        "Double Agent modules were not found. Keep the v3.0 Python files "
-        "together, or set DOUBLE_AGENT_EXTENSION_DIR to that folder."
+        "DoubleAgent modules were not found. Keep DoubleAgent.py beside the "
+        "src folder, or set DOUBLE_AGENT_EXTENSION_DIR to burp or burp/src."
     )
 if _extension_directory not in _bootstrap_sys.path:
     _bootstrap_sys.path.insert(0, _extension_directory)
