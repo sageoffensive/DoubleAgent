@@ -1,6 +1,19 @@
 # Security model
 
-DoubleAgent is built for authorized testing with a human operator in control.
+DoubleAgent is built for authorized testing with a human operator in control. Its safety position is based on bounded model authority, deterministic enforcement, and evidence-backed completion—not on trusting a model to police itself.
+
+## Runaway-agent risk controls
+
+| Risk | Control boundary |
+| --- | --- |
+| Out-of-scope traffic | Agent A executes target requests through Burp and checks configured scope. |
+| Direct model action | Agent B has no separate target-network path and uses an allowlisted loopback tool surface. |
+| Prompt injection | Model output, target content, findings, and imported methodology are untrusted and cannot override scope or tool contracts. |
+| Unreviewed sensitive action | Applicable deterministic gates pause for operator input. |
+| False completion | Completion requires persisted evidence, explicit dispositions, and authoritative read-back. |
+| Cross-provider credential exposure | Credentials are isolated per connection and omitted from public responses and transcripts. |
+
+These controls reduce risk; they do not make the model or operator infallible.
 
 ## Trust boundaries
 

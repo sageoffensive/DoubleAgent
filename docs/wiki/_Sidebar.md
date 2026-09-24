@@ -4,6 +4,7 @@
 - [Install Agent A + Agent B](Installation.md)
 - [Configuration](Configuration.md)
 - [How the team works](Architecture.md)
+- [Why human-in-the-loop](Why-Human-In-The-Loop.md)
 - [Security Model](Security-Model.md)
 - [Operator Workflows](Operator-Workflows.md)
 - [Troubleshooting](Troubleshooting.md)
