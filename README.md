@@ -140,7 +140,6 @@ agent_b/
   run.command          # launch the web interface
   build-macos-app.sh   # build Agent B.app
 docs/wiki/             # plain-language guides
-legacy/                # historical releases, not loaded by v3
 ```
 
 The Burp implementation is split internally because large Jython modules can exceed JVM bytecode limits. Those chunks stay under `burp/src/` so users see one clear entry point without hiding the technical constraint.
