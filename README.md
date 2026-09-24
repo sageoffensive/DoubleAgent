@@ -1,249 +1,165 @@
-# DoubleAgent
+<p align="center">
+  <img src="docs/images/doubleagent-hero.png" alt="DoubleAgent coordinated security testing" width="100%">
+</p>
 
-DoubleAgent is a Burp Suite extension for agentic web security testing. It combines AI-assisted passive analysis, a findings triage workflow, and a local API that an external coding/AI agent can use to claim work, retrieve evidence, run tests through Burp, and write results back to the extension.
+<h1 align="center">DoubleAgent</h1>
 
-The extension is distributed as a single Jython-compatible Python file:
+<p align="center">
+  Agentic web security testing with Burp Suite as the source of truth.
+</p>
 
-- `double-agent-v2.1.py`
+<p align="center">
+  <img alt="Version 3.0.0" src="https://img.shields.io/badge/version-3.0.0-ff9944">
+  <img alt="License MIT" src="https://img.shields.io/badge/license-MIT-2ea44f">
+  <img alt="Burp Suite" src="https://img.shields.io/badge/Burp%20Suite-Jython-f47b20">
+  <img alt="Security local first" src="https://img.shields.io/badge/security-local--first-24292f">
+</p>
 
-## Why DoubleAgent?
+DoubleAgent combines a Burp Suite extension with **Agent B**, a provider-neutral model harness. Burp owns scope, traffic, findings, evidence, approvals, and reporting. Agent B owns the model conversation and testing workflow. The model never receives a direct network path around Burp's controls.
 
-DoubleAgent is built around two complementary agent roles:
+> [!IMPORTANT]
+> DoubleAgent is intended only for systems you own or are explicitly authorized to test.
 
-- A passive observation agent watches in-scope Burp Proxy traffic, reviews requests and responses, and turns likely security signals into triaged findings without actively probing the target.
-- An active verification agent takes the prioritized findings, sends controlled test traffic through Burp, verifies impact, removes false positives, and records reproducible evidence.
+## What v3.0 adds
 
-That split keeps broad traffic review cheap and continuous while reserving active testing for the issues most likely to matter.
+- A modular Jython extension that stays below JVM bytecode limits.
+- A dedicated Agent B desktop/web interface with explicit Burp bootstrap.
+- Provider-aware connections for OpenAI, Anthropic, Amazon Bedrock, and local/OpenAI-compatible servers.
+- No built-in model connections or developer endpoints on a fresh install.
+- Per-connection credentials, owner-only settings, transcript redaction, and no secret fields in public settings responses.
+- Evidence-backed finding validation, immutable finding IDs, optimistic version checks, and deterministic completion gates.
+- Duplicate-review workflows for Agent A findings with auditable merge decisions.
+- Native PortSwigger MCP discovery and tool transport over loopback.
+- Selectable methodology skills, persistent run traces, and reproducible test contracts.
 
-## Features
+## Product tour
 
-- AI-assisted analysis of in-scope Burp Proxy traffic
-- Findings table with agent status, priority, rationale, and hidden false-positive/noise handling
-- Agent queue and local API on `127.0.0.1:8777`
-- Generated curl commands that route target traffic through Burp Proxy on `127.0.0.1:8080`
-- Browser verification workflow for items that require BrowserOS MCP
-- Support for Ollama, OpenAI, Claude, Gemini, Bedrock, and DeepSeek
-- Project folder support for `scope.md`, `target.md`, `findings.md`, `creds.md`, and persisted `double-agent.json`
+### Operator workspace
 
-## Requirements
+Agent B starts as a neutral chat. Burp context and assessment tools are loaded only when the operator selects **Send bootstrap**.
 
-- Burp Suite Professional or Community
-- Jython standalone JAR for Burp Python extensions
-- One AI provider:
-  - Ollama running locally, or
-  - API access for OpenAI, Claude, Gemini, Bedrock, or DeepSeek
-- Optional: BrowserOS for browser-based verification tasks
-- Optional: Claude Code or another agent that can call the local DoubleAgent API
+![Agent B operator workspace](docs/images/agent-b-operator.png)
+
+### Provider-neutral model routing
+
+Connections are created explicitly and keep their own endpoint, model ID, credential, and capabilities.
+
+![Agent B model connections and skills](docs/images/agent-b-connections.png)
+
+## Architecture
+
+```mermaid
+flowchart LR
+    O[Operator] --> B[Burp Suite + DoubleAgent]
+    O --> A[Agent B]
+    A -->|Loopback API| B
+    A -->|Provider adapter| M[Selected model API]
+    B -->|Scoped requests| T[Authorized target]
+    B --> F[(Findings, evidence, audit trail)]
+    F --> A
+```
+
+The separation is deliberate:
+
+- **DoubleAgent** is authoritative for target scope, requests, responses, findings, queue state, approvals, and report data.
+- **Agent B** manages model connections, conversations, methodology, planning, and tool-call orchestration.
+- **Model providers** see only the prompts and tool results required for the selected workflow. Credentials never cross between saved connections.
+
+Read the [Security Model](/sageoffensive/DoubleAgent/wiki/Security-Model) before connecting DoubleAgent to a real assessment.
 
 ## Install
 
-1. Download `double-agent-v2.1.py` from this repository.
+### Requirements
 
-2. Download Jython standalone if you do not already have it.
+- Burp Suite Professional or Community
+- Jython standalone 2.7.x configured in Burp
+- Python 3.10 or later for Agent B
+- macOS 13 or later for the optional native Agent B application
+- A model API connection you configure yourself
 
-   Burp needs a Jython standalone JAR configured under:
+### 1. Install the Burp extension
 
-   `Extensions > Settings > Python Environment > Location of Jython standalone JAR file`
+1. Download and extract the `DoubleAgent-v3.0.0` release bundle.
+2. Keep `double-agent-v3.0.py` and every sibling `double_agent_*.py` file together.
+3. In Burp, open **Extensions → Installed → Add**.
+4. Choose **Python** and select `double-agent-v3.0.py`.
+5. Confirm the **Double Agent** tab appears.
 
-3. In Burp, load the extension:
+If a loader does not expose the extension directory to Jython, set `DOUBLE_AGENT_EXTENSION_DIR` to the extracted folder before launching Burp.
 
-   `Extensions > Installed > Add`
+### 2. Start Agent B
 
-   Use:
-
-   - Extension type: `Python`
-   - Extension file: `double-agent-v2.1.py`
-
-4. Confirm Burp shows a `Double Agent` tab.
-
-## First Run
-
-When the extension loads, it asks for a project folder. Use a folder for the target you are testing. DoubleAgent reads and writes project state there.
-
-Recommended files:
-
-- `scope.md`: required target scope and testing rules
-- `target.md`: target notes, known auth context, roles, app map, and constraints
-- `findings.md`: optional notes/report context
-- `creds.md`: authorized test account details, roles, and login notes for the current assessment
-
-The generated agent prompts check for all four files at startup. If any are missing, the agent should stop and ask the user for the missing scope, target context, prior findings, or authorized account details before continuing.
-
-DoubleAgent also persists state in:
-
-- `double-agent.json`
-
-Do not commit `creds.md`, API keys, cookies, or private target notes to a public repository.
-
-## Configure AI
-
-Open:
-
-`Double Agent > Settings`
-
-Choose an AI provider and model, then click `Test Connection`.
-
-Provider defaults:
-
-- Ollama: `http://localhost:11434`
-- OpenAI: `https://api.openai.com/v1`
-- Claude: `https://api.anthropic.com/v1`
-- Gemini: `https://generativelanguage.googleapis.com/v1`
-- Bedrock: `https://bedrock-runtime.us-east-1.amazonaws.com`
-- DeepSeek: `https://api.deepseek.com/v1`
-
-Bedrock note: the Bedrock field expects a Bedrock bearer API key, not AWS access key ID or secret access key values. Do not paste `AKIA...`, `ASIA...`, or AWS secret keys into the extension.
-
-## Start the Agent API
-
-Open the `Agent AI` tab in DoubleAgent and click `Start Server`.
-
-The local API listens on:
-
-```text
-http://127.0.0.1:8777
-```
-
-Public endpoints:
+From source:
 
 ```bash
-curl -s http://127.0.0.1:8777/api/health
-curl -s http://127.0.0.1:8777/api/docs
+cd agent_b
+./run.command
 ```
 
-Most endpoints require:
+Then open `http://127.0.0.1:4310`.
 
-```text
-Authorization: Bearer <Double Agent API Token>
-```
-
-Copy the token from the `Agent AI` tab.
-
-## Connect an Agent
-
-In the `Agent AI` tab, copy the generated agent prompt and paste it into your AI agent session.
-
-Use:
-
-- `Copy Agent Prompt` for desktop workflows. BrowserOS launches visibly so the user can watch the session.
-- `Copy SSH Prompt` for SSH/headless environments. BrowserOS instructions stay enabled, but the launch command uses headless mode.
-
-The prompt tells the agent how to:
-
-- Read `/api/docs`
-- Pull and triage current findings
-- Poll `/api/findings` every 5 minutes while active
-- Claim queue items
-- Generate safe curl commands
-- Route target traffic through Burp Proxy
-- Submit structured results
-
-Target traffic must go through Burp Proxy:
+On macOS, you can instead download the Agent B application from the release assets or build it locally:
 
 ```bash
-curl -x http://127.0.0.1:8080 -i https://target.example/path
+cd agent_b
+./build-macos-app.sh
+open "dist/Agent B.app"
 ```
 
-Local DoubleAgent API calls to `127.0.0.1:8777` do not use the Burp proxy.
+### 3. Add a model connection
 
-For visible Proxy history notes, target test requests should include:
+Open **Settings → Add connection** and choose one of:
 
-```text
-X-Double-Agent-Note: Agent: <finding/work item> - <test purpose> - <expected result>
-```
+- **OpenAI** — hosted Chat Completions with bearer authentication.
+- **Anthropic** — native Messages API with tool use.
+- **Amazon Bedrock** — Converse API with a Bedrock bearer key.
+- **Local / OpenAI-compatible** — Ollama, LM Studio, vLLM, oMLX, Splash, llama.cpp, and compatible servers.
 
-The extension copies that note into Burp Proxy history and strips the header before sending upstream.
+Use **Test connection** before starting a run. A fresh installation contains no model connection and no API key.
 
-## Browser Verification
+### 4. Connect Burp
 
-Some work items may set `browser_verify=true`. For those, the agent should use BrowserOS MCP instead of curl.
+1. Start the DoubleAgent API from the **Agent AI** tab in Burp.
+2. In Agent B, select **Send bootstrap**.
+3. Confirm the connected target and scope before executing active tests.
 
-### macOS
+See the [Installation](/sageoffensive/DoubleAgent/wiki/Installation) and [Configuration](/sageoffensive/DoubleAgent/wiki/Configuration) wiki pages for a full walkthrough.
 
-Install BrowserOS if needed:
+## Security defaults
+
+- All control services bind to loopback by default.
+- Target traffic is executed through Burp and checked against Burp's scope and safety gates.
+- New Agent B conversations do not automatically load target context.
+- Provider credentials are stored locally with owner-only permissions and omitted from API responses and transcripts.
+- The repository ignores assessment state, credentials, local databases, compiled output, and editor configuration.
+- Finding completion requires persisted, evidence-backed dispositions—not a model's prose claim.
+
+Please report security issues privately using the process in [SECURITY.md](SECURITY.md).
+
+## Development
+
+Run the validation suite before opening a pull request:
 
 ```bash
-brew install --cask browseros
+node --check agent_b/static/app.js
+python3 -m unittest discover -s tests -v
+(cd agent_b && python3 -m unittest discover -s tests -v)
 ```
 
-Launch BrowserOS visibly through Burp Proxy:
+Build and verify the macOS application:
 
 ```bash
-open -na 'BrowserOS' --args --proxy-server=127.0.0.1:8080
+cd agent_b
+./build-macos-app.sh
+codesign --verify --deep --strict "dist/Agent B.app"
 ```
 
-### Kali Linux
+Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and the [wiki](/sageoffensive/DoubleAgent/wiki).
 
-Minimal headless setup for SSH:
+## Project status
 
-```bash
-ss -ltn | grep ':8080 '
-test -x /usr/lib/browseros/browseros || sudo apt install /home/pentester/Downloads/BrowserOS_v*_amd64.deb
-nohup /usr/lib/browseros/browseros --no-sandbox --proxy-server=http://127.0.0.1:8080 --remote-debugging-port=9100 --disable-gpu --ignore-certificate-errors --headless=new --incognito --no-first-run --user-data-dir=/tmp/browseros-profile >/tmp/browseros.log 2>&1 &
-nohup /usr/lib/browseros/BrowserOSServer/default/resources/bin/browseros_server --cdp-port 9100 --server-port 9200 >/tmp/browseros-mcp.log 2>&1 &
-claude mcp add --transport http browseros http://127.0.0.1:9200/mcp --scope user
-```
-
-### Other OSes
-
-Install BrowserOS using the package or instructions supplied by the BrowserOS project, then launch it with Burp Proxy set to `127.0.0.1:8080`.
-
-If using Claude Code MCP, register BrowserOS once:
-
-```bash
-claude mcp add --transport http browseros http://127.0.0.1:9000/mcp --scope user
-```
-
-The agent should ask before state-changing browser actions such as deletes, payments, password changes, uploads, or persistent exploit attempts.
-
-## Typical Workflow
-
-1. Load the extension in Burp.
-2. Choose the project folder.
-3. Configure and test an AI provider.
-4. Start the Agent API server.
-5. Capture target traffic through Burp Proxy.
-6. Enable `Analyze Proxy Traffic ($$)` only when you want AI analysis of in-scope proxy responses.
-7. Review findings in the `Findings` tab.
-8. Copy the agent prompt from `Agent AI` into your AI agent.
-9. Let the agent triage findings and claim queued work.
-10. Review results and report output.
-
-## Safety Notes
-
-- Passive scanning can consume paid AI tokens quickly. It is disabled by default.
-- Keep target curl traffic proxied through Burp using `-x http://127.0.0.1:8080`.
-- Keep provider keys out of git and project files.
-- Do not commit `double-agent.json` if it contains target-specific data.
-- Do not commit `creds.md`; keep authorized account details local to the assessment.
-- Always confirm scope before active testing.
-
-## Troubleshooting
-
-API health check fails:
-
-- Make sure `Start Server` was clicked in the `Agent AI` tab.
-- Confirm nothing else is using port `8777`.
-
-Target curl does not appear in Burp:
-
-- Confirm Burp Proxy is listening on `127.0.0.1:8080`.
-- Confirm the curl command includes `-x http://127.0.0.1:8080`.
-
-AI connection fails:
-
-- Open `Settings`.
-- Re-enter the API key.
-- Check the provider URL.
-- Click `Test Connection`.
-- For Ollama, confirm Ollama is running and the selected model is available.
-
-Bedrock connection fails:
-
-- Use a Bedrock bearer API key, not AWS access key credentials.
-- Use a serverless Bedrock model or inference profile shown by the extension.
-- Increase timeout or reduce scan concurrency if requests time out.
+DoubleAgent v3.0 is an active security tool. Treat model output as untrusted, keep a human operator in the loop, and preserve Burp's scope controls. The roadmap prioritizes reliable evidence, finding deduplication, provider interoperability, and reproducible evaluation.
 
 ## License
 
-MIT License.
+Released under the [MIT License](LICENSE).
