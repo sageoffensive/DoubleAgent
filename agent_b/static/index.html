@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Agent B</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="shell">
+    <aside>
+      <header class="brand">
+        <div class="mark">B</div>
+        <div><strong>Agent B</strong><span>Double Agent harness</span></div>
+        <button type="button" id="close-nav" class="icon nav-close" aria-label="Close menu">×</button>
+      </header>
+      <section class="status-card">
+        <div class="eyebrow">RUN STATE</div>
+        <div class="run-line"><span id="run-dot" class="dot"></span><strong id="run-state">Starting</strong></div>
+        <div class="meter"><i id="step-meter"></i></div>
+        <small id="step-label">Step 0</small>
+        <small id="finding-progress" class="hidden"></small>
+      </section>
+      <section>
+        <div class="eyebrow">CONNECTIONS</div>
+        <div class="connection"><span id="burp-dot" class="dot"></span><div><strong>Double Agent</strong><small id="burp-state">Checking…</small></div></div>
+        <div class="connection"><span id="model-dot" class="dot"></span><div><strong id="model-name">Model</strong><small id="model-state">Checking…</small></div></div>
+        <div id="target-row" class="connection hidden"><span class="dot ok"></span><div><strong>Target</strong><a id="target-link" class="target-link" href="#" target="_blank" rel="noopener noreferrer">Open target</a></div></div>
+      </section>
+      <section>
+        <div class="eyebrow">ACTIVE SKILLS</div>
+        <div id="active-skills" class="active-skills"><span>Loading…</span></div>
+      </section>
+      <section>
+        <div class="eyebrow">CONTROLS</div>
+        <button id="bootstrap" class="primary">1. Send bootstrap</button>
+        <p id="bootstrap-guidance" class="control-guidance">For Burp work, start here. Regular chat works without it.</p>
+        <button id="fetch" disabled>Fetch Burp queue</button>
+        <button id="validate-a" disabled>Validate Agent A findings</button>
+        <button id="seed-surface" disabled>Seed coverage</button>
+        <button id="stop" disabled>Stop current run</button>
+        <button id="clear">New conversation</button>
+        <button id="settings">Settings</button>
+      </section>
+      <footer>Traffic is executed by Burp and governed by its scope and safety gates.</footer>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div><div class="eyebrow">ACTIVE ASSESSMENT</div><h1>Operator chat</h1></div>
+        <div class="topbar-actions">
+          <button type="button" id="open-nav" class="mobile-menu" aria-label="Open controls">Controls</button>
+          <a id="target-link-main" class="target-link-main hidden" href="#" target="_blank" rel="noopener noreferrer">Open target</a>
+          <div id="live" class="pill">Connecting</div>
+        </div>
+      </header>
+      <details id="model-stream-panel" class="model-stream-panel">
+        <summary><span>Model stream (debug)</span><small id="model-stream-state">Waiting for model</small></summary>
+        <pre id="model-stream">No model output yet.</pre>
+      </details>
+      <details id="coverage-panel" class="coverage-panel hidden">
+        <summary><span id="coverage-title">Coverage</span><small id="coverage-sub">Discovered surface reached &amp; tested</small></summary>
+        <div id="coverage-body"></div>
+      </details>
+      <details id="assessment-plan-panel" class="assessment-plan-panel hidden">
+        <summary><span id="assessment-plan-title">Plan of attack</span><small>Prepared before active testing</small></summary>
+        <div id="assessment-plan"></div>
+      </details>
+      <div id="timeline" class="timeline"></div>
+      <div id="question" class="question hidden"></div>
+      <form id="composer">
+        <textarea id="message" rows="2" placeholder="Send a message…"></textarea>
+        <label id="thinking-control" class="hidden">Thinking<select id="thinking-choice" aria-label="Thinking mode"><option value="auto">Auto</option><option value="on">On</option><option value="off">Off</option></select></label>
+        <button type="submit" aria-label="Send">Send</button>
+      </form>
+    </main>
+  </div>
+
+  <dialog id="settings-dialog">
+    <form id="settings-form">
+      <div class="modal-head"><div><div class="eyebrow">MODEL ROUTING</div><h2>Model connections</h2></div><button type="button" id="close-settings" class="icon">×</button></div>
+      <label>Active connection
+        <select name="model" id="model-choice"></select>
+      </label>
+      <div id="connection-summary" class="connection-summary"><span id="provider-badge" class="provider-badge">Local</span><div><strong id="connection-title">Model connection</strong><p id="model-description" class="hint model-description"></p></div></div>
+      <label>Resolved endpoint<input name="model_url" id="model-url-input" placeholder="http://127.0.0.1:8000/v1" disabled></label>
+      <div id="bedrock-settings" class="bedrock-settings hidden">
+        <label>Bedrock region<input name="bedrock_region" placeholder="us-east-1"></label>
+        <label id="bedrock-model-row" class="hidden">Bedrock model ID<input name="bedrock_model" list="bedrock-model-list" placeholder="us.anthropic.claude-..."></label>
+        <datalist id="bedrock-model-list"></datalist>
+        <label>Bedrock API key<input name="bedrock_api_key" type="password" placeholder="Saved & shared across all Bedrock models; leave blank to keep it"></label>
+        <p class="hint">One Amazon Bedrock API key (bearer token) is used for every Claude model on Bedrock — enter it once and it stays when you switch models. For the custom option, copy the exact inference-profile ID from the Bedrock console. Region + key are stored locally with owner-only permissions.</p>
+      </div>
+      <div class="model-actions"><button type="button" id="add-model" class="primary">Add connection</button><button type="button" id="edit-model">Edit</button><button type="button" id="remove-model">Remove</button></div>
+      <fieldset class="skill-picker">
+        <div class="skill-picker-head">
+          <div><strong>Skills</strong><span>Select any combination for the next run.</span></div>
+          <button type="button" id="add-skill">Add skill</button>
+        </div>
+        <div id="skill-options" class="skill-options"></div>
+        <p class="hint">Selections are recorded with the model in each run profile. Use no skills as the control when comparing performance.</p>
+      </fieldset>
+      <details id="legacy-model-settings" class="advanced-settings">
+        <summary>Built-in local connection settings</summary>
+        <div>
+          <label>Local API base URL<input name="legacy_model_url" id="legacy-model-url" placeholder="http://127.0.0.1:8000/v1"></label>
+          <label>Local API key<input name="model_api_key" type="password" placeholder="Optional; leave blank to keep the saved key"></label>
+        </div>
+      </details>
+      <label>Double Agent URL<input name="double_agent_url" placeholder="http://127.0.0.1:8777"></label>
+      <div class="grid2"><label>Maximum steps<input name="max_steps" type="number" min="1" max="120"></label><label>Maximum output tokens<input name="max_output_tokens" type="number" min="512" max="32768"></label></div>
+      <p class="hint">Each saved connection keeps its own credential. Secrets stay in the local settings file with owner-only permissions and are never returned to this page.</p>
+      <div class="modal-actions"><button type="button" id="cancel-settings">Cancel</button><button class="primary" type="submit">Save settings</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="skill-dialog" class="skill-dialog">
+    <form id="skill-form">
+      <div class="modal-head"><div><div class="eyebrow">CUSTOM METHODOLOGY</div><h2>Add a skill</h2></div><button type="button" id="close-skill" class="icon">×</button></div>
+      <label>Name<input name="name" maxlength="80" placeholder="Example: SaaS tenant isolation" required></label>
+      <label>Description<input name="description" maxlength="240" placeholder="When and why this skill should guide the model"></label>
+      <label>Instructions<textarea name="instructions" rows="12" maxlength="12000" placeholder="Give concrete methodology, evidence requirements, stop conditions, and reporting guidance…" required></textarea></label>
+      <p class="hint">Custom skills stay on this Mac and are sent to the selected local model at the start of a run. Do not place credentials in a skill.</p>
+      <div class="modal-actions"><button type="button" id="cancel-skill">Cancel</button><button class="primary" type="submit">Add and select</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="model-dialog" class="skill-dialog">
+    <form id="model-form">
+      <div class="modal-head"><div><div class="eyebrow">MODEL CONNECTION</div><h2>Add a connection</h2></div><button type="button" id="close-model" class="icon">×</button></div>
+      <label>Provider<select name="provider" id="connection-provider"></select></label>
+      <p id="provider-description" class="hint provider-description"></p>
+      <div class="grid2">
+        <label>Connection name<input name="label" maxlength="60" placeholder="Example: Local Qwen" required></label>
+        <label>API model ID<input name="model" id="connection-model" list="connection-model-list" maxlength="180" placeholder="Exact model ID" required></label>
+      </div>
+      <datalist id="connection-model-list"></datalist>
+      <label id="connection-url-row">API base URL<input name="url" maxlength="300" placeholder="http://host:port/v1"></label>
+      <label id="connection-region-row" class="hidden">AWS region<input name="region" placeholder="us-east-1"></label>
+      <label><span id="connection-key-label">API key</span><input name="api_key" id="connection-api-key" type="password" autocomplete="new-password"><small id="connection-key-state" class="field-note"></small></label>
+      <label id="connection-thinking-row"><input type="checkbox" name="supports_thinking"> Supports <code>enable_thinking</code></label>
+      <p id="connection-thinking-help" class="hint">Only enable this when the server accepts <code>chat_template_kwargs.enable_thinking</code>.</p>
+      <div id="connection-test-result" class="connection-test-result hidden" role="status"></div>
+      <div class="modal-actions split-actions"><button type="button" id="test-model">Test connection</button><span></span><button type="button" id="cancel-model">Cancel</button><button class="primary" type="submit">Save and use</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="seed-dialog" class="skill-dialog">
+    <form id="seed-form">
+      <div class="modal-head"><div><div class="eyebrow">COVERAGE SEED</div><h2>Seed the attack surface</h2></div><button type="button" id="close-seed" class="icon">×</button></div>
+      <p class="hint">Paste an OpenAPI/Swagger JSON, a <code>sitemap.xml</code>, <code>robots.txt</code>, or a list of URLs/paths (one per line). Same-origin routes are added to coverage and discovery so Agent B tests beyond what reached Burp's history. <code>robots.txt</code>, <code>sitemap.xml</code> and common OpenAPI paths are also fetched automatically at the start of a Full App assessment.</p>
+      <label>Source<textarea name="text" rows="12" placeholder="Paste OpenAPI JSON, sitemap XML, robots.txt, or one URL/path per line…" required></textarea></label>
+      <div id="seed-result" class="connection-test-result hidden" role="status"></div>
+      <div class="modal-actions"><button type="button" id="cancel-seed">Cancel</button><button class="primary" type="submit">Add to coverage</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="new-conversation-dialog" class="confirm-dialog">
+    <div class="confirm-body">
+      <div class="eyebrow">NEW CONVERSATION</div>
+      <h2>Clear this conversation?</h2>
+      <p>This clears the chat and activity log and starts a regular conversation. For Burp work, press the highlighted Send bootstrap button first.</p>
+      <div class="modal-actions">
+        <button type="button" id="cancel-new-conversation">Cancel</button>
+        <button type="button" id="confirm-new-conversation" class="primary">Start new conversation</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="stop-run-dialog" class="confirm-dialog">
+    <div class="confirm-body">
+      <div class="eyebrow">STOP CURRENT RUN</div>
+      <h2>Stop Agent B?</h2>
+      <p>The current model request will be cancelled. Agent B may take a while to release the connection and finish stopping.</p>
+      <div class="modal-actions">
+        <button type="button" id="cancel-stop-run">Keep running</button>
+        <button type="button" id="confirm-stop-run" class="danger">Stop run</button>
+      </div>
+    </div>
+  </dialog>
+  <script src="/app.js"></script>
+</body>
+</html>

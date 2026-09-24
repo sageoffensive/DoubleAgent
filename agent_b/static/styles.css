@@ -1,0 +1,85 @@
+:root{color-scheme:dark;--bg:#0a0c0f;--panel:#101318;--line:#242a32;--muted:#87909d;--text:#eef1f5;--accent:#ff5c35;--green:#46d39a;--yellow:#f6c85f;--red:#ff6b72;font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);height:100vh;overflow:hidden}.shell{display:grid;grid-template-columns:285px 1fr;height:100vh}aside{background:#0d1014;border-right:1px solid var(--line);padding:24px 20px;display:flex;flex-direction:column;gap:26px}.brand{display:flex;align-items:center;gap:12px}.brand strong{display:block;font-size:18px}.brand span{display:block;color:var(--muted);font-size:12px;margin-top:2px}.mark{height:38px;width:38px;border-radius:11px;background:linear-gradient(145deg,#ff805f,var(--accent));display:grid;place-items:center;font-weight:800;color:#17110e;box-shadow:0 8px 28px #ff5c3530}.eyebrow{color:#707987;font-size:10px;font-weight:750;letter-spacing:.14em;margin-bottom:10px}.status-card{background:#14181e;border:1px solid var(--line);border-radius:14px;padding:16px}.run-line{display:flex;align-items:center;gap:9px;text-transform:capitalize}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#59616d;box-shadow:0 0 0 4px #59616d18}.dot.ok{background:var(--green);box-shadow:0 0 0 4px #46d39a18}.dot.warn{background:var(--yellow);box-shadow:0 0 0 4px #f6c85f18}.dot.bad{background:var(--red);box-shadow:0 0 0 4px #ff6b7218}.meter{height:4px;background:#252b33;border-radius:9px;margin:16px 0 8px;overflow:hidden}.meter i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}.status-card small,footer{color:var(--muted);font-size:11px}.connection{display:flex;align-items:center;gap:12px;margin:13px 3px}.connection strong{font-size:13px;display:block}.connection small{color:var(--muted);font-size:11px;display:block;margin-top:2px;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}aside section button{width:100%;margin:0 0 8px}button{font:inherit;color:var(--text);background:#171b21;border:1px solid #303741;border-radius:9px;padding:10px 13px;cursor:pointer}button:hover{background:#20252d}button.primary{background:var(--accent);border-color:var(--accent);color:#170b07;font-weight:750}button:disabled{opacity:.45;cursor:not-allowed}footer{margin-top:auto;line-height:1.5}main{min-width:0;display:grid;grid-template-rows:auto 1fr auto auto;background:radial-gradient(circle at 65% -20%,#202125 0,transparent 42%)}.topbar{height:94px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 34px}.topbar h1{font-size:22px;margin:0}.pill{border:1px solid var(--line);border-radius:20px;padding:7px 11px;color:var(--muted);font-size:11px}.timeline{overflow-y:auto;padding:28px 12%;scroll-behavior:smooth}.empty{height:100%;display:grid;place-items:center;text-align:center;color:var(--muted)}.empty strong{display:block;color:var(--text);font-size:24px;margin-bottom:8px}.message{max-width:820px;margin:0 auto 22px}.message .meta{font-size:10px;color:#6f7885;margin-bottom:7px;text-transform:uppercase;letter-spacing:.11em}.bubble{background:#15191f;border:1px solid var(--line);border-radius:4px 15px 15px 15px;padding:14px 16px;white-space:pre-wrap;line-height:1.55;font-size:14px}.message.user .meta{text-align:right}.message.user .bubble{background:#222126;border-color:#343138;border-radius:15px 4px 15px 15px;margin-left:auto;max-width:75%}.message.tool .bubble{background:#0f1317;color:#aab3bf;font-family:"SF Mono",Menlo,monospace;font-size:11px;border-style:dashed}.question{margin:0 12% 12px;padding:15px 16px;background:#241c16;border:1px solid #70452f;border-radius:12px}.question strong{display:block;margin-bottom:5px}.question p{color:#c8b2a4;font-size:12px;margin:0 0 11px;white-space:pre-wrap}.question button{margin-right:7px}.hidden{display:none!important}#composer{display:grid;grid-template-columns:1fr auto;gap:10px;margin:0 12% 25px;padding:8px;background:#15191f;border:1px solid #313842;border-radius:14px;box-shadow:0 18px 60px #0006}textarea,input,select{font:inherit;color:var(--text);background:#0f1216;border:1px solid #2c323a;border-radius:8px;padding:10px;outline:none}textarea{resize:none;border:0;background:transparent;line-height:1.45}textarea:focus,input:focus,select:focus{border-color:#8e5949}#composer button{align-self:end;background:var(--accent);border-color:var(--accent);color:#170b07;font-weight:750}dialog{width:min(620px,90vw);background:#12161b;color:var(--text);border:1px solid #343b45;border-radius:17px;padding:0;box-shadow:0 25px 100px #000b}dialog::backdrop{background:#050608cc}#settings-form{padding:25px}.modal-head{display:flex;justify-content:space-between;align-items:start}.modal-head h2{margin:0 0 18px}.icon{border:0;background:transparent;font-size:25px;padding:0 5px}.modal-head+.grid2{}label{display:grid;gap:6px;color:#aeb6c0;font-size:12px;margin-bottom:13px}label input,label select{width:100%}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.hint{color:var(--muted);font-size:11px;line-height:1.45}.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}@media(max-width:760px){.shell{grid-template-columns:1fr}aside{display:none}.timeline,#composer,.question{margin-left:18px;margin-right:18px}.timeline{padding:22px 18px}.topbar{padding:0 20px}}
+
+/* Keep the operator transcript inside the window and independently scrollable. */
+body{height:100dvh}.shell{height:100%;min-height:0;overflow:hidden}main{min-height:0;overflow:hidden;grid-template-rows:auto minmax(0,1fr) auto auto}.timeline{min-height:0;overflow-y:auto;overscroll-behavior:contain}
+main{grid-template-rows:auto auto auto minmax(0,1fr) auto auto}.model-stream-panel,.assessment-plan-panel{margin:12px 12% 0;border:1px solid #303945;border-radius:10px;background:#0c1014;min-width:0}.model-stream-panel summary,.assessment-plan-panel summary{cursor:pointer;padding:10px 13px;color:#b9c4d0;font-size:12px;display:flex;justify-content:space-between;gap:12px}.model-stream-panel summary small,.assessment-plan-panel summary small{color:var(--muted)}.model-stream-panel pre{margin:0;border-top:1px solid #252d36;padding:12px 13px;max-height:min(48vh,520px);overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;color:#9ed2b3;font:11px/1.55 "SF Mono",Menlo,monospace;user-select:text}.assessment-plan-panel{border-color:#45392e}.assessment-plan-panel>div{border-top:1px solid #2d2a28;padding:12px 14px;display:grid;grid-template-columns:1fr 1.5fr;gap:20px;max-height:42vh;overflow:auto}.plan-section>strong{display:block;color:#d9c6b8;font-size:12px;margin-bottom:9px}.plan-section ol{margin:0;padding-left:20px}.plan-section li{font-size:11px;margin:6px 0;color:#c1cad4}.plan-section li span{float:right;color:var(--muted)}.plan-section code{font-family:"SF Mono",Menlo,monospace}.family-grid{display:grid;gap:6px}.family-grid>div{font-size:11px;color:#c1cad4}.family-state{display:inline-block;min-width:118px;margin-right:8px;color:var(--green);font:10px "SF Mono",Menlo,monospace}.family-state.applicability_pending{color:var(--yellow)}
+
+/* Keep routine model/tool chatter available without flooding operator chat. */
+.confirm-dialog{width:min(470px,90vw)}.confirm-body{padding:25px}.confirm-body h2{margin:0 0 10px}.confirm-body p{margin:0;color:#aeb6c0;line-height:1.55;font-size:13px}
+button.connected{border-color:#2b765c;color:var(--green);background:#102019}
+.target-link{display:block;margin-top:3px;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#8fc8ff;font-size:11px;text-decoration:none}.target-link:hover{color:#b7dcff;text-decoration:underline}
+.topbar-actions{display:flex;align-items:center;gap:10px;min-width:0}.target-link-main{display:block;max-width:min(44vw,560px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#9bd0ff;background:#101820;border:1px solid #28445c;border-radius:20px;padding:7px 12px;font-size:11px;text-decoration:none}.target-link-main:hover{color:#c6e6ff;border-color:#3b6484;background:#14212b}
+.message.harness-status{max-width:760px}.message.harness-status .meta{color:#8391a4}.message.harness-status .bubble{background:#10151a;border-color:#27313b;color:#b7c1cc;font-size:13px;padding:11px 14px}
+
+/* Selectable methodology skills and reproducible run profiles. */
+aside{overflow-y:auto}.active-skills{display:flex;flex-wrap:wrap;gap:6px}.active-skills span{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:1px solid #315348;background:#11201b;color:#8fdbbb;border-radius:12px;padding:5px 8px;font-size:10px}.active-skills .muted-skill{border-color:#303741;background:#15191f;color:var(--muted)}
+#settings-dialog{max-height:92vh;overflow:auto}#settings-form,#skill-form{padding:25px}.skill-picker{border:1px solid #303741;border-radius:12px;margin:4px 0 16px;padding:12px}.skill-picker-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:10px}.skill-picker-head strong{display:block;font-size:13px}.skill-picker-head span{display:block;color:var(--muted);font-size:11px;margin-top:2px}.skill-picker-head button{padding:7px 10px;font-size:11px}.skill-options{display:grid;gap:7px;max-height:260px;overflow:auto;padding-right:3px}.skill-option{display:grid;grid-template-columns:auto 1fr auto;align-items:start;gap:10px;margin:0;padding:10px;border:1px solid #272e37;border-radius:9px;background:#0e1216;cursor:pointer}.skill-option:hover{border-color:#3b4653}.skill-option input{width:auto;margin:3px 0 0;accent-color:var(--accent)}.skill-option span strong{display:block;color:var(--text);font-size:12px}.skill-option span small{display:block;color:var(--muted);font-size:10px;line-height:1.4;margin-top:3px}.skill-option em{font-style:normal;color:#6e7b89;font-size:9px;text-transform:uppercase;letter-spacing:.08em;padding-top:3px}.skill-dialog{width:min(650px,92vw);max-height:92vh;overflow:auto}#skill-form textarea{resize:vertical;min-height:190px;background:#0f1216;border:1px solid #2c323a;padding:10px;font:12px/1.5 "SF Mono",Menlo,monospace}
+
+/* Chat layout: transcript fills the space and scrolls; composer is pinned to
+   the bottom at a normal chat-input height. Uses flex so hidden panels can't
+   shift the composer into the flexible row (which made the input huge). */
+main{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.topbar,#model-stream-panel,#coverage-panel,#assessment-plan-panel,#question,#composer{flex:0 0 auto}
+.timeline{flex:1 1 auto;min-height:0;overflow-y:auto}
+#composer{margin:10px 12% 16px}
+#composer textarea{max-height:132px;overflow-y:auto}
+/* Model commentary reads as compact, dimmed "thinking" context, not a wall. */
+#model-stream-panel{margin-top:10px}
+#model-stream-panel summary{font-size:11px}
+#model-stream-panel pre{font-size:10px;line-height:1.5;max-height:220px;color:#8b97a4}
+/* Disabled Settings inputs (e.g. Model API URL, which is display-only). */
+#settings-form input:disabled{opacity:.4;cursor:not-allowed}
+/* Add/Remove model buttons row. */
+.model-actions{display:flex;gap:8px;margin:0 0 13px}
+.model-actions button{width:auto;flex:0 0 auto;font-size:12px;padding:8px 12px}
+#remove-model:disabled{opacity:.4;cursor:not-allowed}
+/* Bedrock settings group inside the Settings dialog. */
+.bedrock-settings{border:1px solid #313842;border-radius:10px;padding:13px 13px 4px;margin:0 0 13px;background:#0f1317}
+.bedrock-settings .hint{margin-top:2px}
+.connection-summary{display:flex;align-items:flex-start;gap:11px;margin:-2px 0 13px;padding:11px 12px;border:1px solid #2b333d;border-radius:10px;background:#0e1216}.connection-summary>div{min-width:0}.connection-summary strong{display:block;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.connection-summary .hint{margin:3px 0 0}.provider-badge{flex:0 0 auto;border:1px solid #3d5b73;border-radius:12px;background:#13202a;color:#9dd2ff;padding:4px 7px;font-size:9px;font-weight:750;letter-spacing:.06em;text-transform:uppercase}.advanced-settings{border:1px solid #2d343d;border-radius:10px;margin:4px 0 14px;background:#0f1317}.advanced-settings summary{cursor:pointer;padding:10px 12px;color:#9da7b3;font-size:11px}.advanced-settings>div{padding:2px 12px 1px;border-top:1px solid #262e37}.provider-description{margin:-5px 0 14px;padding:9px 11px;border-left:2px solid #456079;background:#101820}.field-note{color:var(--muted);font-size:10px}.connection-test-result{margin:12px 0 2px;padding:10px 11px;border-radius:9px;font-size:11px;line-height:1.4;border:1px solid #38414c;background:#10151a;color:#b8c2cd}.connection-test-result.testing{border-color:#66552f;color:var(--yellow)}.connection-test-result.success{border-color:#286247;background:#0f1d17;color:var(--green)}.connection-test-result.failure{border-color:#75363b;background:#211316;color:#ff9da2;white-space:pre-wrap}.split-actions{display:grid;grid-template-columns:auto 1fr auto auto}.split-actions button{white-space:nowrap}#model-form code{font:10px "SF Mono",Menlo,monospace;color:#c5d1df}
+/* In-chat "thinking" messages: small, dim, no bubble — like reasoning context. */
+.message.thinking{max-width:820px;margin:0 auto 12px}
+.message.thinking .meta{color:#6f7885}
+.message.thinking .bubble{background:transparent;border:0;padding:2px 2px;color:#8b97a4;font-size:12px;line-height:1.5;font-style:italic;white-space:pre-wrap}
+
+#thinking-control{font-size:11px;align-self:center;flex:0 0 auto;color:var(--muted)}
+#thinking-choice{display:block;margin-top:4px;max-width:84px;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:5px}
+#composer:has(#thinking-control:not(.hidden)){grid-template-columns:minmax(0,1fr) auto auto}
+button.danger{background:#6d252a;border-color:#9d3a42;color:#fff;font-weight:700}
+button.danger:hover{background:#842d34}
+.mobile-menu,.nav-close{display:none}
+.control-guidance{margin:-2px 2px 12px;color:#f2b39f;font-size:11px;line-height:1.4}
+.control-guidance.ready{color:var(--green)}
+#bootstrap.primary{box-shadow:0 0 0 3px #ff5c3524,0 8px 24px #ff5c3520}
+/* Linked-finding validation progress is shown separately from model steps. */
+.status-card #finding-progress{display:block;margin-top:5px;color:#f6c85f}
+
+/* Coverage panel: how much of the discovered surface has been reached/tested. */
+.coverage-panel{margin:12px 12% 0;border:1px solid #2c4a3d;border-radius:10px;background:#0b110e;min-width:0}
+.coverage-panel summary{cursor:pointer;padding:10px 13px;color:#a9d8c1;font-size:12px;display:flex;justify-content:space-between;gap:12px}
+.coverage-panel summary small{color:var(--muted)}
+#coverage-body{border-top:1px solid #223029;padding:13px 14px;max-height:42vh;overflow:auto}
+.cov-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:12px}
+.cov-cell strong{display:block;font-size:11px;color:#d3e4da;margin-bottom:6px}
+.cov-cell span{display:block;font-size:10px;color:var(--muted);margin-top:5px}
+.cov-meter{height:6px;background:#20302a;border-radius:6px;overflow:hidden}
+.cov-meter i{display:block;height:100%;background:var(--green);transition:width .3s}
+.cov-stats{display:grid;gap:5px}
+.cov-stats>div{font-size:11px;color:#c1cad4}
+.cov-stats em{font-style:normal;display:inline-block;min-width:96px;color:#7f8b98;font-size:10px;text-transform:uppercase;letter-spacing:.06em;margin-right:8px}
+.cov-note{margin:11px 0 0;color:var(--muted);font-size:10px;line-height:1.5}
+@media(max-width:760px){.coverage-panel{margin-left:18px;margin-right:18px}.cov-grid{grid-template-columns:1fr}}
+
+@media(max-width:760px){
+  .mobile-menu{display:block;padding:7px 10px;font-size:11px}
+  aside{display:flex;position:fixed;inset:0 auto 0 0;width:min(88vw,330px);z-index:20;transform:translateX(-105%);transition:transform .2s ease;box-shadow:20px 0 60px #000b}
+  aside.open{transform:translateX(0)}
+  aside.open::after{content:"";position:fixed;inset:0 0 0 100%;width:20vw;background:#0008}
+  .nav-close{display:block;margin-left:auto}
+  .topbar-actions{gap:7px}
+  .pill{display:none}
+  #settings-dialog,#model-dialog,#skill-dialog{width:calc(100vw - 20px);max-height:calc(100dvh - 20px)}
+  #settings-form,#model-form,#skill-form{padding:18px}
+  .grid2{grid-template-columns:1fr}
+  .split-actions{grid-template-columns:1fr 1fr;gap:8px}.split-actions span{display:none}.split-actions button{width:100%}
+}

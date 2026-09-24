@@ -3066,7 +3066,8 @@ class BurpExtender(_BurpExtenderBase):
         # Configuration file path (in user's home directory)
         import os
         self.config_file = os.path.join(os.path.expanduser("~"), ".double_agent_ai_config.json")
-        self.PROJECT_ROOT_DIR = os.environ.get("DOUBLE_AGENT_PROJECT_ROOT", "/Users/seang/PENTESTS")
+        self.PROJECT_ROOT_DIR = os.environ.get(
+            "DOUBLE_AGENT_PROJECT_ROOT", os.path.expanduser("~/Pentests"))
         self.PROJECT_WORKSPACE_DIR = os.environ.get("DOUBLE_AGENT_PROJECT_DIR", os.path.join(self.PROJECT_ROOT_DIR, "GPT"))
         self.PORTSWIGGER_MCP_URL = os.environ.get("PORTSWIGGER_MCP_URL", "http://127.0.0.1:9876/")
         
