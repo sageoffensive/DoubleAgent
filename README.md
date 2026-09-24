@@ -93,7 +93,7 @@ A fresh install contains no connection and no API key. Use **Test connection** b
 3. In Agent B, select **Send bootstrap**.
 4. Review the imported target and scope before asking Agent B to test anything.
 
-The [Installation guide](docs/wiki/Installation.md) includes a complete walkthrough.
+The [Installation guide](https://github.com/sageoffensive/DoubleAgent/wiki/Installation) includes a complete walkthrough.
 
 ## Product tour
 
@@ -133,16 +133,16 @@ The Burp implementation is split internally because large Jython modules can exc
 - Assessment state, credentials, local databases, compiled output, and editor configuration are ignored by Git.
 - A model's final message is not treated as proof: finding completion requires persisted, evidence-backed dispositions.
 
-Read the [Security Model](docs/wiki/Security-Model.md) and report security issues privately through [SECURITY.md](SECURITY.md).
+Read the [Security Model](https://github.com/sageoffensive/DoubleAgent/wiki/Security-Model) and report security issues privately through [SECURITY.md](SECURITY.md).
 
 ## Documentation
 
-- [Wiki home](docs/wiki/Home.md)
-- [Installation](docs/wiki/Installation.md)
-- [Configuration](docs/wiki/Configuration.md)
-- [Architecture](docs/wiki/Architecture.md)
-- [Operator workflows](docs/wiki/Operator-Workflows.md)
-- [Troubleshooting](docs/wiki/Troubleshooting.md)
+- [Wiki home](https://github.com/sageoffensive/DoubleAgent/wiki)
+- [Installation](https://github.com/sageoffensive/DoubleAgent/wiki/Installation)
+- [Configuration](https://github.com/sageoffensive/DoubleAgent/wiki/Configuration)
+- [Architecture](https://github.com/sageoffensive/DoubleAgent/wiki/Architecture)
+- [Operator workflows](https://github.com/sageoffensive/DoubleAgent/wiki/Operator-Workflows)
+- [Troubleshooting](https://github.com/sageoffensive/DoubleAgent/wiki/Troubleshooting)
 - [Contributing](CONTRIBUTING.md)
 
 ## Development
