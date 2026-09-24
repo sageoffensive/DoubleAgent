@@ -5,24 +5,45 @@
 <h1 align="center">DoubleAgent</h1>
 
 <p align="center">
-  <strong>Agent A in Burp. A human hacker in control. Agent B as the teammate.</strong>
+  <strong>Agentic speed. Human authority.</strong><br>
+  A safer, guided way to use AI in web security testing.
 </p>
 
 <p align="center">
   <img alt="Version 3.0.1" src="https://img.shields.io/badge/version-3.0.1-ff9944">
   <img alt="License MIT" src="https://img.shields.io/badge/license-MIT-2ea44f">
   <img alt="Burp Suite" src="https://img.shields.io/badge/Burp%20Suite-Jython-f47b20">
+  <img alt="Human in the loop" src="https://img.shields.io/badge/control-human--in--the--loop-ff9944">
   <img alt="Security local first" src="https://img.shields.io/badge/security-local--first-24292f">
 </p>
 
-DoubleAgent is a two-part toolkit for authorized web security testing:
+Security teams want the speed of agentic testing. Clients need confidence that an AI cannot quietly leave scope, take unreviewed action, or declare success without evidence.
 
-1. **Agent A — the Burp extension** sees proxy traffic, enforces scope, runs requests, and owns findings and evidence.
-2. **The hacker — you** decides what is in scope, approves sensitive actions, and verifies the result.
-3. **Agent B — the teammate** plans and reasons with your chosen model, then asks Agent A to perform controlled work through Burp.
+**DoubleAgent is built for that gap.** It separates reasoning from authority:
+
+1. **Agent A — the Burp extension** enforces scope, runs target requests, and owns findings and evidence.
+2. **The human hacker — the authority** sets the objective, reviews evidence, answers questions, and approves sensitive decisions.
+3. **Agent B — the guided AI teammate** plans and reasons with your chosen model, then requests controlled work through Agent A.
+
+The model assists the tester. It does not become the tester's authority.
 
 > [!IMPORTANT]
 > Use DoubleAgent only on systems you own or are explicitly authorized to test.
+
+## Safer by architecture, not by promise
+
+No AI system is risk-free. DoubleAgent reduces runaway-agent risk by limiting what the model can control and keeping consequential decisions with Burp and the operator.
+
+| Client concern | DoubleAgent control |
+| --- | --- |
+| “What if the agent leaves scope?” | Agent A executes target traffic through Burp and applies Burp's configured scope and safety gates. |
+| “What if the model acts directly?” | Agent B has no separate target-network path; it requests allowlisted actions from Agent A over loopback. |
+| “What if it takes a disruptive action?” | State-changing and sensitive workflows pass through deterministic gates and pause for human input where required. |
+| “What if it says the test is complete when it is not?” | Completion depends on persisted findings, evidence, dispositions, and authoritative read-back—not the model's prose. |
+| “What if target content manipulates the agent?” | Model output, target content, and imported methodology are treated as untrusted input and cannot override scope or tool contracts. |
+| “What if credentials cross providers?” | Each model connection owns its credential; secrets are stored locally, isolated per connection, and redacted from public responses and transcripts. |
+
+This is a **human-in-the-loop control system**, not an unsupervised autonomous scanner. Read [Why human-in-the-loop](https://github.com/sageoffensive/DoubleAgent/wiki/Why-Human-In-The-Loop) for the client-facing risk model.
 
 ## How the team works
 
@@ -34,7 +55,7 @@ flowchart LR
     A -->|scope-checked requests| T[Authorized target]
 ```
 
-Agent B does not bypass Burp. Target traffic remains under Agent A's scope and safety controls, and the human operator remains responsible for every assessment.
+Agent B does not bypass Burp. Target traffic remains under Agent A's scope and safety controls, while the human operator remains responsible for authorization, intensity, approvals, and final judgment.
 
 ## Quick start
 
@@ -141,6 +162,7 @@ Read the [Security Model](https://github.com/sageoffensive/DoubleAgent/wiki/Secu
 - [Installation](https://github.com/sageoffensive/DoubleAgent/wiki/Installation)
 - [Configuration](https://github.com/sageoffensive/DoubleAgent/wiki/Configuration)
 - [Architecture](https://github.com/sageoffensive/DoubleAgent/wiki/Architecture)
+- [Why human-in-the-loop](https://github.com/sageoffensive/DoubleAgent/wiki/Why-Human-In-The-Loop)
 - [Operator workflows](https://github.com/sageoffensive/DoubleAgent/wiki/Operator-Workflows)
 - [Troubleshooting](https://github.com/sageoffensive/DoubleAgent/wiki/Troubleshooting)
 - [Contributing](CONTRIBUTING.md)

@@ -4,6 +4,8 @@ The simplest way to understand DoubleAgent is:
 
 **Agent A gathers and controls → the hacker decides → Agent B assists**
 
+The architecture intentionally separates **reasoning** from **authority**. Agent B can propose work; Agent A and the human operator control whether and how that work becomes target traffic or persisted security state.
+
 ```mermaid
 flowchart LR
     A[Agent A<br/>Burp extension] -->|traffic, evidence, findings| H[Human hacker<br/>scope, goals, approval]
