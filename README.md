@@ -65,7 +65,7 @@ The separation is deliberate:
 - **Agent B** manages model connections, conversations, methodology, planning, and tool-call orchestration.
 - **Model providers** see only the prompts and tool results required for the selected workflow. Credentials never cross between saved connections.
 
-Read the [Security Model](/sageoffensive/DoubleAgent/wiki/Security-Model) before connecting DoubleAgent to a real assessment.
+Read the [Security Model](docs/wiki/Security-Model.md) before connecting DoubleAgent to a real assessment.
 
 ## Install
 
@@ -123,7 +123,7 @@ Use **Test connection** before starting a run. A fresh installation contains no 
 2. In Agent B, select **Send bootstrap**.
 3. Confirm the connected target and scope before executing active tests.
 
-See the [Installation](/sageoffensive/DoubleAgent/wiki/Installation) and [Configuration](/sageoffensive/DoubleAgent/wiki/Configuration) wiki pages for a full walkthrough.
+See the [Installation](docs/wiki/Installation.md) and [Configuration](docs/wiki/Configuration.md) guides for a full walkthrough.
 
 ## Security defaults
 
@@ -154,7 +154,7 @@ cd agent_b
 codesign --verify --deep --strict "dist/Agent B.app"
 ```
 
-Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and the [wiki](/sageoffensive/DoubleAgent/wiki).
+Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) and the [documentation hub](docs/wiki/Home.md).
 
 ## Project status
 
