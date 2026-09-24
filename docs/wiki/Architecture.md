@@ -1,21 +1,22 @@
 # Architecture
 
+The simplest way to understand DoubleAgent is:
+
+**Agent A gathers and controls → the hacker decides → Agent B assists**
+
 ```mermaid
-flowchart TD
-    Operator --> AgentB[Agent B UI and engine]
-    Operator --> Burp[Burp Suite]
-    AgentB -->|authenticated loopback API| Extension[DoubleAgent extension]
-    AgentB --> Adapter[Provider adapter]
-    Adapter --> Model[Selected model API]
-    Extension -->|scope checked request| Target[Authorized target]
-    Target --> Extension
-    Extension --> Store[(Findings and audit state)]
-    Store --> AgentB
+flowchart LR
+    A[Agent A<br/>Burp extension] -->|traffic, evidence, findings| H[Human hacker<br/>scope, goals, approval]
+    H -->|tasks and review| B[Agent B<br/>web or macOS teammate]
+    B -->|allowlisted loopback tools| A
+    A -->|scope-checked requests| T[Authorized target]
+    A -->|persisted state| F[(Findings and audit trail)]
+    F --> H
 ```
 
-## DoubleAgent extension
+## Agent A: authority inside Burp
 
-The Jython extension owns:
+Agent A owns:
 
 - Burp scope and proxy traffic;
 - request execution and safety checks;
@@ -23,32 +24,37 @@ The Jython extension owns:
 - work queues and assessment state;
 - reporting and PortSwigger MCP transport.
 
-The v3.0 implementation is split across sibling Python modules to avoid JVM bytecode limits. The entry point reloads those modules when Burp reloads the extension.
+Burp loads one public entry point: `burp/DoubleAgent.py`. The implementation under `burp/src/` remains split into smaller modules because Jython compiles to JVM bytecode and very large modules can exceed the JVM method-size limit.
 
-## Agent B
+## The human hacker: control plane
+
+The operator owns:
+
+- authorization and target scope;
+- the testing objective;
+- approvals and answers to questions;
+- evidence review and final judgment;
+- confirmation that actions and findings were actually persisted.
+
+DoubleAgent is a teammate system, not an autonomous authority.
+
+## Agent B: reasoning teammate
 
 Agent B owns:
 
-- the operator chat interface;
-- provider-specific request translation;
+- the browser and macOS chat interface;
+- model-provider translation;
 - run contracts, phase control, and methodology selection;
 - duplicate-call prevention and evidence policy;
 - human questions and approval pauses;
 - local run traces and lessons.
 
-Agent B does not replace Burp's authority. It calls an allowlisted subset of DoubleAgent's loopback API.
+Agent B calls an allowlisted subset of Agent A's loopback API. It does not replace Burp's scope controls and has no separate target-network path.
 
-## Provider adapters
+## Model providers
 
-Agent B supports:
-
-- OpenAI Chat Completions;
-- Anthropic Messages;
-- Amazon Bedrock Converse;
-- OpenAI-compatible `/models` and `/chat/completions` servers.
-
-Tool schemas are translated at the provider boundary while the internal workflow remains provider-neutral.
+Agent B supports OpenAI, Anthropic, Amazon Bedrock, and local/OpenAI-compatible servers. Each saved connection owns its own endpoint, exact model ID, credential, and capabilities. Credentials are isolated at the provider boundary.
 
 ## Finding lifecycle
 
-Findings use immutable `daf_...` identifiers and versioned updates. A completed assessment requires persisted dispositions for linked findings. The harness does not accept an unverified model statement that work is complete.
+Findings use immutable `daf_...` identifiers and versioned updates. A completed assessment requires persisted dispositions and evidence. A model saying “done” is not proof that the work was saved.

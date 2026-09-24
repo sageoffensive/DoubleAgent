@@ -22,6 +22,8 @@ jobs:
         run: node --check agent_b/static/app.js
       - name: DoubleAgent tests
         run: python -m unittest discover -s tests -v
+      - name: Burp source compiles
+        run: python -m py_compile burp/DoubleAgent.py burp/src/*.py
       - name: Agent B tests
         working-directory: agent_b
         run: python -m unittest discover -s tests -v

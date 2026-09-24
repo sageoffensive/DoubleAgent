@@ -1,13 +1,13 @@
 **DoubleAgent**
 
-- [Home](Home)
-- [Installation](Installation)
-- [Configuration](Configuration)
-- [Architecture](Architecture)
-- [Security Model](Security-Model)
-- [Operator Workflows](Operator-Workflows)
-- [Troubleshooting](Troubleshooting)
-- [Contributing](Contributing)
+- [Home](Home.md)
+- [Install Agent A + Agent B](Installation.md)
+- [Configuration](Configuration.md)
+- [How the team works](Architecture.md)
+- [Security Model](Security-Model.md)
+- [Operator Workflows](Operator-Workflows.md)
+- [Troubleshooting](Troubleshooting.md)
+- [Contributing](Contributing.md)
 
 ---
 

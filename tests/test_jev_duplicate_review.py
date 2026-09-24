@@ -5,10 +5,16 @@ import ast
 import datetime
 import os
 import stat
+import sys
 import tempfile
 import threading
 import time
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+BURP_SRC = ROOT / "burp" / "src"
+sys.path.insert(0, str(BURP_SRC))
+
 from double_agent_jev import JevReviewMixin
 
 from jev_duplicate_review import (
@@ -74,8 +80,7 @@ class DuplicateReviewTests(unittest.TestCase):
 
     def test_real_config_methods_roundtrip_and_old_config_defaults(self):
         # Load the actual persistence methods without importing Burp's Java interfaces.
-        root = Path(__file__).resolve().parents[1]
-        tree = ast.parse((root / "double_agent_extender_part4.py").read_text())
+        tree = ast.parse((BURP_SRC / "double_agent_extender_part4.py").read_text())
         cls = next(node for node in tree.body if isinstance(node, ast.ClassDef))
         cls.body = [node for node in cls.body if isinstance(node, ast.FunctionDef) and node.name in ("load_config", "save_config")]
         module = ast.Module(body=[cls], type_ignores=[])

@@ -1,37 +1,57 @@
 # Installation
 
-## Requirements
+DoubleAgent has two required halves: **Agent A in Burp** and **Agent B in a browser or macOS app**.
+
+## What you need
 
 - Burp Suite Professional or Community
-- Jython standalone 2.7.x configured in Burp
-- Python 3.10 or later for Agent B
-- macOS 13 or later for the optional native Agent B application
-- One model connection that you configure
+- Jython standalone 2.7.x
+- Python 3.10 or later when running Agent B from source
+- macOS 13 or later for the optional Agent B application
+- A model connection you configure yourself
 
-## Install the Burp extension
+## Step 1: install Agent A
 
-1. Download the latest `DoubleAgent-v3.0.0` release bundle.
-2. Extract it to a stable folder.
-3. Keep `double-agent-v3.0.py`, every `double_agent_*.py` module, `remote_reporting.py`, and `jev_duplicate_review.py` together.
-4. In Burp, open **Extensions → Settings → Python Environment** and select the Jython standalone JAR.
-5. Open **Extensions → Installed → Add**.
-6. Choose **Python** and select `double-agent-v3.0.py`.
-7. Confirm the **Double Agent** tab appears without an extension error.
+1. Download and extract the latest `DoubleAgent-v3.0.1.zip` release bundle.
+2. In Burp, open **Extensions → Settings → Python Environment**.
+3. Select your Jython standalone JAR.
+4. Open **Extensions → Installed → Add**.
+5. Choose **Python** and select:
 
-If Burp's loader does not make the selected file's directory available to Jython, set `DOUBLE_AGENT_EXTENSION_DIR` to the extracted folder before launching Burp.
+   ```text
+   burp/DoubleAgent.py
+   ```
 
-## Run Agent B from source
+6. Confirm the **Double Agent** tab appears without an extension error.
+7. Open the **Agent AI** tab and start the Agent API.
+
+`DoubleAgent.py` automatically finds `burp/src/`. You do not need to select or move any of the internal files.
+
+If an unusual launcher cannot locate the source folder, set `DOUBLE_AGENT_EXTENSION_DIR` to the extracted `burp` folder before starting Burp.
+
+## Step 2A: start Agent B in a browser
+
+From the extracted source:
 
 ```bash
 cd agent_b
 ./run.command
 ```
 
-Open `http://127.0.0.1:4310`.
+Open [http://127.0.0.1:4310](http://127.0.0.1:4310).
 
-Agent B stores local state under `agent_b/data/`. The directory is ignored by Git and must not be shared.
+Agent B uses the Python standard library and starts with no saved model connection. Its local state lives under `agent_b/data/`, which is ignored by Git and should never be shared.
 
-## Build the macOS application
+## Step 2B: install Agent B on macOS
+
+Instead of the browser launch above:
+
+1. Download `Agent-B-macOS-v3.0.1.zip` from the latest release.
+2. Extract **Agent B.app**.
+3. Move it to **Applications**.
+4. Open the app.
+
+Developers can build it locally:
 
 ```bash
 cd agent_b
@@ -40,15 +60,22 @@ codesign --verify --deep --strict "dist/Agent B.app"
 open "dist/Agent B.app"
 ```
 
-The default build is ad-hoc signed. Maintainers can set `SIGN_IDENTITY` and `NOTARIZE_KEYCHAIN_PROFILE` for a distributable notarized build.
+## Step 3: verify both halves
 
-## Verify the services
-
-Start the Agent API in Burp, then check:
+With Agent A's API and Agent B running:
 
 ```bash
 curl -s http://127.0.0.1:8777/api/health
 curl -s http://127.0.0.1:4310/api/health
 ```
 
-Both should return JSON. Continue with [Configuration](Configuration).
+Both commands should return JSON.
+
+## Step 4: connect the team
+
+1. Add and test a model under **Agent B → Settings → Add connection**.
+2. Set the authorized target scope in Burp.
+3. Select **Send bootstrap** in Agent B.
+4. Review the target and scope Agent B received.
+
+Continue with [Configuration](Configuration.md) or [Operator Workflows](Operator-Workflows.md).
