@@ -55,6 +55,10 @@ Agent B owns:
 
 Agent B calls an allowlisted subset of Agent A's loopback API. It does not replace Burp's scope controls and has no separate target-network path.
 
+### Live model activity
+
+The Agent B chat automatically opens a live activity panel for each run. When a provider explicitly emits a reasoning channel, that text is labelled and shown verbatim. When it does not, Agent B shows the model's concise action commentary plus its current phase, such as planning, writing a response, choosing a tool, or applying a harness safety check. DoubleAgent does not invent or expose hidden chain-of-thought.
+
 ## PortSwigger MCP bridge
 
 Agent B is not a direct MCP client. It requests semantic Burp actions from Agent A. Agent A discovers the tools exposed by PortSwigger's MCP Server extension, maps supported capabilities, applies schema, scope, safety and confirmation gates, and then makes the MCP tool call over loopback.

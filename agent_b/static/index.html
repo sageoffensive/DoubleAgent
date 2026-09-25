@@ -55,8 +55,12 @@
         </div>
       </header>
       <details id="model-stream-panel" class="model-stream-panel">
-        <summary><span>Model stream (debug)</span><small id="model-stream-state">Waiting for model</small></summary>
-        <pre id="model-stream">No model output yet.</pre>
+        <summary>
+          <span class="model-activity-title"><i id="model-activity-dot" class="activity-dot"></i><span id="model-activity-label">Model activity</span></span>
+          <small id="model-stream-state" aria-live="polite">Waiting for model</small>
+        </summary>
+        <div class="model-stream-note"><strong id="model-stream-source">Action commentary</strong><span>Provider-exposed reasoning is shown when available. Agent B never invents or exposes hidden chain-of-thought.</span></div>
+        <pre id="model-stream" aria-label="Live model activity">No model output yet.</pre>
       </details>
       <details id="coverage-panel" class="coverage-panel hidden">
         <summary><span id="coverage-title">Coverage</span><small id="coverage-sub">Discovered surface reached &amp; tested</small></summary>

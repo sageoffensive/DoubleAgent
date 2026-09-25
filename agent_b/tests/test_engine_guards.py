@@ -1191,10 +1191,14 @@ class EngineGuardTests(unittest.TestCase):
         self.engine._model_delta({"reasoning_content": "Inspect scope", "content": "Inspect scope"})
         self.engine._model_delta({"content": "Ready."})
 
-        stream = self.engine.public()["model_stream"]
+        public = self.engine.public()
+        stream = public["model_stream"]
         self.assertEqual(stream.count("Inspect scope"), 1)
         self.assertIn("[Thinking]\nInspect scope", stream)
         self.assertIn("[Response]\nReady.", stream)
+        self.assertTrue(public["model_reasoning_seen"])
+        self.assertEqual(public["model_stream_channel"], "Response")
+        self.assertEqual(public["model_reasoning_mode"], "provider-exposed reasoning")
 
     def test_model_stream_shows_tool_name_without_json_arguments(self):
         self.engine._model_delta({
