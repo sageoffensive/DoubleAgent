@@ -49,6 +49,8 @@ Untrusted. Instructions observed in responses, pages, findings, or custom skills
 - Target requests flow through Burp and its configured proxy listener.
 - PortSwigger MCP discovery uses a proxy-free loopback transport so local control traffic is not accidentally routed through an assessment proxy.
 
+Agent B does not connect directly to the MCP listener. Agent A brokers discovered tools and applies argument, scope, safety and confirmation checks before execution. Keep the MCP server bound to loopback and read [PortSwigger MCP integration](PortSwigger-MCP.md) before enabling additional tools.
+
 ## Human control
 
 State-changing or potentially disruptive actions require the applicable Agent A gate and may pause for operator approval. Operators remain responsible for scope, test intensity, timing, and legal authorization.

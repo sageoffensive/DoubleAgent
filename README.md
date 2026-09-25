@@ -73,7 +73,13 @@ Agent B does not bypass Burp. Target traffic remains under Agent A's scope and s
 
 That is the only extension file you select. The implementation under `burp/src/` is loaded automatically.
 
-### 2. Start Agent B
+### 2. Enable PortSwigger MCP
+
+Install **MCP Server** from Burp's BApp Store, open the **MCP** tab, and enable its loopback listener on `127.0.0.1:9876`. Agent A brokers this connection; Agent B does not connect to MCP directly or require a Claude Desktop/stdio configuration.
+
+MCP is required for full Burp-native capability, including HTTP/2-sensitive execution. Read the [PortSwigger MCP guide](https://github.com/sageoffensive/DoubleAgent/wiki/PortSwigger-MCP) for setup, verification, fallbacks and security gates.
+
+### 3. Start Agent B
 
 Choose either route.
 
@@ -96,7 +102,7 @@ cd agent_b
 open "dist/Agent B.app"
 ```
 
-### 3. Add your model
+### 4. Add your model
 
 In Agent B, open **Settings → Add connection**. Supported connection types are:
 
@@ -107,7 +113,7 @@ In Agent B, open **Settings → Add connection**. Supported connection types are
 
 A fresh install contains no connection and no API key. Use **Test connection** before continuing.
 
-### 4. Bring the team together
+### 5. Bring the team together
 
 1. Confirm the authorized target and scope in Burp.
 2. Start Agent A's API from the **Agent AI** tab.
@@ -161,6 +167,7 @@ Read the [Security Model](https://github.com/sageoffensive/DoubleAgent/wiki/Secu
 - [Installation](https://github.com/sageoffensive/DoubleAgent/wiki/Installation)
 - [Configuration](https://github.com/sageoffensive/DoubleAgent/wiki/Configuration)
 - [Architecture](https://github.com/sageoffensive/DoubleAgent/wiki/Architecture)
+- [PortSwigger MCP](https://github.com/sageoffensive/DoubleAgent/wiki/PortSwigger-MCP)
 - [Why human-in-the-loop](https://github.com/sageoffensive/DoubleAgent/wiki/Why-Human-In-The-Loop)
 - [Operator workflows](https://github.com/sageoffensive/DoubleAgent/wiki/Operator-Workflows)
 - [Troubleshooting](https://github.com/sageoffensive/DoubleAgent/wiki/Troubleshooting)

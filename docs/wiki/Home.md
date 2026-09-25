@@ -38,12 +38,14 @@ No AI system is risk-free. DoubleAgent reduces risk by constraining the model an
 ## Get running
 
 1. [Install Agent A in Burp and start Agent B](Installation.md).
-2. [Add a model connection](Configuration.md).
-3. [Run your first authorized workflow](Operator-Workflows.md).
+2. [Enable PortSwigger MCP for full Burp tool access](PortSwigger-MCP.md).
+3. [Add a model connection](Configuration.md).
+4. [Run your first authorized workflow](Operator-Workflows.md).
 
 ## Learn more
 
 - [Architecture](Architecture.md)
+- [PortSwigger MCP integration](PortSwigger-MCP.md)
 - [Why human-in-the-loop](Why-Human-In-The-Loop.md)
 - [Security Model](Security-Model.md)
 - [Troubleshooting](Troubleshooting.md)
