@@ -23,12 +23,15 @@ Security teams want the speed of agentic testing. Clients need confidence that a
 
 1. **Agent A — the Burp extension** enforces scope, runs target requests, and owns findings and evidence.
 2. **The human hacker — the authority** sets the objective, reviews evidence, answers questions, and approves sensitive decisions.
-3. **Agent B — the guided AI teammate** plans and reasons with your chosen model, then requests controlled work through Agent A.
+3. **The AI teammate — Claude Code, Codex, or Agent B** plans and reasons, then uses Agent A's generated prompt and controlled interface to work with Burp.
 
 The model assists the tester. It does not become the tester's authority.
 
 > [!IMPORTANT]
 > Use DoubleAgent only on systems you own or are explicitly authorized to test.
+
+> [!NOTE]
+> Agent B's web interface and macOS app are **experimental works in progress**. You do not need either harness to use DoubleAgent: Agent A generates activation and resume prompts that you can paste directly into a fresh Claude Code or Codex session. The dedicated harnesses are included for testing, contribution, and development toward a more focused security-agent experience.
 
 ## Safer by architecture, not by promise
 
@@ -50,33 +53,33 @@ This is a **human-in-the-loop control system**, not an unsupervised autonomous s
 ```mermaid
 flowchart LR
     A[Agent A<br/>Burp extension] -->|traffic, evidence, findings| H[Human hacker<br/>scope and decisions]
-    H -->|goals, review, approval| B[Agent B<br/>AI teammate]
+    H -->|goals, review, approval| B[AI teammate<br/>Claude Code, Codex, or Agent B]
     B -->|controlled loopback tools| A
     A -->|scope-checked requests| T[Authorized target]
 ```
 
-Agent B does not bypass Burp. Target traffic remains under Agent A's scope and safety controls, while the human operator remains responsible for authorization, intensity, approvals, and final judgment.
+The Agent B harness has no separate target-network path. Claude Code and Codex users receive the same Agent A operating contract through the generated prompt, while retaining the permissions of their general-purpose runtime. The human operator remains responsible for authorization, intensity, approvals, and final judgment.
 
-## Why use Agent B instead of Claude Code or Codex?
+## Claude Code, Codex, or the Agent B harness?
 
-Claude Code and Codex are excellent general-purpose coding agents. They are designed to work across repositories, shells, files, developer tools, and many kinds of tasks. That flexibility is valuable for building software, but a live security assessment benefits from a narrower operating environment.
+**Claude Code and Codex are supported ways to operate DoubleAgent today.** Agent A contains a generated activation prompt and a separate resume prompt tailored to the running Burp workspace. Paste one into a fresh agent session and it directs the agent to load DoubleAgent's current API documentation, Burp skill, capabilities, workspace, scope, preflight checks, queue, findings, and evidence rules. The detailed operating knowledge comes from Agent A at runtime, so users do not need to install a separate prompt pack or agent skill folder.
 
-**Agent B is a purpose-built security harness around your chosen model.** The model supplies intelligence; the harness keeps that intelligence focused on the authorized assessment, gives it a stable Burp-native tool surface, and independently enforces the workflow around it.
+The included Agent B web and macOS harnesses explore what a purpose-built security-agent experience can add on top of the same Agent A control plane. They are **works in progress**, not a claim that users must replace Claude Code or Codex. The model supplies intelligence; the custom harness aims to keep that intelligence focused on the authorized assessment and make the workflow more repeatable.
 
-| Assessment need | Agent B | Typical general-purpose coding-agent workflow |
+| Assessment need | Experimental Agent B harness | Claude Code or Codex with the DoubleAgent prompt |
 | --- | --- | --- |
-| Keep the model focused | Loads an explicit assessment contract, selected security skills, current target state, plan, and relevant evidence. Long histories are compacted into assessment checkpoints instead of becoming an unstructured conversation. | Broad project and shell context can compete with the testing objective unless the operator continually curates prompts and files. |
-| Limit authority | Exposes a small allowlisted security tool surface. The model does not receive a general shell, arbitrary file access, or a separate route to the target. | Often designed to edit files, run commands, install tools, and use broad developer integrations—the right powers for coding, but more authority than a target-facing model needs. |
-| Enforce scope | Routes target traffic through Agent A and Burp, where scope, safety, transport, and confirmation rules are authoritative. | Instructions and MCP configuration can guide scope, but a custom integration must still implement and verify the enforcement boundary. |
-| Demand evidence | Requires captured requests, responses, reproduction detail, finding linkage, persisted dispositions, and authoritative read-back before work is considered complete. | A convincing answer or generated report can be mistaken for completed, persisted assessment work unless an external controller checks it. |
-| Maintain assessment discipline | Uses phase control, stable tool schemas, bounded step budgets, duplicate-call guards, queue ownership, coverage tracking, and completion gates. | The workflow is usually prompt-led and must be rebuilt or re-explained for each engagement. |
-| Preserve human judgment | Pauses for questions and approvals, shows live model activity, and keeps the hacker responsible for authorization and final judgment. | Human review is available, but security-specific approval points depend on how the operator configures each session. |
+| Keep the model focused | Loads an explicit assessment contract, selected security skills, current target state, plan, and relevant evidence. Long histories are compacted into assessment checkpoints instead of becoming an unstructured conversation. | The generated prompt provides a strong initial anchor and live state, while continued focus also depends on the general session context and operator. |
+| Limit authority | Exposes a small allowlisted security tool surface. The model does not receive a general shell, arbitrary file access, or a separate route to the target. | The agent retains the capabilities allowed by its normal runtime. The prompt tells it to use DoubleAgent for target work, but it is not a sandbox; configure the agent's own approvals and permissions appropriately. |
+| Enforce scope | Routes target traffic through Agent A and Burp, where scope, safety, transport, and confirmation rules are authoritative. | Agent A enforces every action requested through its API. Other shell, network, or MCP capabilities remain governed by the Claude Code or Codex runtime and operator configuration. |
+| Demand evidence | Adds controller-level completion checks around Agent A's captured requests, responses, finding linkage, persisted dispositions, and authoritative read-back. | The generated prompt instructs the agent to use those evidence APIs and verify writes; the operator also has the general agent's native transcript and controls. |
+| Maintain assessment discipline | Uses phase control, stable tool schemas, bounded step budgets, duplicate-call guards, queue ownership, coverage tracking, and completion gates. | The generated prompt loads the workflow and current state, while sequencing remains more dependent on the agent session and operator than on a dedicated controller. |
+| Preserve human judgment | Pauses for questions and approvals, shows live model activity, and keeps the hacker responsible for authorization and final judgment. | Claude Code and Codex provide their own human controls; the generated prompt identifies DoubleAgent's approval points, and Agent A enforces gated actions. |
 | Compare models fairly | Runs OpenAI, Anthropic, Bedrock, and local/OpenAI-compatible models behind the same contracts and tools, making model and methodology comparisons more reproducible. | Different agents bring different prompts, tools, context policies, and execution environments, which can confound model comparisons. |
-| Recover and audit | Records local run events, checkpoints assessment progress, protects finding state, and resumes through a domain-specific workflow rather than relying only on chat history. | Recovery and auditability are generally centred on code changes and terminal activity rather than Burp findings and assessment state. |
+| Recover and audit | Records local run events, checkpoints assessment progress, protects finding state, and resumes through a domain-specific workflow rather than relying only on chat history. | Agent A still persists findings, evidence, coverage, and queues; **Copy Resume Prompt** rehydrates that state into a new general-agent session. |
 
 A custom harness also reduces **context drift**. Agent B repeatedly anchors the model to the target, current test phase, outstanding evidence, and permitted next actions. It can reject a structurally invalid action even when the model sounds confident. These controls are deterministic harness behaviour, not another instruction the model may forget.
 
-This is not an either-or choice. Claude Code and Codex remain useful for developing tooling, reviewing source, and handling general engineering work. Agent B is the better fit for running the live DoubleAgent workflow because it turns a capable model into a bounded, repeatable Burp teammate rather than a general computer operator.
+Until the web and macOS harnesses mature, Claude Code or Codex with Agent A's generated prompt is the simplest route for most users. In either route, actions sent through DoubleAgent stay under Agent A and Burp's scope, findings, and evidence controls; the custom harness additionally removes the model's separate general-computer path.
 
 ## Quick start
 
@@ -100,11 +103,24 @@ Install **MCP Server** from Burp's BApp Store, open the **MCP** tab, and enable 
 
 MCP is required for full Burp-native capability, including HTTP/2-sensitive execution. Read the [PortSwigger MCP guide](https://github.com/sageoffensive/DoubleAgent/wiki/PortSwigger-MCP) for setup, verification, fallbacks and security gates.
 
-### 3. Start Agent B
+### 3. Choose how to run the agent
 
-Choose either route.
+**Claude Code or Codex — simplest starting route**
 
-**Web interface — fastest from source**
+1. In Burp's **Agent AI** tab, select **Start Server**.
+2. Select **Copy Agent B's Prompt** and paste it into a fresh Claude Code or Codex session.
+3. Let the agent run the prompt's local readiness checks, then review its reported target, scope, and available Burp capabilities.
+4. When continuing after a restart or a long break, use **Copy Resume Prompt** instead so the agent reloads persisted findings, coverage, knowledge, fixtures, confirmations, and queued work.
+
+You can also print the current activation prompt from the loopback API:
+
+```bash
+curl -s http://127.0.0.1:8777/api/agent/prompt | jq -r .prompt
+```
+
+The prompt contains no API key. It points the agent at Agent A's loopback-only, self-describing API and tells it to fetch the current Burp operating skill and workspace state before acting. Because Claude Code and Codex remain general-purpose agents, review their normal shell, network, approval, and MCP permissions separately.
+
+**Agent B web interface — experimental work in progress**
 
 ```bash
 cd agent_b
@@ -113,7 +129,7 @@ cd agent_b
 
 Open [http://127.0.0.1:4310](http://127.0.0.1:4310).
 
-**macOS application**
+**Agent B macOS application — experimental work in progress**
 
 Download `Agent-B-macOS-v3.0.1.zip` from the latest release, extract it, and move **Agent B.app** to Applications. Maintainers and developers can build it with:
 
@@ -123,9 +139,9 @@ cd agent_b
 open "dist/Agent B.app"
 ```
 
-### 4. Add your model
+### 4. If using Agent B, add your model
 
-In Agent B, open **Settings → Add connection**. Supported connection types are:
+Skip this step when using Claude Code or Codex. In the experimental Agent B harness, open **Settings → Add connection**. Supported connection types are:
 
 - OpenAI
 - Anthropic
@@ -134,20 +150,20 @@ In Agent B, open **Settings → Add connection**. Supported connection types are
 
 A fresh install contains no connection and no API key. Use **Test connection** before continuing.
 
-### 5. Bring the team together
+### 5. Start the assessment
 
 1. Confirm the authorized target and scope in Burp.
 2. Start Agent A's API from the **Agent AI** tab.
-3. In Agent B, select **Send bootstrap**.
-4. Review the imported target and scope before asking Agent B to test anything.
+3. Paste **Copy Agent B's Prompt** into Claude Code or Codex, or select **Send bootstrap** in the Agent B harness.
+4. Review the imported target, scope, capabilities, and safety state before asking the agent to test anything.
 
 The [Installation guide](https://github.com/sageoffensive/DoubleAgent/wiki/Installation) includes a complete walkthrough.
 
 ## Product tour
 
-### Agent B workspace
+### Agent B workspace (work in progress)
 
-Agent B opens as a normal, neutral chat. Burp context and assessment tools are loaded only when you explicitly select **Send bootstrap**.
+The experimental Agent B harness opens as a normal, neutral chat. Burp context and assessment tools are loaded only when you explicitly select **Send bootstrap**.
 
 ![Agent B operator workspace](docs/images/agent-b-operator.png)
 
