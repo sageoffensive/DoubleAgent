@@ -2188,6 +2188,8 @@ class Engine:
         self.model_stream = ""
         self.model_stream_step = 0
         self.model_stream_channel = ""
+        self.model_reasoning_seen = False
+        self.chat_thinking: bool | None = None
         self.target_url = ""
         self.assessment_plan: dict[str, Any] = {}
         self.assessment_inventory: dict[str, Any] = {}
@@ -2310,10 +2312,15 @@ class Engine:
                 "model_stream_length": stream_length,
                 "model_stream_step": self.model_stream_step,
                 "model_stream_started": self.model_step_started,
+                "model_stream_channel": self.model_stream_channel,
+                "model_reasoning_seen": self.model_reasoning_seen,
+                "model_reasoning_requested": self.chat_thinking is True,
                 "model_reasoning_mode": (
-                    "provider-exposed thinking enabled"
-                    if cfg.model == "cyberstrike"
-                    else "non-thinking checkpoint; model commentary is required"
+                    "provider-exposed reasoning"
+                    if self.model_reasoning_seen
+                    else "thinking requested; waiting for provider output"
+                    if self.chat_thinking is True
+                    else "concise action commentary"
                 ),
                 "target_url": self.target_url,
                 "contract": self.contract,
@@ -2454,6 +2461,7 @@ class Engine:
             self.model_stream = ""
             self.model_stream_step = 0
             self.model_stream_channel = ""
+            self.model_reasoning_seen = False
             self.queue_fetch_mode = queue_fetch_mode
             self.thread = threading.Thread(target=self._run, args=(text,), daemon=True, name="agent-b")
             self._checkpoint()
@@ -2640,6 +2648,8 @@ class Engine:
             self.model_stream = ""
             self.model_stream_step = 0
             self.model_stream_channel = ""
+            self.model_reasoning_seen = False
+            self.chat_thinking = None
             self.resume_queue_id = ""
             self.resume_requested = False
             self.context = [{"role": "system", "content": CHAT_SYSTEM}]
@@ -4195,6 +4205,8 @@ class Engine:
                     self.model_last_substantive = time.time()
                 elif time.time() - self.model_last_substantive > 30:
                     raise RuntimeError("whitespace-only model stream stalled")
+                if reasoning:
+                    self.model_reasoning_seen = True
                 for channel, text in chunks:
                     if self.model_stream_channel != channel:
                         self.model_stream += f"\n[{channel}]\n"

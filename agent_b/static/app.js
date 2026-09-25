@@ -117,6 +117,7 @@ function render(value) {
   if (runChanged) {
     cache.modelRun = value.started;
     cache.modelStream = '';
+    if (active && value.started) streamPanel.open = true;
   }
   if (streamOffset === cache.modelStream.length) {
     cache.modelStream += streamDelta;
@@ -136,10 +137,31 @@ function render(value) {
     ? Math.max(0, Math.floor(Date.now() / 1000 - Number(value.model_stream_started)))
     : 0;
   const reasoningMode = value.model_reasoning_mode || 'provider output shown verbatim';
+  const streamChannel = String(value.model_stream_channel || '');
+  let activityLabel = 'Model activity';
+  if (active) {
+    if (streamChannel === 'Thinking') activityLabel = 'Thinking';
+    else if (streamChannel === 'Model commentary') activityLabel = 'Planning next action';
+    else if (streamChannel === 'Response') activityLabel = 'Writing response';
+    else if (streamChannel === 'Tool call') activityLabel = 'Choosing a tool';
+    else if (streamChannel === 'Harness') activityLabel = 'Applying safety checks';
+    else if (streamChannel === 'Finish') activityLabel = 'Finishing model step';
+    else activityLabel = 'Starting model';
+  } else if (streamLength) {
+    activityLabel = value.model_reasoning_seen ? 'Reasoning and activity' : 'Last model activity';
+  }
+  $('#model-activity-label').textContent = activityLabel;
+  $('#model-activity-dot').className = `activity-dot ${active ? 'active' : streamLength ? 'complete' : ''}`;
+  $('#model-stream-source').textContent = value.model_reasoning_seen
+    ? 'Provider-exposed reasoning'
+    : value.model_reasoning_requested
+      ? 'Waiting for provider reasoning'
+      : 'Action commentary';
+  streamPanel.classList.toggle('active', active);
+  streamPanel.classList.toggle('has-reasoning', Boolean(value.model_reasoning_seen));
   $('#model-stream-state').textContent = streamLength
-    ? `Step ${value.model_stream_step}${modelElapsed ? ` · generating ${modelElapsed}s` : ''} · ${streamLength.toLocaleString()} characters · ${reasoningMode}`
+    ? `Step ${value.model_stream_step}${modelElapsed ? ` · ${modelElapsed}s` : ''} · ${reasoningMode}`
     : `Waiting for ${modelOption(value.settings.model)?.label || 'model'} · ${reasoningMode}`;
-  // The model stream is a debug view; leave it collapsed unless the operator opens it.
 
   const plan = value.assessment_plan || {};
   const planPanel = $('#assessment-plan-panel');

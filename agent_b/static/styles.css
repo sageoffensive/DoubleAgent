@@ -23,10 +23,23 @@ main{display:flex;flex-direction:column;min-height:0;overflow:hidden}
 .timeline{flex:1 1 auto;min-height:0;overflow-y:auto}
 #composer{margin:10px 12% 16px}
 #composer textarea{max-height:132px;overflow-y:auto}
-/* Model commentary reads as compact, dimmed "thinking" context, not a wall. */
-#model-stream-panel{margin-top:10px}
-#model-stream-panel summary{font-size:11px}
-#model-stream-panel pre{font-size:10px;line-height:1.5;max-height:220px;color:#8b97a4}
+/* Live model activity surfaces provider-emitted reasoning and concise action
+   commentary without implying access to hidden chain-of-thought. */
+#model-stream-panel{margin-top:10px;transition:border-color .2s,box-shadow .2s}
+#model-stream-panel.active{border-color:#604b36;box-shadow:0 0 0 1px #f6c85f10,0 10px 32px #0003}
+#model-stream-panel.has-reasoning{border-color:#315348}
+#model-stream-panel summary{font-size:11px;align-items:center}
+.model-activity-title{display:inline-flex;align-items:center;gap:9px;color:#d7dde5;font-weight:700}
+.activity-dot{width:8px;height:8px;border-radius:50%;background:#59616d;box-shadow:0 0 0 4px #59616d18;flex:0 0 auto}
+.activity-dot.active{background:var(--yellow);box-shadow:0 0 0 4px #f6c85f18;animation:activity-pulse 1.5s ease-in-out infinite}
+.activity-dot.complete{background:var(--green);box-shadow:0 0 0 4px #46d39a18}
+.model-stream-note{display:flex;align-items:baseline;gap:9px;border-top:1px solid #252d36;padding:9px 13px;color:#788493;font-size:10px;line-height:1.45}
+.model-stream-note strong{color:#aeb9c5;white-space:nowrap}
+#model-stream-panel.has-reasoning .model-stream-note strong{color:#8fdbbb}
+#model-stream-panel pre{font-size:11px;line-height:1.55;max-height:220px;color:#a5b0bc;border-top:1px solid #202831}
+@keyframes activity-pulse{50%{opacity:.5;transform:scale(.82)}}
+@media(prefers-reduced-motion:reduce){.activity-dot.active{animation:none}}
+@media(max-width:760px){.model-stream-note{display:block}.model-stream-note strong{display:block;margin-bottom:3px}.model-stream-panel summary{align-items:flex-start}.model-stream-panel summary small{text-align:right}}
 /* Disabled Settings inputs (e.g. Model API URL, which is display-only). */
 #settings-form input:disabled{opacity:.4;cursor:not-allowed}
 /* Add/Remove model buttons row. */

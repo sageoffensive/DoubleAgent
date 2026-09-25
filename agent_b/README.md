@@ -17,6 +17,8 @@ Agent B is a provider-neutral model harness for the Double Agent Burp extension.
 
 The chat remains active during a run. A message either answers the pending question or is added as steering for the next model step.
 
+Each run automatically opens **Live model activity** above the chat. It shows provider-exposed reasoning verbatim when the selected model returns a reasoning channel; otherwise it shows the model's concise action commentary and current phase (planning, writing, tool choice, or safety checks). It does not claim access to hidden chain-of-thought, and the operator can collapse the panel at any time.
+
 ## Design
 
 - Only a loopback Double Agent URL is accepted.
