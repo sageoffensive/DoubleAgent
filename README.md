@@ -57,6 +57,27 @@ flowchart LR
 
 Agent B does not bypass Burp. Target traffic remains under Agent A's scope and safety controls, while the human operator remains responsible for authorization, intensity, approvals, and final judgment.
 
+## Why use Agent B instead of Claude Code or Codex?
+
+Claude Code and Codex are excellent general-purpose coding agents. They are designed to work across repositories, shells, files, developer tools, and many kinds of tasks. That flexibility is valuable for building software, but a live security assessment benefits from a narrower operating environment.
+
+**Agent B is a purpose-built security harness around your chosen model.** The model supplies intelligence; the harness keeps that intelligence focused on the authorized assessment, gives it a stable Burp-native tool surface, and independently enforces the workflow around it.
+
+| Assessment need | Agent B | Typical general-purpose coding-agent workflow |
+| --- | --- | --- |
+| Keep the model focused | Loads an explicit assessment contract, selected security skills, current target state, plan, and relevant evidence. Long histories are compacted into assessment checkpoints instead of becoming an unstructured conversation. | Broad project and shell context can compete with the testing objective unless the operator continually curates prompts and files. |
+| Limit authority | Exposes a small allowlisted security tool surface. The model does not receive a general shell, arbitrary file access, or a separate route to the target. | Often designed to edit files, run commands, install tools, and use broad developer integrations—the right powers for coding, but more authority than a target-facing model needs. |
+| Enforce scope | Routes target traffic through Agent A and Burp, where scope, safety, transport, and confirmation rules are authoritative. | Instructions and MCP configuration can guide scope, but a custom integration must still implement and verify the enforcement boundary. |
+| Demand evidence | Requires captured requests, responses, reproduction detail, finding linkage, persisted dispositions, and authoritative read-back before work is considered complete. | A convincing answer or generated report can be mistaken for completed, persisted assessment work unless an external controller checks it. |
+| Maintain assessment discipline | Uses phase control, stable tool schemas, bounded step budgets, duplicate-call guards, queue ownership, coverage tracking, and completion gates. | The workflow is usually prompt-led and must be rebuilt or re-explained for each engagement. |
+| Preserve human judgment | Pauses for questions and approvals, shows live model activity, and keeps the hacker responsible for authorization and final judgment. | Human review is available, but security-specific approval points depend on how the operator configures each session. |
+| Compare models fairly | Runs OpenAI, Anthropic, Bedrock, and local/OpenAI-compatible models behind the same contracts and tools, making model and methodology comparisons more reproducible. | Different agents bring different prompts, tools, context policies, and execution environments, which can confound model comparisons. |
+| Recover and audit | Records local run events, checkpoints assessment progress, protects finding state, and resumes through a domain-specific workflow rather than relying only on chat history. | Recovery and auditability are generally centred on code changes and terminal activity rather than Burp findings and assessment state. |
+
+A custom harness also reduces **context drift**. Agent B repeatedly anchors the model to the target, current test phase, outstanding evidence, and permitted next actions. It can reject a structurally invalid action even when the model sounds confident. These controls are deterministic harness behaviour, not another instruction the model may forget.
+
+This is not an either-or choice. Claude Code and Codex remain useful for developing tooling, reviewing source, and handling general engineering work. Agent B is the better fit for running the live DoubleAgent workflow because it turns a capable model into a bounded, repeatable Burp teammate rather than a general computer operator.
+
 ## Quick start
 
 ### 1. Install Agent A in Burp
