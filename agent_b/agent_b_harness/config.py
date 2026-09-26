@@ -190,6 +190,7 @@ class Config:
                 # Every connection is user-manageable now (editable + removable).
                 "custom": True,
                 "supports_thinking": bool(m.get("supports_thinking", False)),
+                "supports_images": bool(m.get("supports_images", False)),
                 "recommended_max_steps": rec["max_steps"],
                 "recommended_max_output_tokens": rec["max_output_tokens"],
             })
@@ -295,6 +296,7 @@ def _normalize_custom_models(value: Any) -> tuple:
                     "region": str(m.get("region") or ""),
                     "inherit_legacy_key": bool(m.get("inherit_legacy_key", legacy_key)),
                     "supports_thinking": bool(m.get("supports_thinking", False)),
+                    "supports_images": bool(m.get("supports_images", False)),
                 }
                 if m.get("inherit_bedrock_key"):
                     entry["inherit_bedrock_key"] = True
@@ -354,6 +356,7 @@ def add_custom_model(
     provider: str = "openai_compatible",
     api_key: str = "",
     region: str = "",
+    supports_images: bool = False,
 ) -> "Config":
     connection = _validated_connection(label, model, url, provider, api_key, region)
     stored = _stored()
@@ -368,7 +371,7 @@ def add_custom_model(
         raise ValueError("%s is required" % PROVIDERS[connection["provider"]]["key_label"])
     models = [m for m in (stored.get("custom_models") or []) if isinstance(m, dict)]
     slug = _custom_model_slug(label or model, {m.get("id") for m in models} | _DEFAULT_CONNECTION_IDS)
-    entry = {"id": slug, **connection, "supports_thinking": supports_thinking}
+    entry = {"id": slug, **connection, "supports_thinking": supports_thinking, "supports_images": supports_images}
     if inherit_bedrock:
         entry["inherit_bedrock_key"] = True
     models.append(entry)
@@ -384,6 +387,7 @@ def edit_custom_model(
     provider: str = "openai_compatible",
     api_key: str = "",
     region: str = "",
+    supports_images: bool | None = None,
 ) -> "Config":
     stored = _stored()
     models = [dict(m) for m in (stored.get("custom_models") or []) if isinstance(m, dict)]
@@ -406,6 +410,7 @@ def edit_custom_model(
         "id": model_id,
         **connection,
         "supports_thinking": supports_thinking if supports_thinking is not None else bool(base.get("supports_thinking", False)),
+        "supports_images": supports_images if supports_images is not None else bool(base.get("supports_images", False)),
     }
     if base.get("description"):
         updated["description"] = str(base["description"])

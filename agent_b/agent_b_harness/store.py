@@ -90,6 +90,15 @@ class Store:
                   created REAL NOT NULL,
                   answered REAL
                 );
+                CREATE TABLE IF NOT EXISTS suggestion_decisions (
+                  id TEXT PRIMARY KEY,
+                  decision TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS suggestions (
+                  id TEXT PRIMARY KEY,
+                  payload TEXT NOT NULL,
+                  created REAL NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS goals (
                   id TEXT PRIMARY KEY,
                   objective TEXT NOT NULL,
@@ -173,8 +182,8 @@ class Store:
             ).fetchall()
         return [self._event(row) for row in rows]
 
-    def ask(self, question: str, reason: str, options: list[str]) -> str:
-        qid = uuid.uuid4().hex
+    def ask(self, question: str, reason: str, options: list[str], kind: str = "clarification") -> str:
+        qid = ("approval-" if kind == "approval" else "question-") + str(uuid.uuid4())
         question = redact_text(question)
         reason = redact_text(reason)
         options = [redact_text(item) for item in options]
@@ -187,6 +196,7 @@ class Store:
         return qid
 
     def answer(self, qid: str, answer: str) -> bool:
+        answer = redact_text(answer)
         with self.lock, self._connect() as db:
             row = db.execute(
                 "UPDATE questions SET status='answered',answer=?,answered=? WHERE id=? AND status='pending'",
@@ -196,6 +206,29 @@ class Store:
         if changed:
             self.event("answer", {"id": qid, "answer": answer})
         return changed
+
+    def cancel_questions(self, reason: str) -> None:
+        with self.lock, self._connect() as db:
+            db.execute("UPDATE questions SET status='cancelled',answer=?,answered=? WHERE status='pending'", (reason, time.time()))
+
+    def decide_suggestion(self, ident: str, decision: str) -> None:
+        if decision not in {"saved", "dismissed", "open"}:
+            raise ValueError("Choose saved, dismissed, or open")
+        with self.lock, self._connect() as db:
+            db.execute("INSERT OR REPLACE INTO suggestion_decisions VALUES (?,?)", (ident, decision))
+
+    def suggestion_decisions(self) -> dict:
+        with self.lock, self._connect() as db:
+            return dict(db.execute("SELECT id,decision FROM suggestion_decisions").fetchall())
+
+    def record_suggestion(self, ident: str, item: dict) -> None:
+        with self.lock, self._connect() as db:
+            db.execute("INSERT OR IGNORE INTO suggestions VALUES (?,?,?)", (ident, json.dumps(redact_value(item)), time.time()))
+
+    def suggestions(self) -> list[dict]:
+        with self.lock, self._connect() as db:
+            rows = db.execute("SELECT id,payload FROM suggestions ORDER BY created DESC LIMIT 100").fetchall()
+        return [{**json.loads(row["payload"]), "id": row["id"]} for row in rows]
 
     def pending(self) -> dict[str, Any] | None:
         with self.lock, self._connect() as db:
@@ -214,6 +247,8 @@ class Store:
             db.execute("DELETE FROM messages")
             db.execute("DELETE FROM events")
             db.execute("DELETE FROM questions")
+            db.execute("DELETE FROM suggestion_decisions")
+            db.execute("DELETE FROM suggestions")
             db.execute("DELETE FROM run_checkpoint")
 
     def save_checkpoint(self, value: dict[str, Any]) -> None:

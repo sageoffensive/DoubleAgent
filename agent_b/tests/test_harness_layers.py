@@ -224,24 +224,85 @@ class IndependentVerifierTests(unittest.TestCase):
         self.assertFalse(result["accept"])
         self.assertEqual(self.engine.verifier_reviews["finding:9"]["reason"], "no control")
 
-    def test_fails_open_on_unparseable_reply(self):
+    def test_fails_closed_on_unparseable_reply(self):
         with self._patch_reviewer("I cannot produce JSON"):
             result = self.engine._independent_verifier("x", {"poc": "..."}, reference="finding:1")
-        self.assertTrue(result["accept"])
+        self.assertFalse(result["accept"])
         self.assertFalse(result["verified"])
 
-    def test_fails_open_on_model_error(self):
+    def test_fails_closed_on_model_error(self):
         class BoomModel:
             def __init__(self, *a, **k):
                 self.thinking = None
 
             def complete(self, *a, **k):
-                raise RuntimeError("network down")
+                raise RuntimeError("sensitive provider response must not be persisted")
 
         with patch("agent_b_harness.engine.Model", BoomModel):
             result = self.engine._independent_verifier("x", {"poc": "..."}, reference="finding:2")
-        self.assertTrue(result["accept"])
+        self.assertFalse(result["accept"])
         self.assertFalse(result["verified"])
+        self.assertNotIn("sensitive provider", str(self.engine.store.events()))
+
+    def test_rejects_malformed_schemas_and_wrapped_json(self):
+        replies = [
+            '{"accept": "false", "reason": "x"}',
+            '{"accept": "true", "reason": "x"}',
+            '{"accept": 1, "reason": "x"}',
+            '{"accept": null, "reason": "x"}',
+            '{"accept": true}', '{"accept": true, "reason": []}',
+            '{"accept": true, "reason": " "}',
+            '{"accept": false, "accept": true, "reason": "x"}',
+            '```json\n{"accept": true, "reason": "x"}\n```',
+            'refusal {"accept": true, "reason": "x"}',
+            '[]', '',
+        ]
+        for reply in replies:
+            with self.subTest(reply=reply), self._patch_reviewer(reply):
+                result = self.engine._independent_verifier("claim", {"evidence": "fixture"})
+                self.assertFalse(result["accept"])
+                self.assertFalse(result["verified"])
+
+    def test_unknown_or_rejected_review_stops_writes_and_preserves_evidence(self):
+        for reply in ('invalid', '{"accept": false, "reason": "insufficient evidence"}'):
+            for tool, args in (
+                ("record_finding", {"title": "fixture", "evidence": "retained evidence"}),
+                ("triage_finding", {"finding_id": "12", "status": "valid",
+                                    "rationale": "A benign test fixture rationale.",
+                                    "poc_request": "GET / HTTP/1.1\r\nHost: example.test\r\n\r\n"}),
+            ):
+                with self.subTest(reply=reply, tool=tool), self._patch_reviewer(reply):
+                    client = FakeDoubleAgent()
+                    result, finished = self.engine._tool(client, tool, args)
+                    self.assertFalse(result["ok"])
+                    self.assertTrue(finished)
+                    self.assertEqual(self.engine.state, "blocked")
+                    self.assertEqual(client.posts, [])
+                    events = self.engine.store.events()
+                    expected_claim = args if tool == "record_finding" else {
+                        "finding_id": "12", "rationale": args["rationale"],
+                        "poc_request": args["poc_request"], "priority": "P2",
+                    }
+                    self.assertTrue(any(e["kind"].startswith("verifier_")
+                                        and e["data"].get("claim") == expected_claim for e in events))
+
+    def test_stop_during_review_cannot_accept(self):
+        engine = self.engine
+
+        class CancelModel:
+            def __init__(self, *a, **k):
+                pass
+
+            def complete(self, *a, **k):
+                self.active_at_review = engine.active_model is self
+                engine.stop_event.set()
+                return {"content": '{"accept": true, "reason": "ok"}'}
+
+        with patch("agent_b_harness.engine.Model", CancelModel):
+            result = engine._independent_verifier("fixture", {})
+        self.assertFalse(result["accept"])
+        self.assertFalse(result["verified"])
+        self.assertIsNone(engine.active_model)
 
 
 if __name__ == "__main__":

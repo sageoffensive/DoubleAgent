@@ -163,6 +163,14 @@ def _to_anthropic_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
+def _image_data(part: dict[str, Any]) -> tuple[str, str]:
+    url = part.get("image_url", {}).get("url", "")
+    match = re.fullmatch(r"data:(image/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)", url)
+    if not match:
+        raise ValueError("Image input must be a supported uploaded image")
+    return match.group(1), match.group(2)
+
+
 def _to_anthropic_messages(messages: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
     """Translate the harness's OpenAI-style messages into Anthropic Messages
     format: pull system text to the top level, turn tool results into user
@@ -206,6 +214,17 @@ def _to_anthropic_messages(messages: list[dict[str, Any]]) -> tuple[str, list[di
                 continue
             turns.append({"role": "assistant", "content": blocks})
         else:  # user (or anything else, treated as user text)
+            if isinstance(content, list):
+                blocks = []
+                for part in content:
+                    if part.get("type") == "text" and part.get("text"):
+                        blocks.append({"type": "text", "text": part["text"]})
+                    elif part.get("type") == "image_url":
+                        mime, data = _image_data(part)
+                        blocks.append({"type": "image", "source": {"type": "base64", "media_type": mime, "data": data}})
+                if blocks:
+                    turns.append({"role": "user", "content": blocks})
+                continue
             text = content if isinstance(content, str) else json.dumps(content)
             if not (isinstance(text, str) and text.strip()):
                 continue
@@ -278,6 +297,13 @@ def _to_bedrock_messages(messages: list[dict[str, Any]]) -> tuple[list[dict[str,
         blocks: list[dict[str, Any]] = []
         if isinstance(content, str) and content.strip():
             blocks.append({"text": content})
+        elif isinstance(content, list) and role == "user":
+            for part in content:
+                if part.get("type") == "text" and part.get("text"):
+                    blocks.append({"text": part["text"]})
+                elif part.get("type") == "image_url":
+                    mime, data = _image_data(part)
+                    blocks.append({"image": {"format": mime.split("/")[1], "source": {"bytes": data}}})
         if role == "assistant":
             for call in message.get("tool_calls", []) or []:
                 if not isinstance(call, dict):

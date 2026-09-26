@@ -29,7 +29,45 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "AgentB/3.0"
 
     def do_GET(self) -> None:
+        if not self.local_request():
+            return
         parsed = urllib.parse.urlsplit(self.path)
+        if parsed.path.startswith("/api/files/"):
+            try:
+                file_path = parsed.path[len("/api/files/"):]
+                preview = file_path.endswith("/preview")
+                ident, name, mime, data = ENGINE.attachments.get(file_path[:-8] if preview else file_path)
+                if preview:
+                    if not mime.startswith("image/"):
+                        raise ValueError("Only images have a preview")
+                    self.send_response(200)
+                    self.send_header("Content-Type", mime)
+                    self.send_header("Content-Length", str(len(data)))
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("X-Content-Type-Options", "nosniff")
+                    self.send_header("Content-Security-Policy", "default-src 'none'")
+                    self.end_headers()
+                    self.wfile.write(data)
+                else:
+                    self.download(name, data)
+            except ValueError as exc:
+                self.json({"error": str(exc)}, 404)
+            return
+        if parsed.path == "/api/export":
+            text = "# Agent B conversation\n\n" + "\n\n".join(
+                "## " + m["role"].title() + "\n\n" + m["content"] for m in STORE.messages(10000)
+                if not m.get("metadata", {}).get("intermediate")
+            )
+            self.download("agent-b-conversation.md", text.encode("utf-8"))
+            return
+        if parsed.path.startswith("/api/messages/") and parsed.path.endswith("/download"):
+            ident = parsed.path.split("/")[3]
+            message = next((m for m in STORE.messages(10000) if str(m["id"]) == ident), None)
+            if message is None:
+                self.json({"error": "Message not found"}, 404)
+            else:
+                self.download("agent-b-response-" + ident + ".md", message["content"].encode("utf-8"))
+            return
         if parsed.path == "/api/state":
             query = urllib.parse.parse_qs(parsed.query)
             after = int(query.get("after", ["0"])[0])
@@ -63,11 +101,25 @@ class Handler(BaseHTTPRequestHandler):
         self.static(parsed.path)
 
     def do_POST(self) -> None:
+        if not self.local_request():
+            return
         parsed = urllib.parse.urlsplit(self.path)
         try:
+            if self.headers.get_content_type() != "application/json":
+                raise ValueError("Requests must use application/json")
             body = self.body()
+            if parsed.path == "/api/files":
+                self.json(ENGINE.attachments.add(str(body.get("name", "")), str(body.get("data", ""))), 201)
+                return
+            if parsed.path == "/api/suggestions/decide":
+                ident = str(body.get("id", ""))
+                if not any(s["id"] == ident for s in ENGINE.suggestions()):
+                    raise ValueError("Suggestion is no longer available")
+                STORE.decide_suggestion(ident, str(body.get("decision", "")))
+                self.json({"ok": True})
+                return
             if parsed.path == "/api/chat":
-                self.json(ENGINE.chat(str(body.get("message", "")), body.get("thinking")), 202)
+                self.json(ENGINE.chat(str(body.get("message", "")), body.get("thinking"), body.get("attachments", []), body.get("discussion") is True), 202)
                 return
             if parsed.path == "/api/run/validate-findings":
                 self.json(ENGINE.validate_findings(), 202)
@@ -106,6 +158,7 @@ class Handler(BaseHTTPRequestHandler):
                     str(body.get("label", "")), str(body.get("model", "")), str(body.get("url", "")),
                     body.get("supports_thinking") is True, str(body.get("provider", "openai_compatible")),
                     str(body.get("api_key", "")), str(body.get("region", "")),
+                    supports_images=body.get("supports_images") is True,
                 )
                 ENGINE.health_cache = None
                 self.json(saved.public(), 201)
@@ -127,6 +180,7 @@ class Handler(BaseHTTPRequestHandler):
                     str(body.get("id", "")), str(body.get("label", "")), str(body.get("model", "")),
                     str(body.get("url", "")), body.get("supports_thinking") if isinstance(body.get("supports_thinking"), bool) else None,
                     str(body.get("provider", "openai_compatible")), str(body.get("api_key", "")), str(body.get("region", "")),
+                    supports_images=body.get("supports_images") if isinstance(body.get("supports_images"), bool) else None,
                 )
                 ENGINE.health_cache = None
                 self.json(saved.public())
@@ -146,13 +200,37 @@ class Handler(BaseHTTPRequestHandler):
 
     def body(self) -> dict[str, Any]:
         size = int(self.headers.get("Content-Length", "0"))
-        if size > 1_000_000:
+        limit = 4_300_000 if self.path == "/api/files" else 1_000_000
+        if size < 0 or size > limit:
             raise ValueError("Request body is too large")
         raw = self.rfile.read(size).decode("utf-8", "replace") if size else "{}"
         value = json.loads(raw)
         if not isinstance(value, dict):
             raise ValueError("JSON body must be an object")
         return value
+
+    def local_request(self) -> bool:
+        host = self.headers.get("Host", "")
+        try:
+            parsed = urllib.parse.urlsplit("http://" + host)
+            allowed = parsed.hostname in {"127.0.0.1", "localhost", "::1"} and parsed.port == self.server.server_port
+        except ValueError:
+            allowed = False
+        origin = self.headers.get("Origin")
+        if not allowed or (origin and origin != "http://" + host) or self.headers.get("Sec-Fetch-Site") == "cross-site":
+            self.json({"error": "Open Agent B from its local address"}, 403)
+            return False
+        return True
+
+    def download(self, name: str, data: bytes) -> None:
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Disposition", "attachment; filename*=UTF-8''" + urllib.parse.quote(name, safe=""))
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        self.wfile.write(data)
 
     def json(self, value: Any, status: int = 200) -> None:
         data = json.dumps(value, ensure_ascii=False).encode()

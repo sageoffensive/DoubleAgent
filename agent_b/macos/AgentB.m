@@ -1,7 +1,7 @@
 #import <Cocoa/Cocoa.h>
 #import <WebKit/WebKit.h>
 
-@interface AppDelegate : NSObject <NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate>
+@interface AppDelegate : NSObject <NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate, WKDownloadDelegate>
 @property NSWindow *window;
 @property WKWebView *webView;
 @property NSTask *task;
@@ -79,11 +79,13 @@
     [[NSFileManager defaultManager] createDirectoryAtURL:support withIntermediateDirectories:YES attributes:nil error:nil];
 
     self.task = [[NSTask alloc] init];
-    self.task.executableURL = [NSURL fileURLWithPath:@"/bin/zsh"];
-    self.task.arguments = @[
-        @"-c",
-        @"exec /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/bin/python3 -B -m agent_b_harness.server --no-browser --port 4310"
-    ];
+    NSString *python = [resources URLByAppendingPathComponent:@"python/bin/python3"].path;
+    if (![[NSFileManager defaultManager] isExecutableFileAtPath:python]) {
+        [self showError:@"Agent B's bundled Python runtime is missing. Download a fresh copy of the app."];
+        return;
+    }
+    self.task.executableURL = [NSURL fileURLWithPath:python];
+    self.task.arguments = @[@"-E", @"-s", @"-B", @"-m", @"agent_b_harness.server", @"--no-browser", @"--port", @"4310"];
     self.task.currentDirectoryURL = harness;
     NSDictionary *parentEnvironment = NSProcessInfo.processInfo.environment;
     NSMutableDictionary *environment = [@{
@@ -91,16 +93,11 @@
         @"PATH": @"/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
         @"LANG": @"C.UTF-8",
         @"LC_ALL": @"C.UTF-8",
-        @"DEVELOPER_DIR": @"/Library/Developer/CommandLineTools",
     } mutableCopy];
     NSString *temporaryDirectory = parentEnvironment[@"TMPDIR"];
     if (temporaryDirectory.length) environment[@"TMPDIR"] = temporaryDirectory;
     environment[@"AGENT_B_DATA_DIR"] = support.path;
-    environment[@"PYTHONDONTWRITEBYTECODE"] = @"1";
-    NSURL *bundledAuth = [resources URLByAppendingPathComponent:@"model-auth.json"];
-    if ([[NSFileManager defaultManager] fileExistsAtPath:bundledAuth.path]) {
-        environment[@"AGENT_B_MODEL_AUTH_FILE"] = bundledAuth.path;
-    }
+    environment[@"SSL_CERT_FILE"] = [resources URLByAppendingPathComponent:@"python/lib/python3.12/site-packages/pip/_vendor/certifi/cacert.pem"].path;
     self.task.environment = environment;
 
     NSURL *logs = [[[[NSFileManager defaultManager] URLsForDirectory:NSLibraryDirectory inDomains:NSUserDomainMask].firstObject URLByAppendingPathComponent:@"Logs"] URLByAppendingPathComponent:@"Agent B.log"];
@@ -135,6 +132,10 @@
     BOOL localHarness = ([host isEqualToString:@"127.0.0.1"] || [host isEqualToString:@"localhost"])
         && (url.port == nil || url.port.integerValue == 4310);
     if (url == nil || [scheme isEqualToString:@"about"] || localHarness) {
+        if (localHarness && navigationAction.shouldPerformDownload) {
+            decisionHandler(WKNavigationActionPolicyDownload);
+            return;
+        }
         decisionHandler(WKNavigationActionPolicyAllow);
         return;
     }
@@ -142,6 +143,41 @@
         [[NSWorkspace sharedWorkspace] openURL:url];
     }
     decisionHandler(WKNavigationActionPolicyCancel);
+}
+
+- (void)webView:(WKWebView *)webView runOpenPanelWithParameters:(WKOpenPanelParameters *)parameters initiatedByFrame:(WKFrameInfo *)frame completionHandler:(void (^)(NSArray<NSURL *> *))completionHandler {
+    NSOpenPanel *panel = [NSOpenPanel openPanel];
+    panel.canChooseFiles = YES;
+    panel.canChooseDirectories = NO;
+    panel.allowsMultipleSelection = parameters.allowsMultipleSelection;
+    [panel beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse result) {
+        completionHandler(result == NSModalResponseOK ? panel.URLs : nil);
+    }];
+}
+
+- (void)webView:(WKWebView *)webView decidePolicyForNavigationResponse:(WKNavigationResponse *)response decisionHandler:(void (^)(WKNavigationResponsePolicy))decisionHandler {
+    NSHTTPURLResponse *http = (NSHTTPURLResponse *)response.response;
+    NSString *disposition = [http isKindOfClass:[NSHTTPURLResponse class]] ? [http valueForHTTPHeaderField:@"Content-Disposition"] : nil;
+    decisionHandler([disposition.lowercaseString hasPrefix:@"attachment"] ? WKNavigationResponsePolicyDownload : WKNavigationResponsePolicyAllow);
+}
+
+- (void)webView:(WKWebView *)webView navigationAction:(WKNavigationAction *)action didBecomeDownload:(WKDownload *)download { download.delegate = self; }
+- (void)webView:(WKWebView *)webView navigationResponse:(WKNavigationResponse *)response didBecomeDownload:(WKDownload *)download { download.delegate = self; }
+
+- (void)download:(WKDownload *)download decideDestinationUsingResponse:(NSURLResponse *)response suggestedFilename:(NSString *)suggestedFilename completionHandler:(void (^)(NSURL *))completionHandler {
+    NSSavePanel *panel = [NSSavePanel savePanel];
+    panel.nameFieldStringValue = suggestedFilename.lastPathComponent;
+    [panel beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse result) {
+        completionHandler(result == NSModalResponseOK ? panel.URL : nil);
+    }];
+}
+
+- (void)download:(WKDownload *)download didFailWithError:(NSError *)error resumeData:(NSData *)resumeData {
+    if (error.code == NSURLErrorCancelled) return;
+    NSAlert *alert = [[NSAlert alloc] init];
+    alert.messageText = @"Download could not finish";
+    alert.informativeText = error.localizedDescription;
+    [alert beginSheetModalForWindow:self.window completionHandler:nil];
 }
 
 // WKWebView suppresses JS alert()/confirm()/prompt() unless the host app

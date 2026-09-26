@@ -28,6 +28,18 @@ jobs:
         working-directory: agent_b
         run: python -m unittest discover -s tests -v
 
+  macos-bundle:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build self-contained app (ad-hoc CI signature)
+        run: zsh agent_b/build-macos-app.sh
+      - name: Test bundled runtime
+        working-directory: agent_b
+        run: |
+          "dist/Agent B.app/Contents/Resources/python/bin/python3" -E -s -B -m unittest discover -s tests -q
+          "dist/Agent B.app/Contents/Resources/python/bin/python3" -E -s -B tests/smoke_macos_bundle.py "dist/Agent B.app"
+
   secrets:
     runs-on: ubuntu-latest
     steps:

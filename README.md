@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 3.0.1" src="https://img.shields.io/badge/version-3.0.1-ff9944">
+  <img alt="Version 3.1.0 beta 1" src="https://img.shields.io/badge/version-3.1.0--beta.1-ff9944">
   <img alt="License MIT" src="https://img.shields.io/badge/license-MIT-2ea44f">
   <img alt="Burp Suite" src="https://img.shields.io/badge/Burp%20Suite-Jython-f47b20">
   <img alt="Human in the loop" src="https://img.shields.io/badge/control-human--in--the--loop-ff9944">
@@ -131,7 +131,7 @@ Open [http://127.0.0.1:4310](http://127.0.0.1:4310).
 
 **Agent B macOS application — experimental work in progress**
 
-Download `Agent-B-macOS-v3.0.1.zip` from the latest release, extract it, and move **Agent B.app** to Applications. Maintainers and developers can build it with:
+Download `Agent-B-macOS-arm64-v3.1.0-beta.1.zip` from the [beta release](https://github.com/sageoffensive/DoubleAgent/releases/tag/v3.1.0-beta.1), extract it, and move **Agent B.app** to Applications. This build targets Apple Silicon and includes Python. The release notes state its signing/notarization status and remaining validation limits; the harness remains experimental. Maintainers and developers can build it with:
 
 ```bash
 cd agent_b
@@ -164,6 +164,8 @@ The [Installation guide](https://github.com/sageoffensive/DoubleAgent/wiki/Insta
 ### Agent B workspace (work in progress)
 
 The experimental Agent B harness opens as a normal, neutral chat. Burp context and assessment tools are loaded only when you explicitly select **Send bootstrap**.
+
+The **Discuss** mode gives you a place to review notes and screenshots, ask questions, and weigh suggestions without invoking assessment tools. Existing recommendations have evidence, confidence, and save/dismiss controls; questions and one-time approvals have dedicated cards. You can upload text and images, download responses, and export the conversation in both the web and Mac apps. Image input must be enabled for a compatible model connection. See the [file types, limits, and privacy details](agent_b/README.md#files-and-images).
 
 ![Agent B operator workspace](docs/images/agent-b-operator.png)
 
