@@ -49,6 +49,7 @@
       <header class="topbar">
         <div><div class="eyebrow">ACTIVE ASSESSMENT</div><h1>Operator chat</h1></div>
         <div class="topbar-actions">
+          <a class="download-link" href="/api/export" download>Export chat</a>
           <button type="button" id="open-nav" class="mobile-menu" aria-label="Open controls">Controls</button>
           <a id="target-link-main" class="target-link-main hidden" href="#" target="_blank" rel="noopener noreferrer">Open target</a>
           <div id="live" class="pill">Connecting</div>
@@ -70,12 +71,25 @@
         <summary><span id="assessment-plan-title">Plan of attack</span><small>Prepared before active testing</small></summary>
         <div id="assessment-plan"></div>
       </details>
-      <div id="timeline" class="timeline"></div>
-      <div id="question" class="question hidden"></div>
+      <details id="suggestions-panel" class="suggestions-panel hidden">
+        <summary>Ideas &amp; recommendations <span id="suggestion-count"></span></summary>
+        <p class="hint">Suggestions are for your review. Saving or discussing one does not authorize an action.</p>
+        <div id="suggestions"></div>
+      </details>
+      <div id="timeline" class="timeline" aria-label="Conversation"></div>
+      <div id="question" class="question hidden" role="region" aria-label="Agent B needs your input"></div>
       <form id="composer">
-        <textarea id="message" rows="2" placeholder="Send a message…"></textarea>
+        <div class="composer-toolbar">
+          <label for="conversation-mode">Mode</label><select id="conversation-mode"><option value="discuss">Discuss · advice and files</option><option value="assessment">Assessment chat</option></select>
+          <button type="button" id="attach-files">Attach files</button>
+          <input type="file" id="file-picker" class="hidden" multiple accept=".txt,.md,.csv,.json,.log,.xml,.yaml,.yml,.png,.jpg,.jpeg,.webp">
+        </div>
+        <div id="attachment-list" class="attachment-list hidden"></div>
+        <textarea id="message" rows="2" aria-label="Message to Agent B" placeholder="Ask a question, share a file, or paste a screenshot…"></textarea>
         <label id="thinking-control" class="hidden">Thinking<select id="thinking-choice" aria-label="Thinking mode"><option value="auto">Auto</option><option value="on">On</option><option value="off">Off</option></select></label>
         <button type="submit" aria-label="Send">Send</button>
+        <p id="composer-help" class="composer-help"></p>
+        <p id="composer-status" class="composer-help" role="status" aria-live="polite"></p>
       </form>
     </main>
   </div>
@@ -143,6 +157,8 @@
       <label id="connection-region-row" class="hidden">AWS region<input name="region" placeholder="us-east-1"></label>
       <label><span id="connection-key-label">API key</span><input name="api_key" id="connection-api-key" type="password" autocomplete="new-password"><small id="connection-key-state" class="field-note"></small></label>
       <label id="connection-thinking-row"><input type="checkbox" name="supports_thinking"> Supports <code>enable_thinking</code></label>
+      <label><input type="checkbox" name="supports_images"> Supports image input</label>
+      <p class="hint">Enable only when both the model and server support vision. Images are sent to this connection when you press Send.</p>
       <p id="connection-thinking-help" class="hint">Only enable this when the server accepts <code>chat_template_kwargs.enable_thinking</code>.</p>
       <div id="connection-test-result" class="connection-test-result hidden" role="status"></div>
       <div class="modal-actions split-actions"><button type="button" id="test-model">Test connection</button><span></span><button type="button" id="cancel-model">Cancel</button><button class="primary" type="submit">Save and use</button></div>

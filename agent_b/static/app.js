@@ -8,6 +8,64 @@ let modelOptions = [];
 let providerOptions = [];
 let skillCatalog = [];
 let loadedModelUrl = '';
+let attachmentDrafts = [];
+let uploading = false;
+let sending = false;
+let latestState = {};
+let questionKey = null;
+let suggestionsKey = null;
+
+function composerStatus(text) { $('#composer-status').textContent = text; }
+
+function renderAttachments() {
+  const list = $('#attachment-list');
+  list.classList.toggle('hidden', !attachmentDrafts.length);
+  list.innerHTML = attachmentDrafts.map((f, index) => `<span class="attachment-chip">${f.mime.startsWith('image/') ? `<img class="attachment-thumbnail" src="/api/files/${encodeURIComponent(f.id)}/preview" alt="${esc(f.name)}">` : ''}${esc(f.name)} · ${Math.ceil(f.size / 1024)} KB <button type="button" data-remove-file="${index}" aria-label="Remove ${esc(f.name)}">×</button></span>`).join('');
+  list.querySelectorAll('[data-remove-file]').forEach(button => {
+    button.onclick = () => { attachmentDrafts.splice(Number(button.dataset.removeFile), 1); renderAttachments(); };
+  });
+}
+
+async function attachFiles(files) {
+  if (uploading || sending) return;
+  if (latestState.pending_question || ['starting', 'running', 'waiting', 'stopping'].includes(latestState.status)) {
+    composerStatus('Wait for the response or stop the run before attaching files.'); return;
+  }
+  if (attachmentDrafts.length + files.length > 4) { composerStatus('Attach up to four files per message.'); return; }
+  uploading = true;
+  $('#attach-files').disabled = true;
+  $('#conversation-mode').value = 'discuss';
+  try {
+    for (const file of files) {
+      if (file.size > 3 * 1024 * 1024) throw new Error(`${file.name}: maximum file size is 3 MB.`);
+      if (/\.(png|jpe?g|webp)$/i.test(file.name) && !modelOption(latestState.settings?.model)?.supports_images) {
+        throw new Error('This connection has image input disabled. Enable it in Settings for a vision-capable model.');
+      }
+      composerStatus(`Adding ${file.name}…`);
+      const encoded = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1]);
+        reader.onerror = () => reject(new Error('Could not read the selected file.'));
+        reader.readAsDataURL(file);
+      });
+      attachmentDrafts.push(await api('/api/files', {method: 'POST', body: JSON.stringify({name: file.name, data: encoded})}));
+      renderAttachments();
+    }
+    composerStatus('Files ready. They will be sent to the selected connection with your message.');
+  } catch (error) { composerStatus(error.message); }
+  finally { uploading = false; $('#attach-files').disabled = false; $('#file-picker').value = ''; }
+}
+
+$('#attach-files').onclick = () => $('#file-picker').click();
+$('#file-picker').onchange = event => attachFiles([...event.target.files]);
+$('#message').addEventListener('paste', event => {
+  const files = [...(event.clipboardData?.files || [])];
+  if (files.length) { event.preventDefault(); attachFiles(files); }
+});
+$('#composer').addEventListener('dragover', event => { event.preventDefault(); });
+$('#composer').addEventListener('drop', event => {
+  event.preventDefault(); attachFiles([...event.dataTransfer.files]);
+});
 
 function modelOption(id) {
   return modelOptions.find(option => option.id === id);
@@ -39,12 +97,17 @@ function esc(value) {
 
 function visibleMessage(value) {
   const message = String(value ?? '');
-  if (message.length <= 1800) return esc(message);
-  return `${esc(message.slice(0, 1600))}\n\n… ${message.length - 1600} more characters kept in this conversation`;
+  const formatted = text => esc(text).replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  if (message.length <= 1800) return formatted(message);
+  return `${formatted(message.slice(0, 1600))}<details class="full-response"><summary>Read full response · ${message.length.toLocaleString()} characters</summary>${formatted(message)}</details>`;
 }
 
 function render(value) {
-  if (value.settings?.model_options?.length) modelOptions = value.settings.model_options;
+  latestState = value;
+  $('#composer-help').textContent = $('#conversation-mode').value === 'discuss'
+    ? `Discuss uses no assessment tools. Text files up to 120 KB; images up to 3 MB. Files go to ${modelOption(value.settings?.model)?.label || 'the selected connection'} when sent. Text is redacted for common secrets; check screenshots yourself.`
+    : 'Assessment chat uses the current Burp context. Use Discuss for file and image review.';
+  if (value.settings?.model_options) modelOptions = value.settings.model_options;
   const stopping = value.status === 'stopping';
   const bootstrapped = Boolean(value.burp_prompt_loaded);
   $('#run-state').textContent = stopping ? 'Waiting for model to stop…' : value.status;
@@ -211,7 +274,8 @@ function render(value) {
       return `
       <div class="message ${esc(message.role)} ${harnessMessage ? 'harness-status' : ''} ${thinking ? 'thinking' : ''}">
         <div class="meta">${speaker}</div>
-        <div class="bubble">${visibleMessage(content)}</div>
+        <div class="bubble">${visibleMessage(content)}${(meta.attachments || []).map(f => `<a class="attachment-download" href="/api/files/${encodeURIComponent(f.id)}" download>${f.mime.startsWith('image/') ? `<img class="attachment-thumbnail" src="/api/files/${encodeURIComponent(f.id)}/preview" alt="${esc(f.name)}">` : ''}${esc(f.name)} ↓</a>`).join('')}</div>
+        ${message.role === 'assistant' && !harnessMessage ? `<a class="download-link response-download" href="/api/messages/${encodeURIComponent(message.id)}/download" download>Download response</a>` : ''}
       </div>`;
     });
 
@@ -223,17 +287,49 @@ function render(value) {
 
   const pending = value.pending_question;
   const question = $('#question');
-  if (pending) {
+  if (pending && questionKey !== pending.id) {
+    questionKey = pending.id;
     question.classList.remove('hidden');
-    question.innerHTML = `<strong>${esc(pending.question)}</strong><p>${esc(pending.reason)}</p><div>${
+    const approval = pending.id.startsWith('approval-');
+    question.innerHTML = `<div class="eyebrow">${approval ? 'YOUR APPROVAL IS REQUIRED' : 'A QUESTION FOR YOU'}</div><strong>${esc(pending.question)}</strong><p>${esc(pending.reason)}</p><div>${
       (pending.options || []).map(option => `<button data-answer="${esc(option)}">${esc(option)}</button>`).join('')
-    }</div>`;
+    }</div>${approval ? '<p class="hint">Approval applies only to this pending action. Stopping the run cancels it.</p>' : '<form id="question-reply"><input aria-label="Your answer" name="reply" maxlength="4000" required placeholder="Or answer in your own words…"><button type="submit">Reply</button></form>'}`;
     question.querySelectorAll('button').forEach(button => {
       button.onclick = () => answer(pending.id, button.dataset.answer);
     });
-  } else {
+    if (!approval) $('#question-reply').onsubmit = event => { event.preventDefault(); answer(pending.id, event.target.elements.reply.value); };
+  } else if (!pending) {
+    questionKey = null;
     question.classList.add('hidden');
   }
+  renderSuggestions(value.route_recommendations || []);
+}
+
+function renderSuggestions(items) {
+  const key = JSON.stringify(items);
+  if (key === suggestionsKey) return;
+  suggestionsKey = key;
+  $('#suggestions-panel').classList.toggle('hidden', !items.length);
+  $('#suggestion-count').textContent = `· ${items.filter(s => s.decision !== 'dismissed').length} to review`;
+  $('#suggestions').innerHTML = items.map(s => `<article class="suggestion ${s.decision === 'dismissed' ? 'dismissed' : ''}">
+    <strong>${esc(s.subject || 'Recommendation')}</strong><span class="suggestion-state">${esc(s.route)} · ${esc(s.confidence || 'unrated')} confidence · ${esc(s.decision)}</span>
+    <p>${esc(s.rationale)}</p><p>${esc(s.next_step || '')}</p>
+    ${s.evidence?.length ? `<details><summary>Supporting evidence</summary><pre>${esc(JSON.stringify(s.evidence, null, 2))}</pre></details>` : ''}
+    <div class="suggestion-actions"><button data-discuss="${esc(s.id)}">Discuss</button><button data-decision="saved" data-id="${esc(s.id)}">Save</button><button data-decision="${s.decision === 'dismissed' ? 'open' : 'dismissed'}" data-id="${esc(s.id)}">${s.decision === 'dismissed' ? 'Restore' : 'Dismiss'}</button></div></article>`).join('');
+  $('#suggestions').querySelectorAll('[data-decision]').forEach(button => {
+    button.onclick = async () => {
+      try { await api('/api/suggestions/decide', {method: 'POST', body: JSON.stringify({id: button.dataset.id, decision: button.dataset.decision})}); await poll(); }
+      catch (error) { composerStatus(error.message); }
+    };
+  });
+  $('#suggestions').querySelectorAll('[data-discuss]').forEach(button => {
+    button.onclick = () => {
+      const s = items.find(item => item.id === button.dataset.discuss);
+      $('#conversation-mode').value = 'discuss';
+      $('#message').value = `Let's discuss this recommendation and its uncertainty:\n${s.subject || ''}\n${s.rationale || ''}\nSuggested next step: ${s.next_step || ''}`;
+      $('#message').focus();
+    };
+  });
 }
 
 function renderCoverage(coverage) {
@@ -288,30 +384,40 @@ async function poll() {
   }
 }
 
-async function send(message) {
+async function send(message, assessment = false) {
+  if (sending || uploading) return;
+  sending = true;
+  $('#composer button[type="submit"]').disabled = true;
   try {
     const mode = $('#thinking-control').classList.contains('hidden') ? 'auto' : $('#thinking-choice').value;
-    await api('/api/chat', {method: 'POST', body: JSON.stringify({message, thinking: mode === 'auto' ? null : mode === 'on'})});
+    await api('/api/chat', {method: 'POST', body: JSON.stringify({message, thinking: mode === 'auto' ? null : mode === 'on', discussion: !assessment && $('#conversation-mode').value === 'discuss', attachments: assessment ? [] : attachmentDrafts.map(f => f.id)})});
     $('#message').value = '';
+    if (!assessment) { attachmentDrafts = []; renderAttachments(); }
+    composerStatus('Message sent.');
     await poll();
   } catch (error) {
-    alert(error.message);
+    composerStatus(error.message);
+  } finally {
+    sending = false;
+    $('#composer button[type="submit"]').disabled = false;
   }
 }
 
 async function answer(id, response) {
+  $('#question').querySelectorAll('button,input').forEach(el => { el.disabled = true; });
   try {
     await api(`/api/questions/${id}/answer`, {method: 'POST', body: JSON.stringify({answer: response})});
     await poll();
   } catch (error) {
-    alert(error.message);
+    composerStatus(error.message);
+    $('#question').querySelectorAll('button,input').forEach(el => { el.disabled = false; });
   }
 }
 
 $('#composer').onsubmit = event => {
   event.preventDefault();
   const message = $('#message').value.trim();
-  if (message) send(message);
+  if (message || attachmentDrafts.length) send(message);
 };
 $('#message').onkeydown = event => {
   if (event.key === 'Enter' && !event.shiftKey) {
@@ -319,7 +425,7 @@ $('#message').onkeydown = event => {
     $('#composer').requestSubmit();
   }
 };
-$('#fetch').onclick = () => send('Fetch the Double Agent queue, run preflight, select the highest-value actionable item, and complete it using evidence-backed testing. Ask me in chat for any missing fixture or required approval.');
+$('#fetch').onclick = () => send('Fetch the Double Agent queue, run preflight, select the highest-value actionable item, and complete it using evidence-backed testing. Ask me in chat for any missing fixture or required approval.', true);
 $('#validate-a').onclick = async () => {
   try {
     // Queues Double Agent automated-testing for the current Agent A findings and
@@ -397,6 +503,7 @@ $('#bootstrap').onclick = async () => {
 async function clearConversation() {
   try {
     await api('/api/run/clear', {method: 'POST', body: '{}'});
+    attachmentDrafts = []; renderAttachments(); composerStatus('');
     cache = {messages: [], modelStream: '', modelRun: 0};
     renderedFeed = null;
     last = 0;
@@ -597,6 +704,7 @@ function openModelDialog(option = null) {
   providerSelect.innerHTML = providerOptions.map(provider => `<option value="${esc(provider.id)}">${esc(provider.label)}</option>`).join('');
   providerSelect.value = option?.provider || 'openai_compatible';
   form.elements.namedItem('supports_thinking').checked = Boolean(option?.supports_thinking);
+  form.elements.namedItem('supports_images').checked = Boolean(option?.supports_images);
   for (const name of ['label', 'model', 'url', 'region']) {
     form.elements.namedItem(name).value = option?.[name] || '';
   }
@@ -618,6 +726,7 @@ $('#model-form').onsubmit = async event => {
   event.preventDefault();
   const body = Object.fromEntries(new FormData(event.target).entries());
   body.supports_thinking = event.target.elements.namedItem('supports_thinking').checked;
+  body.supports_images = event.target.elements.namedItem('supports_images').checked;
   try {
     if (editingModelId) body.id = editingModelId;
     await api(editingModelId ? '/api/models/edit' : '/api/models', {method: 'POST', body: JSON.stringify(body)});

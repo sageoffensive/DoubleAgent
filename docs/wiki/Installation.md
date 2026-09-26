@@ -8,12 +8,12 @@ DoubleAgent has two required halves: **Agent A in Burp** and **Agent B in a brow
 - Jython standalone 2.7.x
 - PortSwigger's MCP Server BApp for full Burp-native capability
 - Python 3.10 or later when running Agent B from source
-- macOS 13 or later for the optional Agent B application
+- macOS 13 or later on Apple Silicon for the published beta Agent B application; Python is bundled
 - A model connection you configure yourself
 
 ## Step 1: install Agent A
 
-1. Download and extract the latest `DoubleAgent-v3.0.1.zip` release bundle.
+1. Download and extract `DoubleAgent-v3.1.0-beta.1.zip` from the beta release.
 2. In Burp, open **Extensions → Settings → Python Environment**.
 3. Select your Jython standalone JAR.
 4. Open **Extensions → Installed → Add**.
@@ -58,10 +58,14 @@ Agent B uses the Python standard library and starts with no saved model connecti
 
 Instead of the browser launch above:
 
-1. Download `Agent-B-macOS-v3.0.1.zip` from the latest release.
+1. Download `Agent-B-macOS-arm64-v3.1.0-beta.1.zip` from the beta release and read its signing/notarization status.
 2. Extract **Agent B.app**.
 3. Move it to **Applications**.
 4. Open the app.
+
+The launcher uses its bundled, checksum-pinned Python runtime. Homebrew, Xcode and a separate Python installation are not required to run the app. The published build is Apple Silicon only; Intel builds require building on an Intel Mac and separate validation.
+
+The default developer build is ad-hoc signed for local use. Developer ID signing, Apple notarization and clean-machine installation testing are distinct checks. Do not infer notarization from a valid signature; check the release notes. See [macOS release checklist](../macos-release.md).
 
 Developers can build it locally:
 

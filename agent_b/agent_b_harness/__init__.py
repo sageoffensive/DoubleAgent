@@ -1,3 +1,3 @@
 """Agent B harness for Double Agent and the local CyberStrike model."""
 
-__version__ = "3.0.1"
+__version__ = "3.1.0b1"
