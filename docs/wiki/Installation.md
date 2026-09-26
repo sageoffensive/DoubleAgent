@@ -67,6 +67,8 @@ The launcher uses its bundled, checksum-pinned Python runtime. Homebrew, Xcode a
 
 The default developer build is ad-hoc signed for local use. Developer ID signing, Apple notarization and clean-machine installation testing are distinct checks. Do not infer notarization from a valid signature; check the release notes. See [macOS release checklist](../macos-release.md).
 
+The `v3.1.0-beta.1` Apple Silicon release app is Developer ID-signed, notarized by Apple and includes a stapled ticket. Gatekeeper acceptance was verified locally. macOS can still ask for the normal first-launch confirmation for an app downloaded from the internet; this is not an unidentified-developer block. Clean-Mac UI installation testing remains outstanding.
+
 Developers can build it locally:
 
 ```bash

@@ -29,6 +29,7 @@ These changes do not add automatic execution of recommendations or expand target
 | JavaScript syntax, Python compilation, diff whitespace | Passed |
 | Repository secret scan with redacted output | No findings |
 | Mac compilation and strict signature verification | Passed; Developer ID signature, hardened runtime and secure timestamp |
+| Apple notarization, stapled ticket and Gatekeeper assessment | Passed; Apple accepted submission 03eb60af-c890-4fa7-86f1-c3cd8cffa046; Gatekeeper reports Notarized Developer ID |
 | Bundled runtime with empty settings and minimal PATH | Passed: startup and local upload/download |
 | Bundled runtime HTTPS certificate verification | Passed; TLS verification enabled |
 | Installed Mac app startup | Local health endpoint returned ok |
@@ -52,7 +53,7 @@ Rejected or unresolved reviews stop automatic actions in a visible blocked state
 
 The new Apple Silicon bundle includes CPython 3.12.14 and is Developer ID-signed with hardened runtime and a secure timestamp, including nested runtime binaries. It rejects embedded model credentials. The build supports notarization, stapling and Gatekeeper checks with a stored Keychain profile; a macOS CI job builds and smoke-tests the self-contained app.
 
-Apple notarization and a quarantined fresh-macOS installation test are still release checks, not inferred from local signature verification. An isolated-runtime test does not prove clean-machine UI compatibility. See [release checklist](macos-release.md); consult the specific release notes for the final notarization result. Intel builds and macOS 13 compatibility have not been exercised here.
+Apple notarization, ticket stapling and Gatekeeper assessment passed on 26 September 2026. The installed app and release bundle validate as Notarized Developer ID. A quarantined fresh-macOS installation test remains outstanding: isolated-runtime checks do not prove clean-machine UI compatibility. See [release checklist](macos-release.md). Intel builds and macOS 13 compatibility have not been exercised here, so the release remains a beta.
 
 ### P2: live provider/model image compatibility remains to be verified
 
@@ -64,4 +65,4 @@ PDF/Office/archive ingestion, camera capture, generated binary artifacts, and au
 
 ## Release hygiene
 
-The rebuilt bundle contains no embedded model-auth file. Runtime settings, databases, and uploaded files stay outside the release source list. A later public release should scan its exact staged tree and packaged archive again after packaging. This review is a bounded source/integration check, not a full security audit.
+The bundle contains no embedded model-auth file. Runtime settings, databases, and uploaded files stay outside the release source list. The exact staged tree and packaged app are secret-scanned, and release archive checksums are published. This review is a bounded source/integration check, not a full security audit or a guarantee that every secret pattern is detectable.
