@@ -15,6 +15,7 @@ from typing import Any
 from . import config
 from .clients import Model
 from .engine import Engine
+from .research import Research, connection_label, parse_dependencies
 from .skills import create_skill, public_catalog
 from .store import Store
 
@@ -23,6 +24,7 @@ ROOT = Path(__file__).resolve().parent.parent
 STATIC = ROOT / "static"
 STORE = Store(config.DATA / "agent-b.sqlite3")
 ENGINE = Engine(STORE)
+RESEARCH = Research(config.DATA / "research.sqlite3")
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -32,6 +34,19 @@ class Handler(BaseHTTPRequestHandler):
         if not self.local_request():
             return
         parsed = urllib.parse.urlsplit(self.path)
+        if parsed.path == "/api/research":
+            self.json({"notes": RESEARCH.list(), "connection": connection_label(config.resolve_model_connection(config.load()))})
+            return
+        if parsed.path.startswith("/api/research/"):
+            try:
+                ident = parsed.path.split("/")[3]
+                if parsed.path.endswith("/download"):
+                    self.download("agent-b-research-" + ident + ".md", RESEARCH.markdown(ident))
+                else:
+                    self.json(RESEARCH.get(ident))
+            except ValueError as exc:
+                self.json({"error": str(exc)}, 404)
+            return
         if parsed.path.startswith("/api/files/"):
             try:
                 file_path = parsed.path[len("/api/files/"):]
@@ -108,6 +123,36 @@ class Handler(BaseHTTPRequestHandler):
             if self.headers.get_content_type() != "application/json":
                 raise ValueError("Requests must use application/json")
             body = self.body()
+            if parsed.path == "/api/research/preview-dependencies":
+                self.json(parse_dependencies(str(body.get("format", "")), body.get("text", "")))
+                return
+            if parsed.path == "/api/research/cancel":
+                RESEARCH.cancel()
+                self.json({"ok": True})
+                return
+            if parsed.path == "/api/research/delete":
+                RESEARCH.delete(str(body.get("id", "")))
+                self.json({"ok": True})
+                return
+            if parsed.path == "/api/research/start":
+                kind = str(body.get("kind", ""))
+                model = destination = None
+                if kind == "review":
+                    if body.get("allow_model") is not True:
+                        raise ValueError("Explicit model-sharing consent is required")
+                    if ENGINE.thread and ENGINE.thread.is_alive():
+                        raise ValueError("Stop the active chat or assessment before starting a research model review")
+                    cfg = config.load()
+                    connection = config.resolve_model_connection(cfg)
+                    destination = connection_label(connection)
+                    if body.get("connection_fingerprint") != destination["fingerprint"]:
+                        raise ValueError("Model connection changed. Check the destination and approve sharing again.")
+                    if not connection.get("base_url") or not connection.get("model"):
+                        raise ValueError("Configure a model connection in Settings first")
+                    model = Model(connection["base_url"], connection["api_key"], connection["model"],
+                                  min(cfg.request_timeout, 120), min(cfg.max_output_tokens, 4096), connection["provider"])
+                self.json(RESEARCH.start(kind, body, model, destination), 202)
+                return
             if parsed.path == "/api/files":
                 self.json(ENGINE.attachments.add(str(body.get("name", "")), str(body.get("data", ""))), 201)
                 return

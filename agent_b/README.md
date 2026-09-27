@@ -1,5 +1,13 @@
 # Agent B Harness
 
+## Research workspace (beta 2)
+
+Choose **Research** from the operator-chat header. Research is human-operated and separate from assessment tools. Look up OSV records, preview and check supported dependency manifests, import selected local source or retrieve explicitly named public GitHub files. No code is executed, built or installed. Inspect and export local notes without a model connection.
+
+Optional **Share this note & request review** displays the configured destination and requires fresh consent. It submits only that note to an isolated, tool-free model call. Expect remediation suggestions and questions, not proof of exploitability; verify model output yourself.
+
+See [the research guide](../docs/wiki/Research.md) for formats, quotas and privacy. Notes persist separately in `research.sqlite3` in the Agent B data directory; clearing chat does not clear this notebook.
+
 Agent B is a provider-neutral model harness for the Double Agent Burp extension. Double Agent remains authoritative for Burp scope, requests, findings, coverage and reporting. The harness supplies a chat interface, model loop, selectable methodology skills, evidence policy, duplicate-call guard and human question/approval channel.
 
 ## Start

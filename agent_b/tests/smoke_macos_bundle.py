@@ -53,6 +53,24 @@ def main():
             assert settings["model_options"] == [], "Fresh install must have no built-in connections"
             with urllib.request.urlopen(base, timeout=2) as reply:
                 assert b"Attach files" in reply.read()
+            with urllib.request.urlopen(base + "/research.html", timeout=2) as reply:
+                assert b"Research, with receipts" in reply.read()
+            with urllib.request.urlopen(base + "/api/research", timeout=2) as reply:
+                assert json.load(reply)["notes"] == [], "Fresh research notebook must be empty"
+            source_request = urllib.request.Request(base + "/api/research/start", data=json.dumps({
+                "kind": "upload", "files": [{"name": "example.py", "data": base64.b64encode(b"value = 42").decode()}],
+            }).encode(), headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(source_request, timeout=2) as reply:
+                research_id = json.load(reply)["id"]
+            for attempt in range(30):
+                with urllib.request.urlopen(base + "/api/research/" + research_id, timeout=2) as reply:
+                    research_note = json.load(reply)
+                if research_note["status"] != "running":
+                    break
+                time.sleep(0.1)
+            assert research_note["status"] == "complete", "Research source import failed"
+            with urllib.request.urlopen(base + "/api/research/" + research_id + "/download", timeout=2) as reply:
+                assert b"value = 42" in reply.read()
             fixture = b"Harmless release smoke-test note."
             request = urllib.request.Request(base + "/api/files", data=json.dumps({
                 "name": "smoke.txt", "data": base64.b64encode(fixture).decode(),
@@ -64,7 +82,7 @@ def main():
                 assert reply.read() == fixture
                 assert reply.headers["Content-Disposition"].startswith("attachment;")
                 assert reply.headers["X-Content-Type-Options"] == "nosniff"
-            print("PASS: bundle signature, isolated runtime, empty settings, UI, local upload/download")
+            print("PASS: bundle signature, isolated runtime, empty settings, UI, local uploads/downloads, research import/export")
         finally:
             process.terminate()
             try:
