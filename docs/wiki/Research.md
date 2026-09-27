@@ -1,6 +1,10 @@
-# Read-only research
+# Review source together
 
-Open **Research** in the operator-chat header in the web harness or Mac app. This separate workspace works without Burp. Lookups and source import do not require a model.
+When a reply mentions a CVE or a version-related concern, a **Review together** offer can appear beneath it. **Not now** dismisses the offer. You can also choose **Review source** beside the composer. A compact panel opens inside the chat; there is no separate research page.
+
+Offers are passive suggestions, not background scans or proof of a vulnerable version. No lookup starts until you select inputs and approve. Discuss mode is prompted to ask whether you want to inspect advisories/source for a relevant fix, with uncertainty and one focused question. Assessment tools are unchanged; research never becomes an automatic assessment step.
+
+Choose **Package version** to check an exact package name, ecosystem and version against OSV, or choose an advisory ID, selected source files or a manifest. Product names need mapping to the correct package; a banner alone is not sufficient. Lookups and local source import do not require a model or Burp.
 
 ## Advisory lookup
 
@@ -10,7 +14,7 @@ This is an OSV integration, not a general web browser or an NVD integration. Mis
 
 ## Dependency review
 
-Upload or paste a manifest, then **Preview locally**. Review the exact package names and versions before approving transmission to OSV. The full manifest, comments and local paths are not sent. Package names can still disclose private projects.
+Choose **Dependency manifest**, paste it, then **Preview locally**. Review the exact package names and versions before approving transmission to OSV. The full manifest, comments and local paths are not sent. Package names can still disclose private projects.
 
 - `requirements.txt`: exact `name==version` pins. Ranges, included files and environment-marker lines are skipped and reported.
 - npm `package-lock.json`: versions 2/3 with resolved `packages` entries. Local links are not queried.
@@ -26,11 +30,11 @@ Local imports accept up to six UTF-8 files, 120 KB each. Common programming lang
 
 ## Optional model review
 
-Select a completed note and inspect it for secrets. The review panel shows the current provider, model and destination host. Tick the permission checkbox and choose **Share this note & request review** only if authorised to share the entire note with that destination. Changing connections invalidates approval.
+Inspect the completed note for secrets. The panel shows the model and destination host. Tick the sharing checkbox and choose **Ask Agent B about fixes** only if authorised to share the entire note with that destination. Changing connections invalidates approval. Results remain in this in-chat panel; **Saved checks** reopens earlier notes without adding them to assessment context.
 
 This separate call has no assessment tools, shell, browsing or execution. It receives only the selected note, not chat history, Burp credentials or other notes. Source is line-numbered for citations. The prompt asks for potential concerns, applicability, uncertainty, questions and remediation; it forbids treating source comments as instructions or claiming tests were executed. Tool calls and empty responses are rejected. Model citations and advice still need human verification.
 
-Review input is limited to 80,000 characters. Use fewer/smaller files for larger notes or small-context models. Stop an active chat/assessment first. Only one research operation runs at a time. **Cancel research** stops subsequent work and cancels model requests; it cannot recall data already sent, and an in-flight lookup may take up to its timeout to return.
+Review input is limited to 80,000 characters. Use fewer/smaller files for larger notes or small-context models. Stop an active chat/assessment first. Only one research operation runs at a time. **Cancel check** stops subsequent work and cancels model requests; it cannot recall data already sent, and an in-flight lookup may take up to its timeout to return.
 
 ## Privacy and storage
 

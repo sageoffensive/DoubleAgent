@@ -90,11 +90,38 @@ class ResearchHTTPTests(unittest.TestCase):
             self.assertEqual(model.return_value.complete.call_args.args[1],[])
 
     def test_ui_is_available_and_source_is_not_rendered_as_html(self):
-        for path in ('/research.html','/research.css','/research.js'):
+        for path in ('/', '/source-review.js'):
             self.assertEqual(self.request('GET',path)[0],200)
-        script = self.request('GET','/research.js')[2].decode()
+        script = self.request('GET','/source-review.js')[2].decode()
         self.assertNotIn('innerHTML',script)
         self.assertIn('textContent',script)
+
+    def test_version_is_visible_without_javascript(self):
+        from agent_b_harness import DISPLAY_VERSION, __version__
+        for path in ('/',):
+            status, headers, data = self.request('GET', path)
+            self.assertEqual(status, 200)
+            self.assertIn(DISPLAY_VERSION.encode(), data)
+            self.assertNotIn(b'{{AGENT_B_VERSION}}', data)
+            self.assertIn('AgentB/' + __version__, headers['Server'])
+            self.assertEqual(int(headers['Content-Length']), len(data))
+        with patch.object(self.server, 'DISPLAY_VERSION', 'v9.0.0-beta.1 <test>'):
+            for path in ('/',):
+                data = self.request('GET', path)[2]
+                self.assertIn(b'v9.0.0-beta.1 &lt;test&gt;', data)
+                self.assertNotIn(DISPLAY_VERSION.encode(), data)
+
+    def test_review_stays_in_chat_and_header_has_no_target(self):
+        status, headers, _ = self.request('GET', '/research.html')
+        self.assertEqual(status, 303)
+        self.assertEqual(headers['Location'], '/')
+        page = self.request('GET', '/')[2].decode()
+        self.assertIn('id="source-review-panel"', page)
+        self.assertIn('id="target-link"', page)
+        self.assertNotIn('id="target-link-main"', page)
+        self.assertNotIn('href="/research.html"', page)
+        self.assertIn('File details', page)
+        self.assertEqual(self.request('GET', '/research.js')[0], 404)
 
 
 if __name__ == '__main__':

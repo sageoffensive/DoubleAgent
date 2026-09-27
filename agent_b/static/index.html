@@ -21,15 +21,8 @@
         <small id="step-label">Step 0</small>
         <small id="finding-progress" class="hidden"></small>
       </section>
-      <section>
-        <div class="eyebrow">CONNECTIONS</div>
-        <div class="connection"><span id="burp-dot" class="dot"></span><div><strong>Double Agent</strong><small id="burp-state">Checking…</small></div></div>
-        <div class="connection"><span id="model-dot" class="dot"></span><div><strong id="model-name">Model</strong><small id="model-state">Checking…</small></div></div>
-        <div id="target-row" class="connection hidden"><span class="dot ok"></span><div><strong>Target</strong><a id="target-link" class="target-link" href="#" target="_blank" rel="noopener noreferrer">Open target</a></div></div>
-      </section>
-      <section>
-        <div class="eyebrow">ACTIVE SKILLS</div>
-        <div id="active-skills" class="active-skills"><span>Loading…</span></div>
+      <section id="target-row" class="hidden">
+        <div class="connection"><span class="dot ok"></span><div><strong>Target</strong><a id="target-link" class="target-link" href="#" target="_blank" rel="noopener noreferrer">Open target</a></div></div>
       </section>
       <section>
         <div class="eyebrow">CONTROLS</div>
@@ -42,17 +35,15 @@
         <button id="clear">New conversation</button>
         <button id="settings">Settings</button>
       </section>
-      <footer>Traffic is executed by Burp and governed by its scope and safety gates.</footer>
+      <footer>Burp manages traffic and scope.</footer>
     </aside>
 
     <main>
       <header class="topbar">
-        <div><div class="eyebrow">ACTIVE ASSESSMENT</div><h1>Operator chat</h1></div>
+        <div><div class="eyebrow">ACTIVE ASSESSMENT</div><h1>Operator chat</h1><small class="app-version" aria-label="Agent B version">{{AGENT_B_VERSION}}</small></div>
         <div class="topbar-actions">
           <a class="download-link" href="/api/export" download>Export chat</a>
-          <a class="download-link" href="/research.html">Research</a>
           <button type="button" id="open-nav" class="mobile-menu" aria-label="Open controls">Controls</button>
-          <a id="target-link-main" class="target-link-main hidden" href="#" target="_blank" rel="noopener noreferrer">Open target</a>
           <div id="live" class="pill">Connecting</div>
         </div>
       </header>
@@ -79,25 +70,56 @@
       </details>
       <div id="timeline" class="timeline" aria-label="Conversation"></div>
       <div id="question" class="question hidden" role="region" aria-label="Agent B needs your input"></div>
+      <section id="source-review-panel" class="source-review hidden" aria-label="Review together">
+        <div class="review-heading"><strong>Review together</strong><button type="button" id="close-source-review" aria-label="Close source review">×</button></div>
+        <p class="hint">Read-only. Nothing is fetched or shared until you approve.</p>
+        <form id="review-input-form">
+          <label>What should we check?<select id="review-kind"><option value="version">Package version</option><option value="advisory">CVE / advisory</option><option value="upload">Local source files</option><option value="github">Public GitHub files</option><option value="dependencies">Dependency manifest</option></select></label>
+          <div data-review-kind="version" class="grid2"><label>Package<input id="review-package" placeholder="Package name" maxlength="200"></label><label>Exact version<input id="review-version" placeholder="1.2.3" maxlength="120"></label><label>Ecosystem<select id="review-ecosystem"><option value="pypi">PyPI</option><option value="npm">npm</option><option value="maven">Maven</option><option value="golang">Go</option><option value="cargo">crates.io</option><option value="gem">RubyGems</option><option value="nuget">NuGet</option><option value="composer">Packagist</option></select></label></div>
+          <label data-review-kind="advisory" hidden>Advisory ID<input id="review-advisory" placeholder="CVE-YYYY-NNNN" maxlength="100"></label>
+          <label data-review-kind="upload" hidden>Source files<input type="file" id="review-files" multiple><span class="hint">Up to six UTF-8 files, 120 KB each. Imported locally only.</span></label>
+          <div data-review-kind="github" hidden><div class="grid2"><label>Public repository<input id="review-repository" placeholder="owner/repository" maxlength="201"></label><label>Revision<input id="review-revision" placeholder="Tag or commit" maxlength="200"></label></div><label>Files — one path per line<textarea id="review-paths" rows="2" maxlength="2000"></textarea></label><p class="hint">Up to six files at a pinned commit. No cloning or execution.</p></div>
+          <div data-review-kind="dependencies" hidden><label>Format<select id="review-format"><option value="requirements">Pinned requirements.txt</option><option value="package-lock">npm package-lock v2/v3</option><option value="cyclonedx">CycloneDX JSON</option></select></label><label>Manifest<textarea id="review-manifest" rows="3" maxlength="120000"></textarea></label><button type="button" id="review-preview">Preview locally</button><pre id="review-preview-result" hidden></pre></div>
+          <label class="review-consent" id="review-network-label"><input type="checkbox" id="review-network"><span id="review-network-text">Send this package name and version to OSV.</span></label>
+          <button type="submit" id="review-start">Check version</button>
+        </form>
+        <p id="review-status" class="hint" role="status" aria-live="polite"></p><button type="button" id="review-cancel" hidden>Cancel check</button>
+        <details><summary>Saved checks</summary><label>Local notes<select id="review-notes"><option value="">Choose a note…</option></select></label><p class="hint">Notes remain local across conversations.</p></details>
+        <article id="review-result" hidden><strong id="review-title"></strong><div id="review-evidence"></div><a id="review-download" class="download-link" download>Download note</a><button type="button" id="review-delete">Delete note</button></article>
+        <form id="review-model-form" hidden><p class="hint" id="review-destination"></p><label class="review-consent"><input type="checkbox" id="review-model-consent" required><span>I approve sharing this note with this model. I have checked it for secrets.</span></label><button type="submit" id="review-ask">Ask Agent B about fixes</button></form>
+        <details class="hint"><summary>Privacy &amp; limits</summary><p>Notes are not encrypted. Redaction may miss secrets. Only the selected note goes to the model, without Burp credentials or chat history. Checks cannot run code, send target traffic or create findings. A version match is not proof of exploitability. Cancel cannot recall data already sent.</p></details>
+      </section>
       <form id="composer">
         <div class="composer-toolbar">
-          <label for="conversation-mode">Mode</label><select id="conversation-mode"><option value="discuss">Discuss · advice and files</option><option value="assessment">Assessment chat</option></select>
+          <label for="conversation-mode">Mode</label><select id="conversation-mode"><option value="discuss">Discuss</option><option value="assessment">Assessment</option></select>
           <button type="button" id="attach-files">Attach files</button>
+          <button type="button" id="open-source-review">Review source</button>
           <input type="file" id="file-picker" class="hidden" multiple accept=".txt,.md,.csv,.json,.log,.xml,.yaml,.yml,.png,.jpg,.jpeg,.webp">
         </div>
         <div id="attachment-list" class="attachment-list hidden"></div>
-        <textarea id="message" rows="2" aria-label="Message to Agent B" placeholder="Ask a question, share a file, or paste a screenshot…"></textarea>
+        <textarea id="message" rows="2" aria-label="Message to Agent B" placeholder="Message Agent B…"></textarea>
         <label id="thinking-control" class="hidden">Thinking<select id="thinking-choice" aria-label="Thinking mode"><option value="auto">Auto</option><option value="on">On</option><option value="off">Off</option></select></label>
         <button type="submit" aria-label="Send">Send</button>
         <p id="composer-help" class="composer-help"></p>
+        <details class="composer-help file-details"><summary>File details</summary><p>Text: 120 KB. Images: 3 MB, with a compatible model. Attached files are sent with your message. Check for secrets; text redaction may miss them and images are not redacted.</p></details>
         <p id="composer-status" class="composer-help" role="status" aria-live="polite"></p>
       </form>
     </main>
   </div>
 
-  <dialog id="settings-dialog">
+  <dialog id="settings-dialog" aria-labelledby="settings-title">
     <form id="settings-form">
-      <div class="modal-head"><div><div class="eyebrow">MODEL ROUTING</div><h2>Model connections</h2></div><button type="button" id="close-settings" class="icon">×</button></div>
+      <div class="modal-head"><div><div class="eyebrow">{{AGENT_B_VERSION}}</div><h2 id="settings-title">Settings</h2></div><button type="button" id="close-settings" class="icon" aria-label="Close settings">×</button></div>
+      <div class="settings-tabs" role="tablist" aria-label="Settings sections">
+        <button type="button" role="tab" id="settings-tab-connections" aria-controls="settings-connections" aria-selected="true" tabindex="0" data-settings-tab="connections">Connections</button>
+        <button type="button" role="tab" id="settings-tab-skills" aria-controls="settings-skills" aria-selected="false" tabindex="-1" data-settings-tab="skills">Skills</button>
+        <button type="button" role="tab" id="settings-tab-general" aria-controls="settings-general" aria-selected="false" tabindex="-1" data-settings-tab="general">General</button>
+      </div>
+      <section id="settings-connections" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-connections" tabindex="0">
+      <div class="connection-health">
+        <div class="connection"><span id="burp-dot" class="dot"></span><div><strong>Double Agent</strong><small id="burp-state">Checking…</small></div></div>
+        <div class="connection"><span id="model-dot" class="dot"></span><div><strong id="model-name">Model</strong><small id="model-state">Checking…</small></div></div>
+      </div>
       <label>Active connection
         <select name="model" id="model-choice"></select>
       </label>
@@ -111,14 +133,6 @@
         <p class="hint">One Amazon Bedrock API key (bearer token) is used for every Claude model on Bedrock — enter it once and it stays when you switch models. For the custom option, copy the exact inference-profile ID from the Bedrock console. Region + key are stored locally with owner-only permissions.</p>
       </div>
       <div class="model-actions"><button type="button" id="add-model" class="primary">Add connection</button><button type="button" id="edit-model">Edit</button><button type="button" id="remove-model">Remove</button></div>
-      <fieldset class="skill-picker">
-        <div class="skill-picker-head">
-          <div><strong>Skills</strong><span>Select any combination for the next run.</span></div>
-          <button type="button" id="add-skill">Add skill</button>
-        </div>
-        <div id="skill-options" class="skill-options"></div>
-        <p class="hint">Selections are recorded with the model in each run profile. Use no skills as the control when comparing performance.</p>
-      </fieldset>
       <details id="legacy-model-settings" class="advanced-settings">
         <summary>Built-in local connection settings</summary>
         <div>
@@ -127,8 +141,19 @@
         </div>
       </details>
       <label>Double Agent URL<input name="double_agent_url" placeholder="http://127.0.0.1:8777"></label>
-      <div class="grid2"><label>Maximum steps<input name="max_steps" type="number" min="1" max="120"></label><label>Maximum output tokens<input name="max_output_tokens" type="number" min="512" max="32768"></label></div>
-      <p class="hint">Each saved connection keeps its own credential. Secrets stay in the local settings file with owner-only permissions and are never returned to this page.</p>
+      <p class="hint">Keys are stored locally and never shown here.</p>
+      </section>
+      <section id="settings-skills" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-skills" tabindex="0" hidden>
+        <p class="eyebrow">SAVED SELECTION</p>
+        <div id="active-skills" class="active-skills"><span>Loading…</span></div>
+        <fieldset class="skill-picker">
+          <div class="skill-picker-head"><div><strong>Next run</strong><span>Choose the skills to use.</span></div><button type="button" id="add-skill">Add skill</button></div>
+          <div id="skill-options" class="skill-options"></div>
+        </fieldset>
+      </section>
+      <section id="settings-general" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-general" tabindex="0" hidden>
+        <div class="grid2"><label>Maximum steps<input name="max_steps" type="number" min="1" max="120"></label><label>Maximum output tokens<input name="max_output_tokens" type="number" min="512" max="32768"></label></div>
+      </section>
       <div class="modal-actions"><button type="button" id="cancel-settings">Cancel</button><button class="primary" type="submit">Save settings</button></div>
     </form>
   </dialog>
@@ -199,6 +224,7 @@
       </div>
     </div>
   </dialog>
+  <script src="/source-review.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

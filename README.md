@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 3.1.0 beta 2" src="https://img.shields.io/badge/version-3.1.0--beta.2-ff9944">
+  <img alt="Version 3.1.0 beta 3" src="https://img.shields.io/badge/version-3.1.0--beta.3-ff9944">
   <img alt="License MIT" src="https://img.shields.io/badge/license-MIT-2ea44f">
   <img alt="Burp Suite" src="https://img.shields.io/badge/Burp%20Suite-Jython-f47b20">
   <img alt="Human in the loop" src="https://img.shields.io/badge/control-human--in--the--loop-ff9944">
@@ -131,7 +131,7 @@ Open [http://127.0.0.1:4310](http://127.0.0.1:4310).
 
 **Agent B macOS application — experimental work in progress**
 
-Download `Agent-B-macOS-arm64-v3.1.0-beta.2.zip` from the [beta release](https://github.com/sageoffensive/DoubleAgent/releases/tag/v3.1.0-beta.2), extract it, and move **Agent B.app** to Applications. This build targets Apple Silicon and includes Python. The release notes state its signing/notarization status and remaining validation limits; the harness remains experimental. Maintainers and developers can build it with:
+Download `Agent-B-macOS-arm64-v3.1.0-beta.3.zip` from the [beta release](https://github.com/sageoffensive/DoubleAgent/releases/tag/v3.1.0-beta.3), extract it, and move **Agent B.app** to Applications. This build targets Apple Silicon and includes Python. The release notes state its signing/notarization status and remaining validation limits; the harness remains experimental. Maintainers and developers can build it with:
 
 ```bash
 cd agent_b
@@ -171,7 +171,7 @@ The **Discuss** mode gives you a place to review notes and screenshots, ask ques
 
 ### Read-only research
 
-Open **Research** in the web or Mac harness to look up OSV/CVE advisories, check exact dependencies from npm lockfiles, pinned requirements or CycloneDX SBOMs, and inspect explicitly selected local or public GitHub source files. GitHub references resolve to a pinned commit; no source is executed or installed.
+Agent B can offer **Review together** beneath a reply about a possible version-related issue. Choose it—or **Review source** beside the composer—to check an exact package version, CVE/OSV advisory, dependency manifest, or selected local/public GitHub source without leaving the chat. GitHub references resolve to a pinned commit; no source is executed or installed.
 
 Inspect the local note first, then explicitly approve a separate, tool-free model review if wanted. The displayed model destination receives only that note—not Burp sessions or assessment history. Reviews focus on applicability, uncertainty, questions and remediation. Research does not create findings, initiate tests or confirm exploitability. See [Research workspace](docs/wiki/Research.md) for supported inputs, privacy and limits.
 

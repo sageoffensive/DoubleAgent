@@ -105,8 +105,8 @@ function visibleMessage(value) {
 function render(value) {
   latestState = value;
   $('#composer-help').textContent = $('#conversation-mode').value === 'discuss'
-    ? `Discuss uses no assessment tools. Text files up to 120 KB; images up to 3 MB. Files go to ${modelOption(value.settings?.model)?.label || 'the selected connection'} when sent. Text is redacted for common secrets; check screenshots yourself.`
-    : 'Assessment chat uses the current Burp context. Use Discuss for file and image review.';
+    ? `No testing. Files go to ${modelOption(value.settings?.model)?.label || 'your model'}.`
+    : 'Uses your Burp context.';
   if (value.settings?.model_options) modelOptions = value.settings.model_options;
   const stopping = value.status === 'stopping';
   const bootstrapped = Boolean(value.burp_prompt_loaded);
@@ -162,14 +162,10 @@ function render(value) {
   $('#model-state').textContent = model.ok ? `${value.settings.model} ready` : String(model.detail || 'Unavailable').slice(0, 70);
   const targetUrl = value.target_url || '';
   $('#target-row').classList.toggle('hidden', !targetUrl);
-  $('#target-link-main').classList.toggle('hidden', !targetUrl);
   if (targetUrl) {
     $('#target-link').href = targetUrl;
     $('#target-link').textContent = targetUrl;
     $('#target-link').title = `Open ${targetUrl} in your browser`;
-    $('#target-link-main').href = targetUrl;
-    $('#target-link-main').textContent = `Open target · ${targetUrl}`;
-    $('#target-link-main').title = `Open ${targetUrl} in your browser`;
   }
   $('#live').textContent = active ? 'Live run' : 'Local and idle';
   const streamPanel = $('#model-stream-panel');
@@ -276,11 +272,13 @@ function render(value) {
         <div class="meta">${speaker}</div>
         <div class="bubble">${visibleMessage(content)}${(meta.attachments || []).map(f => `<a class="attachment-download" href="/api/files/${encodeURIComponent(f.id)}" download>${f.mime.startsWith('image/') ? `<img class="attachment-thumbnail" src="/api/files/${encodeURIComponent(f.id)}/preview" alt="${esc(f.name)}">` : ''}${esc(f.name)} ↓</a>`).join('')}</div>
         ${message.role === 'assistant' && !harnessMessage ? `<a class="download-link response-download" href="/api/messages/${encodeURIComponent(message.id)}/download" download>Download response</a>` : ''}
+        ${AgentBReview.offerFor(message) ? `<div class="source-offer" data-review-offer="${esc(message.id)}"><strong>Check the advisory or source?</strong><p>A version match still needs verification.</p><button type="button" data-open-review>Review together</button><button type="button" data-dismiss-review>Not now</button></div>` : ''}
       </div>`;
     });
 
     timeline.innerHTML = items.length ? items.join('') : `
       <div class="empty"><div><strong>Agent B is ready</strong>Regular chat is ready. For Burp work, send bootstrap first.</div></div>`;
+    AgentBReview.bindOffers(timeline, transcript);
     timeline.scrollTop = follow ? timeline.scrollHeight : position;
     renderedFeed = feedKey;
   }
@@ -522,6 +520,35 @@ $('#confirm-new-conversation').onclick = async () => {
 };
 
 const dialog = $('#settings-dialog');
+let settingsTab = 'connections';
+function selectSettingsTab(name, focus = false) {
+  const tabs = [...dialog.querySelectorAll('[data-settings-tab]')];
+  const selected = tabs.find(tab => tab.dataset.settingsTab === name);
+  if (!selected) return;
+  settingsTab = name;
+  tabs.forEach(tab => {
+    const active = tab === selected;
+    tab.setAttribute('aria-selected', String(active));
+    tab.tabIndex = active ? 0 : -1;
+    document.getElementById(tab.getAttribute('aria-controls')).hidden = !active;
+  });
+  if (focus) selected.focus();
+}
+dialog.querySelectorAll('[data-settings-tab]').forEach(tab => {
+  tab.onclick = () => selectSettingsTab(tab.dataset.settingsTab);
+  tab.onkeydown = event => {
+    const names = ['connections', 'skills', 'general'];
+    const index = names.indexOf(tab.dataset.settingsTab);
+    const next = {ArrowRight: (index + 1) % names.length, ArrowLeft: (index + names.length - 1) % names.length, Home: 0, End: names.length - 1}[event.key];
+    if (next === undefined) return;
+    event.preventDefault();
+    selectSettingsTab(names[next], true);
+  };
+});
+$('#settings-form').addEventListener('invalid', event => {
+  const panel = event.target.closest('[role="tabpanel"]');
+  if (panel) selectSettingsTab(panel.id.replace('settings-', ''));
+}, true);
 function renderModelDescription() {
   const selected = $('#model-choice').value;
   const option = modelOption(selected);
@@ -559,7 +586,7 @@ function renderSkillOptions(selectedIds = []) {
     </label>`).join('');
 }
 
-async function openSettings() {
+async function openSettings(tab = settingsTab) {
   const [value, catalog] = await Promise.all([api('/api/settings'), api('/api/skills')]);
   modelOptions = value.model_options || [];
   providerOptions = value.providers || [];
@@ -579,9 +606,10 @@ async function openSettings() {
   $('#legacy-model-url').value = value.model_url || '';
   renderSkillOptions(value.selected_skills || []);
   renderModelDescription();
+  selectSettingsTab(tab);
   dialog.showModal();
 }
-$('#settings').onclick = () => { closeNavigation(); openSettings(); };
+$('#settings').onclick = () => { closeNavigation(); openSettings('connections'); };
 // Switching model applies that model's recommended step/output budget so hosted
 // models get room for long runs without manual tuning. The user can still edit
 // the fields before saving; the saved values then win over the recommendation.
