@@ -1,8 +1,8 @@
 # Agent B Harness
 
-## Research workspace (beta 2)
+## Review source together
 
-Choose **Research** from the operator-chat header. Research is human-operated and separate from assessment tools. Look up OSV records, preview and check supported dependency manifests, import selected local source or retrieve explicitly named public GitHub files. No code is executed, built or installed. Inspect and export local notes without a model connection.
+Choose **Review together** beneath a relevant reply, or **Review source** beside the composer. Checks open inside the chat and remain separate from assessment tools. Check exact package versions or OSV records, preview dependency manifests, import local source or retrieve selected public GitHub files. No code is executed, built or installed. Inspect and export notes without a model connection.
 
 Optional **Share this note & request review** displays the configured destination and requires fresh consent. It submits only that note to an isolated, tool-free model call. Expect remediation suggestions and questions, not proof of exploitability; verify model output yourself.
 

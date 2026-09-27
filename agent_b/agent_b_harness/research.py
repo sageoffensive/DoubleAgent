@@ -37,6 +37,9 @@ with exact file/line or advisory citations, uncertainty, prerequisites and fixes
 Do not call a version match or a static concern a confirmed exploitable finding.
 Ask focused questions about missing deployment context and suggested fixes.
 End with what was not checked. Never imply a complete audit or a live test.
+Keep the review compact: lead with the useful conclusion, cite relevant evidence,
+suggest a fix and ask at most one focused question. Avoid boilerplate, long
+introductions and repeated caveats. Use more detail only when necessary.
 """
 
 

@@ -21,7 +21,8 @@ jobs:
       - name: JavaScript syntax
         run: |
           node --check agent_b/static/app.js
-          node --check agent_b/static/research.js
+          node --check agent_b/static/source-review.js
+          node agent_b/tests/test_source_review_ui.cjs
       - name: DoubleAgent tests
         run: python -m unittest discover -s tests -v
       - name: Burp source compiles

@@ -52,9 +52,19 @@ def main():
                     time.sleep(0.1)
             assert settings["model_options"] == [], "Fresh install must have no built-in connections"
             with urllib.request.urlopen(base, timeout=2) as reply:
-                assert b"Attach files" in reply.read()
+                page = reply.read()
+                assert b"Attach files" in page
+                assert b'id="settings-tab-connections"' in page
+                assert b'id="settings-tab-skills"' in page
+                assert b'aria-label="Agent B version">v' in page
+                assert b"{{AGENT_B_VERSION}}" not in page
             with urllib.request.urlopen(base + "/research.html", timeout=2) as reply:
-                assert b"Research, with receipts" in reply.read()
+                page = reply.read()
+                assert reply.url == base + "/", "Legacy research page must return to chat"
+                assert b'id="source-review-panel"' in page
+                assert b'id="target-link-main"' not in page
+                assert b'aria-label="Agent B version">v' in page
+                assert b"{{AGENT_B_VERSION}}" not in page
             with urllib.request.urlopen(base + "/api/research", timeout=2) as reply:
                 assert json.load(reply)["notes"] == [], "Fresh research notebook must be empty"
             source_request = urllib.request.Request(base + "/api/research/start", data=json.dumps({

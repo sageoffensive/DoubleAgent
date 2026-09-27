@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import mimetypes
 import os
@@ -12,7 +13,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
-from . import config
+from . import DISPLAY_VERSION, __version__, config
 from .clients import Model
 from .engine import Engine
 from .research import Research, connection_label, parse_dependencies
@@ -28,12 +29,18 @@ RESEARCH = Research(config.DATA / "research.sqlite3")
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "AgentB/3.0"
+    server_version = "AgentB/" + __version__
 
     def do_GET(self) -> None:
         if not self.local_request():
             return
         parsed = urllib.parse.urlsplit(self.path)
+        if parsed.path == "/research.html":
+            self.send_response(303)
+            self.send_header("Location", "/")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         if parsed.path == "/api/research":
             self.json({"notes": RESEARCH.list(), "connection": connection_label(config.resolve_model_connection(config.load()))})
             return
@@ -298,6 +305,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         data = target.read_bytes()
         kind = mimetypes.guess_type(str(target))[0] or "application/octet-stream"
+        if kind == "text/html":
+            data = data.replace(b"{{AGENT_B_VERSION}}", html.escape(DISPLAY_VERSION).encode("utf-8"))
         self.send_response(200)
         self.send_header("Content-Type", kind + ("; charset=utf-8" if kind.startswith("text/") else ""))
         self.send_header("Content-Length", str(len(data)))
