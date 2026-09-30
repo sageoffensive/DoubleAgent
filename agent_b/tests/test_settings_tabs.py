@@ -31,7 +31,7 @@ class SettingsTabsTests(unittest.TestCase):
 
     def test_unique_controls_and_accessible_tabs(self):
         self.assertEqual(self.page.duplicates, [])
-        for name in ('connections', 'skills', 'general'):
+        for name in ('models', 'skills', 'run'):
             _, tab, _ = self.page.ids['settings-tab-' + name]
             _, panel, _ = self.page.ids['settings-' + name]
             self.assertEqual(tab['role'], 'tab')
@@ -39,17 +39,25 @@ class SettingsTabsTests(unittest.TestCase):
             self.assertEqual(tab['aria-controls'], panel['id'])
             self.assertEqual(panel['aria-labelledby'], tab['id'])
             self.assertEqual(panel['role'], 'tabpanel')
-            self.assertEqual('hidden' in panel, name != 'connections')
+            self.assertEqual('hidden' in panel.get('class', '').split(), name != 'models')
 
-    def test_connections_and_skills_are_inside_settings_not_sidebar(self):
-        for ident, panel in [('burp-state', 'connections'), ('model-state', 'connections'),
-                             ('model-choice', 'connections'), ('active-skills', 'skills'),
+    def test_editable_controls_stay_in_the_correct_settings_section(self):
+        for ident, panel in [('model-choice', 'models'), ('model-url-input', 'models'),
                              ('skill-options', 'skills')]:
             ancestors = self.page.ids[ident][2]
             self.assertIn(('section', 'settings-' + panel), ancestors)
             self.assertIn(('form', 'settings-form'), ancestors)
             self.assertFalse(any(tag == 'aside' for tag, _ in ancestors))
 
-    def test_target_remains_in_sidebar(self):
-        self.assertTrue(any(tag == 'aside' for tag, _ in self.page.ids['target-link'][2]))
-        self.assertNotIn('target-link-main', self.page.ids)
+    def test_status_and_target_are_reachable_in_the_sidebar(self):
+        for ident in ('burp-state', 'model-state', 'active-skills', 'target-link'):
+            self.assertTrue(any(tag == 'aside' for tag, _ in self.page.ids[ident][2]))
+        self.assertIn('target-link-main', self.page.ids)
+
+    def test_workspace_tabs_link_to_unique_views(self):
+        for name in ('conversation', 'notebook', 'assessment'):
+            _, tab, _ = self.page.ids['tab-' + name]
+            _, panel, _ = self.page.ids['pane-' + name]
+            self.assertEqual(tab['aria-controls'], panel['id'])
+            self.assertEqual(panel['aria-labelledby'], tab['id'])
+            self.assertEqual(panel['role'], 'tabpanel')

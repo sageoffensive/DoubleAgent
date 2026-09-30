@@ -47,6 +47,13 @@ def _connection_provider(model_id: str, custom_models: Any = ()) -> str:
     return ""
 
 PROVIDERS = {
+    "openrouter": {
+        "label": "OpenRouter",
+        "description": "OpenRouter's Chat Completions API. Use the exact provider/model ID from its catalogue.",
+        "default_url": "https://openrouter.ai/api/v1",
+        "key_label": "OpenRouter API key",
+        "key_placeholder": "sk-or-…",
+    },
     "openai": {
         "label": "OpenAI",
         "description": "OpenAI's hosted API. Uses Chat Completions with bearer authentication.",
@@ -343,7 +350,7 @@ def _validated_connection(
         parsed = urlsplit(url)
         if parsed.scheme not in ("http", "https") or not parsed.hostname:
             raise ValueError("API base URL must be a valid http:// or https:// URL")
-        if provider in ("openai", "anthropic") and parsed.scheme != "https":
+        if provider in ("openai", "anthropic", "openrouter") and parsed.scheme != "https":
             raise ValueError("Hosted provider connections must use HTTPS")
     return {"label": label, "model": model, "url": url, "provider": provider, "api_key": api_key, "region": region}
 

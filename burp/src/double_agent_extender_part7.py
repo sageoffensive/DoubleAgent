@@ -298,7 +298,7 @@ class BurpExtenderChunk7(object):
         try:
             if self.AI_PROVIDER == "Ollama":
                 response = self._ask_ollama(prompt)
-            elif self.AI_PROVIDER == "OpenAI":
+            elif self.AI_PROVIDER in ("OpenAI", "OpenRouter"):
                 response = self._ask_openai(prompt)
             elif self.AI_PROVIDER == "Claude":
                 response = self._ask_claude(prompt)
@@ -409,6 +409,12 @@ class BurpExtenderChunk7(object):
 
     def _ask_openai(self, prompt):
         """Send request to OpenAI with configurable timeout"""
+        if self.AI_PROVIDER == "OpenRouter":
+            parsed = urlparse.urlsplit(str(self.API_URL or ""))
+            if parsed.scheme != "https" or not parsed.hostname:
+                raise ValueError("OpenRouter API URL must use HTTPS")
+            if not str(self.API_KEY or "").strip():
+                raise ValueError("OpenRouter API key is required")
         def _safe_text(value):
             if value is None:
                 return ""
@@ -470,6 +476,8 @@ class BurpExtenderChunk7(object):
             "max_completion_tokens": self.MAX_TOKENS,
             "temperature": 0.0
         }
+        if self.AI_PROVIDER == "OpenRouter":
+            request_payload["max_tokens"] = request_payload.pop("max_completion_tokens")
         endpoint_path = "/chat/completions"
 
         try:

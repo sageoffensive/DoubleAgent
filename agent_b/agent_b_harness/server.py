@@ -110,6 +110,20 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/api/skills":
             self.json({"skills": public_catalog(config.DATA)})
             return
+        if parsed.path == "/api/notebook":
+            self.json({**ENGINE.notebook, "files": ENGINE.attachments.references()})
+            return
+        if parsed.path == "/api/notebook/export":
+            notebook = ENGINE.notebook
+            sections = ["# Agent B engagement notebook", "Engagement: " + notebook["engagement_id"]]
+            for title, key in (("Objective", "objective"), ("Confirmed facts (operator supplied)", "facts"),
+                               ("Open questions", "questions"), ("Decisions", "decisions")):
+                sections.append("## " + title + "\n\n" + notebook[key])
+            sections.append("## Recommendation decisions\n\n" + json.dumps(ENGINE.suggestions(), ensure_ascii=False, indent=2))
+            sections.append("## File references\n\n" + json.dumps(ENGINE.attachments.references(), ensure_ascii=False, indent=2))
+            sections.append("## Last read-only snapshot\n\n" + json.dumps(notebook["snapshot"], ensure_ascii=False, indent=2))
+            self.download("agent-b-notebook.md", "\n\n".join(sections).encode("utf-8"))
+            return
         if parsed.path == "/api/traces":
             query = urllib.parse.parse_qs(parsed.query)
             limit = max(1, min(200, int(query.get("limit", ["50"])[0])))
@@ -165,10 +179,14 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if parsed.path == "/api/suggestions/decide":
                 ident = str(body.get("id", ""))
-                if not any(s["id"] == ident for s in ENGINE.suggestions()):
-                    raise ValueError("Suggestion is no longer available")
-                STORE.decide_suggestion(ident, str(body.get("decision", "")))
+                ENGINE.decide_suggestion(ident, str(body.get("decision", "")))
                 self.json({"ok": True})
+                return
+            if parsed.path == "/api/notebook":
+                self.json(ENGINE.update_notebook(body))
+                return
+            if parsed.path == "/api/notebook/refresh":
+                self.json(ENGINE.refresh_discussion_snapshot())
                 return
             if parsed.path == "/api/chat":
                 self.json(ENGINE.chat(str(body.get("message", "")), body.get("thinking"), body.get("attachments", []), body.get("discussion") is True), 202)

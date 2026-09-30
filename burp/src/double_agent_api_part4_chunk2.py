@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from double_agent_prelude import *
+from double_agent_scope import validate_destination, validate_raw_destination, validate_request_path
 
 class AgentAPIChunk4Chunk2(object):
     def _portswigger_mcp_rpc(self, method, params=None, timeout_sec=12, retry=True, fresh_session=False):
@@ -407,6 +408,12 @@ class AgentAPIChunk4Chunk2(object):
     def _mcp_action_gate(self, capabilities, tool_name, arguments, confirmed):
         policy = self._mcp_action_policy(capabilities, tool_name)
         classification = policy.get("classification", "destructive")
+        if classification == "destructive" or policy.get("policy_source") != "explicit_registry":
+            return 403, {
+                "error": "mcp_action_not_permitted",
+                "message": "Agent actions cannot change Burp configuration or invoke unreviewed MCP tools. Use Burp's operator controls.",
+                "policy": policy
+            }
         tool_definition = self._mcp_tool_definition(capabilities, tool_name)
         schema = tool_definition.get("inputSchema", {}) if isinstance(tool_definition, dict) else {}
         required = schema.get("required", []) if isinstance(schema, dict) else []
@@ -421,6 +428,27 @@ class AgentAPIChunk4Chunk2(object):
         target = extract_mcp_target(arguments)
         target_url = target.get("url", "")
         method = target.get("method", "GET")
+        try:
+            service = arguments.get("httpService", arguments.get("service", {})) or {}
+            host = arguments.get("targetHostname", arguments.get("host", service.get("host", "")))
+            if host:
+                https = arguments.get("usesHttps", arguments.get("https", service.get("https", service.get("protocol", "https") != "http")))
+                port = arguments.get("targetPort", arguments.get("port", service.get("port", 443 if https else 80)))
+                pseudo = arguments.get("pseudoHeaders", arguments.get("pseudo_headers", {})) or {}
+                headers = arguments.get("headers", {}) or {}
+                authorities = [value for key, value in headers.items() if str(key).lower() == "host"]
+                if pseudo.get(":authority"):
+                    authorities.append(pseudo[":authority"])
+                validate_destination(target_url, host, port, https, authorities)
+                if pseudo.get(":path"):
+                    validate_request_path(target_url, pseudo[":path"])
+                if pseudo.get(":scheme") and pseudo[":scheme"] != ("https" if https else "http"):
+                    raise ValueError("HTTP/2 scheme does not match the service")
+                raw = arguments.get("rawRequest", arguments.get("request", arguments.get("content", "")))
+                if raw:
+                    validate_raw_destination(target_url, host, port, https, raw)
+        except Exception:
+            return 400, {"error": "ambiguous_target", "message": "The scope-check URL and MCP destination must match."}
         scope_guard = self._scope_guard_for_url(target_url) if target_url else {}
         if target_url and policy.get("executes_target_request"):
             safety_gate = self._safety_gate_for_request(method, target_url)
@@ -448,8 +476,8 @@ class AgentAPIChunk4Chunk2(object):
                 "classification": classification,
                 "policy": policy
             }
-        if target_url and scope_guard.get("in_scope") is False:
-            return 403, {"error": "out_of_scope", "scope_guard": scope_guard, "target": target}
+        if target_url and scope_guard.get("in_scope") is not True:
+            return 403, {"error": "scope_not_verified", "scope_guard": scope_guard, "target": target}
         if target_url and (scope_guard.get("requires_confirmation") or safety_gate.get("requires_confirmation")) and not confirmed:
             return 409, {
                 "error": "mcp_action_confirmation_required",
@@ -689,12 +717,23 @@ class AgentAPIChunk4Chunk2(object):
         scope_guard = self._scope_guard_for_url(target_url)
         safety_gate = self._safety_gate_for_request(method, target_url)
         confirmed = self._coerce_bool(body.get("confirmed", False), False)
-        if scope_guard.get("in_scope") is False:
+        try:
+            authorities = [value for name, value in headers.items() if str(name).lower() == "host"]
+            if pseudo_headers.get(":authority"):
+                authorities.append(pseudo_headers[":authority"])
+            validate_destination(target_url, target_host, target_port, uses_https, authorities)
+            validate_request_path(target_url, pseudo_headers.get(":path", "/"))
+            if pseudo_headers.get(":scheme") and pseudo_headers[":scheme"] != ("https" if uses_https else "http"):
+                raise ValueError("HTTP/2 scheme does not match the service")
+        except Exception:
+            self._send_json(400, {"error": "ambiguous_target", "message": "HTTP/2 authority and destination must match."})
+            return
+        if scope_guard.get("in_scope") is not True:
             self._send_json(403, {
-                "error": "out_of_scope",
+                "error": "scope_not_verified",
                 "scope_guard": scope_guard,
                 "url": target_url,
-                "message": "HTTP/2 MCP request refused because target is outside scope."
+                "message": "HTTP/2 MCP request refused because target is outside scope or scope could not be verified."
             })
             return
         if scope_guard.get("requires_confirmation") and not confirmed:
@@ -829,8 +868,13 @@ class AgentAPIChunk4Chunk2(object):
         scope_guard = self._scope_guard_for_url(target_url)
         safety_gate = self._safety_gate_for_request(method, target_url)
         confirmed = self._coerce_bool(body.get("confirmed", False), False)
-        if scope_guard.get("in_scope") is False:
-            self._send_json(403, {"error": "out_of_scope", "scope_guard": scope_guard, "url": target_url})
+        try:
+            validate_raw_destination(target_url, host, port, use_https, raw_request)
+        except Exception:
+            self._send_json(400, {"error": "ambiguous_target", "message": "HTTP request Host, URL and destination must match."})
+            return
+        if scope_guard.get("in_scope") is not True:
+            self._send_json(403, {"error": "scope_not_verified", "scope_guard": scope_guard, "url": target_url})
             return
         if (scope_guard.get("requires_confirmation") or safety_gate.get("requires_confirmation")) and not confirmed:
             self._send_json(409, {

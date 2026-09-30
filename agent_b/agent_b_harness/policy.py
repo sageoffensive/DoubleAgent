@@ -23,28 +23,42 @@ POST_PATTERNS = (
     r"^/api/agent/queue/[^/]+/(?:claim|release|result|heartbeat|repeater)$",
     r"^/api/agent/queue/[^/]+/campaign/step$",
     r"^/api/agent/results/[^/]+/amend$",
-    r"^/api/agent/(?:project-profile|knowledge|fixtures|confirmations|attack-surface)(?:/[^?]+)?$",
+    r"^/api/agent/(?:knowledge|attack-surface)(?:/[^?]+)?$",
     r"^/api/agent/burp/action(?:/dry-run)?$",
     r"^/api/agent/(?:request|request/http2|mcp/call)$",
-    r"^/api/agent/scanner/(?:full-app|active)$",
 )
 
 
 def path_only(path: str) -> str:
     parsed = urllib.parse.urlsplit(path)
-    if parsed.scheme or parsed.netloc or not parsed.path.startswith("/api/") or ".." in parsed.path:
+    decoded = urllib.parse.unquote(parsed.path)
+    if (parsed.scheme or parsed.netloc or parsed.fragment or not parsed.path.startswith("/api/")
+            or ".." in decoded or "\\" in decoded or decoded != parsed.path
+            or any(ord(char) < 32 for char in path)):
         raise ValueError("Only Double Agent /api/ paths are accepted")
     return parsed.path
 
 
 def allow_get(path: str) -> None:
     value = path_only(path)
-    if not any(value.startswith(prefix) for prefix in GET_PREFIXES):
+    if not any(value.startswith(prefix) if prefix.endswith("/") else (value == prefix or value.startswith(prefix + "/")) for prefix in GET_PREFIXES):
         raise ValueError(f"GET path is outside the Agent B contract: {value}")
 
 
 def allow_post(path: str, body: dict[str, Any]) -> None:
     value = path_only(path)
+    if value in {"/api/agent/scanner/active", "/api/agent/scanner/full-app"}:
+        raise ValueError("Model-initiated Scanner delegation is disabled until every generated request can be scope-enforced; use Burp's operator controls")
+    def check_approval(value: Any) -> None:
+        if isinstance(value, dict):
+            for key, child in value.items():
+                if str(key).lower() == "confirmed" and child not in (False, None, "", 0):
+                    raise ValueError("Only the harness may attach a human approval; models cannot set confirmed")
+                check_approval(child)
+        elif isinstance(value, list):
+            for child in value:
+                check_approval(child)
+    check_approval(body)
     if value.endswith("/curl"):
         raise ValueError(
             "The queue /curl endpoint is GET-only. Use double_agent_get to read it, "

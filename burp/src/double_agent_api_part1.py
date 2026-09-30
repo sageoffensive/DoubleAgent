@@ -88,7 +88,8 @@ class AgentAPIChunk1(object):
                     "version": getattr(self.extender, "VERSION", "3.0"),
                     "queue_size": total,
                     "queue_pending": pending,
-                    "docs": "/api/docs"
+                    "docs": "/api/docs",
+                    "scope_enforcement": {"version": 1, "fail_closed": True, "authority": "burp_suite"}
                 })
                 return
 

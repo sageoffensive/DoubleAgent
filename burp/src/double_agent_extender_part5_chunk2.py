@@ -344,6 +344,8 @@ class BurpExtenderChunk5Chunk2(object):
                 return self._test_ollama_connection()
             elif self.AI_PROVIDER == "OpenAI":
                 return self._test_openai_connection()
+            elif self.AI_PROVIDER == "OpenRouter":
+                return self._test_openrouter_connection()
             elif self.AI_PROVIDER == "Claude":
                 return self._test_claude_connection()
             elif self.AI_PROVIDER == "Gemini":
@@ -405,7 +407,7 @@ class BurpExtenderChunk5Chunk2(object):
             return 0
 
         try:
-            req = urllib2.Request("https://api.openai.com/v1/models")
+            req = urllib2.Request(self.API_URL.rstrip('/') + "/models")
             req.add_header('Authorization', 'Bearer ' + self.API_KEY)
 
             response = urllib2.urlopen(req, timeout=10)
@@ -436,6 +438,43 @@ class BurpExtenderChunk5Chunk2(object):
             return False
         except Exception as e:
             self.stderr.println("[!] OpenAI connection failed: %s" % self._safe_ascii_text(e))
+            return False
+
+    def _test_openrouter_connection(self, require_model=True):
+        if not str(self.API_KEY or "").strip():
+            self.stderr.println("[!] OpenRouter API key required")
+            return False
+        try:
+            api_base = str(self.API_URL or "https://openrouter.ai/api/v1").rstrip("/")
+            parsed = urlparse.urlsplit(api_base)
+            if parsed.scheme != "https" or not parsed.hostname:
+                self.stderr.println("[!] OpenRouter API URL must use HTTPS")
+                return False
+            # /models is public. Authenticate independently without inference.
+            def fetch(path):
+                req = urllib2.Request(api_base + path)
+                req.add_header('Authorization', 'Bearer ' + self.API_KEY)
+                req.add_header('Accept', 'application/json')
+                response = urllib2.urlopen(req, timeout=10)
+                try:
+                    return json.loads(response.read())
+                finally:
+                    response.close()
+            key_info = fetch("/key")
+            if not isinstance(key_info, dict) or not isinstance(key_info.get("data"), dict):
+                self.stderr.println("[!] Unexpected OpenRouter key-check response")
+                return False
+            data = fetch("/models")
+            self.available_models = [str(model['id']) for model in data.get('data', [])
+                                     if isinstance(model, dict) and model.get('id')]
+            if require_model and self.MODEL not in self.available_models:
+                self.stderr.println("[!] OpenRouter model is not listed. Enter the exact provider/model ID or click Refresh.")
+                return False
+            self.stdout.println("[AI CONNECTION] OpenRouter API key accepted; %d models listed. Inference was not tested." % len(self.available_models))
+            return True
+        except Exception:
+            # Do not echo provider response bodies, which may include credentials.
+            self.stderr.println("[!] OpenRouter connection failed. Check the API URL, key and network connection.")
             return False
 
     def _test_deepseek_connection(self):

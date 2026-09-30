@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 3.1.0 beta 3" src="https://img.shields.io/badge/version-3.1.0--beta.3-ff9944">
+  <img alt="Version 3.1.0 beta 4" src="https://img.shields.io/badge/version-3.1.0--beta.4-ff9944">
   <img alt="License MIT" src="https://img.shields.io/badge/license-MIT-2ea44f">
   <img alt="Burp Suite" src="https://img.shields.io/badge/Burp%20Suite-Jython-f47b20">
   <img alt="Human in the loop" src="https://img.shields.io/badge/control-human--in--the--loop-ff9944">
@@ -74,7 +74,7 @@ The included Agent B web and macOS harnesses explore what a purpose-built securi
 | Demand evidence | Adds controller-level completion checks around Agent A's captured requests, responses, finding linkage, persisted dispositions, and authoritative read-back. | The generated prompt instructs the agent to use those evidence APIs and verify writes; the operator also has the general agent's native transcript and controls. |
 | Maintain assessment discipline | Uses phase control, stable tool schemas, bounded step budgets, duplicate-call guards, queue ownership, coverage tracking, and completion gates. | The generated prompt loads the workflow and current state, while sequencing remains more dependent on the agent session and operator than on a dedicated controller. |
 | Preserve human judgment | Pauses for questions and approvals, shows live model activity, and keeps the hacker responsible for authorization and final judgment. | Claude Code and Codex provide their own human controls; the generated prompt identifies DoubleAgent's approval points, and Agent A enforces gated actions. |
-| Compare models fairly | Runs OpenAI, Anthropic, Bedrock, and local/OpenAI-compatible models behind the same contracts and tools, making model and methodology comparisons more reproducible. | Different agents bring different prompts, tools, context policies, and execution environments, which can confound model comparisons. |
+| Compare models fairly | Runs OpenRouter, OpenAI, Anthropic, Bedrock, and local/OpenAI-compatible models behind the same contracts and tools, making model and methodology comparisons more reproducible. | Different agents bring different prompts, tools, context policies, and execution environments, which can confound model comparisons. |
 | Recover and audit | Records local run events, checkpoints assessment progress, protects finding state, and resumes through a domain-specific workflow rather than relying only on chat history. | Agent A still persists findings, evidence, coverage, and queues; **Copy Resume Prompt** rehydrates that state into a new general-agent session. |
 
 A custom harness also reduces **context drift**. Agent B repeatedly anchors the model to the target, current test phase, outstanding evidence, and permitted next actions. It can reject a structurally invalid action even when the model sounds confident. These controls are deterministic harness behaviour, not another instruction the model may forget.
@@ -131,7 +131,7 @@ Open [http://127.0.0.1:4310](http://127.0.0.1:4310).
 
 **Agent B macOS application — experimental work in progress**
 
-Download `Agent-B-macOS-arm64-v3.1.0-beta.3.zip` from the [beta release](https://github.com/sageoffensive/DoubleAgent/releases/tag/v3.1.0-beta.3), extract it, and move **Agent B.app** to Applications. This build targets Apple Silicon and includes Python. The release notes state its signing/notarization status and remaining validation limits; the harness remains experimental. Maintainers and developers can build it with:
+Download `Agent-B-macOS-arm64-v3.1.0-beta.4.zip` from the [beta release](https://github.com/sageoffensive/DoubleAgent/releases/tag/v3.1.0-beta.4), extract it, and move **Agent B.app** to Applications. This build targets Apple Silicon and includes Python. The release notes state its signing/notarization status and remaining validation limits; the harness remains experimental. Maintainers and developers can build it with:
 
 ```bash
 cd agent_b

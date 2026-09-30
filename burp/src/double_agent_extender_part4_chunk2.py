@@ -48,7 +48,7 @@ class BurpExtenderChunk4Chunk2(object):
         aiPanel.add(JLabel("AI Provider:"), gbc)
         gbc.gridx = 1
         gbc.gridwidth = 2
-        providerCombo = JComboBox(["Ollama", "OpenAI", "Claude", "Gemini", "Bedrock", "DeepSeek"])
+        providerCombo = JComboBox(["Ollama", "OpenAI", "OpenRouter", "Claude", "Gemini", "Bedrock", "DeepSeek"])
         providerCombo.setSelectedItem(self.AI_PROVIDER)
 
         # Auto-update API URL when provider changes
@@ -64,6 +64,7 @@ class BurpExtenderChunk4Chunk2(object):
                 default_urls = {
                     "Ollama": "http://localhost:11434",
                     "OpenAI": "https://api.openai.com/v1",
+                    "OpenRouter": "https://openrouter.ai/api/v1",
                     "Claude": "https://api.anthropic.com/v1",
                     "Gemini": "https://generativelanguage.googleapis.com/v1",
                     "Bedrock": "https://bedrock-runtime.us-east-1.amazonaws.com",
@@ -125,6 +126,7 @@ class BurpExtenderChunk4Chunk2(object):
         else:
             models_to_show = self.available_models if self.available_models else [self.MODEL]
         modelCombo = JComboBox(models_to_show)
+        modelCombo.setEditable(self.AI_PROVIDER == "OpenRouter")
         if self.MODEL in models_to_show:
             modelCombo.setSelectedItem(self.MODEL)
         elif len(models_to_show) > 0:
@@ -133,6 +135,7 @@ class BurpExtenderChunk4Chunk2(object):
 
         def updateModelComboForProvider():
             provider = str(providerCombo.getSelectedItem())
+            modelCombo.setEditable(provider == "OpenRouter")
             previous_model = str(modelCombo.getSelectedItem() or "")
             modelCombo.removeAllItems()
 
@@ -172,7 +175,8 @@ class BurpExtenderChunk4Chunk2(object):
                 self.API_URL = apiUrlField.getText().strip()
                 self.API_KEY = "".join(apiKeyField.getPassword())
                 try:
-                    if self.test_ai_connection():
+                    connected = self._test_openrouter_connection(require_model=False) if self.AI_PROVIDER == "OpenRouter" else self.test_ai_connection()
+                    if connected:
                         def _update_ui():
                             modelCombo.removeAllItems()
                             models = self._bedrock_serverless_models() if self.AI_PROVIDER == "Bedrock" else self.available_models
@@ -230,7 +234,7 @@ class BurpExtenderChunk4Chunk2(object):
             _prev_provider[0] = provider
 
             is_bedrock = provider == "Bedrock"
-            uses_api_key = provider in ("OpenAI", "Claude", "Gemini", "Bedrock", "DeepSeek")
+            uses_api_key = provider in ("OpenAI", "OpenRouter", "Claude", "Gemini", "Bedrock", "DeepSeek")
 
             apiKeyLabel.setVisible(uses_api_key)
 
@@ -244,6 +248,8 @@ class BurpExtenderChunk4Chunk2(object):
                 apiUrlField.setVisible(True)
                 if provider == "OpenAI":
                     apiKeyLabel.setText("OpenAI API Key:")
+                elif provider == "OpenRouter":
+                    apiKeyLabel.setText("OpenRouter API Key:")
                 elif provider == "Claude":
                     apiKeyLabel.setText("Claude API Key:")
                 elif provider == "Gemini":
@@ -375,6 +381,14 @@ class BurpExtenderChunk4Chunk2(object):
                     "Provider: Claude\n\n"
                     "URL: https://api.anthropic.com/v1\n"
                     "Auth: API key required."
+                )
+            elif provider == "OpenRouter":
+                text = (
+                    "Provider: OpenRouter\n\n"
+                    "URL: https://openrouter.ai/api/v1\n"
+                    "Auth: OpenRouter API key required.\n"
+                    "Model: exact provider/model ID. Use Refresh or enter it directly.\n"
+                    "Test Connection checks the key and model catalogue without inference."
                 )
             elif provider == "Gemini":
                 text = (

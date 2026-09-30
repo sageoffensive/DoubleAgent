@@ -1,4 +1,4 @@
-"""Agent B harness for Double Agent and the local CyberStrike model."""
+"""Agent B teammate harness for DoubleAgent."""
 
-__version__ = "3.1.0b3"
+__version__ = "3.1.0b4"
 DISPLAY_VERSION = "v" + __version__.replace("b", "-beta.")
