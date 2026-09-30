@@ -63,7 +63,7 @@ class BurpExtenderChunk1Chunk2(object):
         self._initialize_remote_reporting()
 
         # AI Provider Settings (defaults - will be overridden by saved config)
-        self.AI_PROVIDER = "Ollama"  # Options: Ollama, OpenAI, Claude, Gemini, Bedrock, DeepSeek
+        self.AI_PROVIDER = "Ollama"  # Options: Ollama, OpenAI, OpenRouter, Claude, Gemini, Bedrock, DeepSeek
         self.API_URL = "http://localhost:11434"
         self.API_KEY = ""  # For OpenAI, Claude, Gemini, DeepSeek
         self.API_KEYS_PER_PROVIDER = {}  # Provider name -> API key

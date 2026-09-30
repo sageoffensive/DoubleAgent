@@ -63,10 +63,24 @@ class Store:
         path.parent.mkdir(parents=True, exist_ok=True)
         self.path = path
         self.lock = threading.RLock()
+        if not path.exists():
+            path.touch(mode=0o600)
+        path.chmod(0o600)
         with self._connect() as db:
             db.executescript(
                 """
                 PRAGMA journal_mode=WAL;
+                CREATE TABLE IF NOT EXISTS collaboration (
+                  id INTEGER PRIMARY KEY CHECK (id = 1),
+                  data TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS discussion_messages (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  role TEXT NOT NULL,
+                  content TEXT NOT NULL,
+                  attachments TEXT NOT NULL DEFAULT '[]',
+                  created REAL NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS messages (
                   id INTEGER PRIMARY KEY AUTOINCREMENT,
                   role TEXT NOT NULL,
@@ -130,6 +144,23 @@ class Store:
                 """
             )
         self._redact_existing()
+        self._migrate_discussion_history()
+
+    def _migrate_discussion_history(self) -> None:
+        """Recover explicitly tagged legacy Discuss turns once, without tool history."""
+        with self.lock, self._connect() as db:
+            if db.execute("SELECT 1 FROM collaboration LIMIT 1").fetchone() or db.execute("SELECT 1 FROM discussion_messages LIMIT 1").fetchone():
+                return
+            discussing = False
+            for row in db.execute("SELECT * FROM messages ORDER BY id").fetchall():
+                metadata = json.loads(row["metadata"])
+                if row["role"] == "user":
+                    discussing = metadata.get("discussion") is True
+                if not discussing or row["role"] not in {"user", "assistant"} or any(metadata.get(flag) for flag in ("harness_status", "intermediate", "progress")):
+                    continue
+                attachments = [item["id"] for item in metadata.get("attachments", []) if isinstance(item, dict) and isinstance(item.get("id"), str)]
+                db.execute("INSERT INTO discussion_messages(role,content,attachments,created) VALUES(?,?,?,?)",
+                           (row["role"], row["content"], json.dumps(attachments), row["created"]))
 
     def _redact_existing(self) -> None:
         with self.lock, self._connect() as db:
@@ -244,12 +275,53 @@ class Store:
 
     def clear(self) -> None:
         with self.lock, self._connect() as db:
+            db.execute("DELETE FROM collaboration")
+            db.execute("DELETE FROM discussion_messages")
             db.execute("DELETE FROM messages")
             db.execute("DELETE FROM events")
             db.execute("DELETE FROM questions")
             db.execute("DELETE FROM suggestion_decisions")
             db.execute("DELETE FROM suggestions")
             db.execute("DELETE FROM run_checkpoint")
+
+    def collaboration(self) -> dict[str, Any]:
+        with self.lock, self._connect() as db:
+            row = db.execute("SELECT data FROM collaboration WHERE id=1").fetchone()
+        return json.loads(row["data"]) if row else {}
+
+    def save_collaboration(self, value: dict[str, Any]) -> None:
+        payload = json.dumps(redact_checkpoint_value(value), ensure_ascii=False)
+        with self.lock, self._connect() as db:
+            db.execute("INSERT OR REPLACE INTO collaboration VALUES (1,?)", (payload,))
+
+    def discussion_message(self, role: str, content: str, attachments: list[str] | None = None) -> None:
+        if role not in {"user", "assistant"}:
+            raise ValueError("Discussion messages must be user or assistant messages")
+        with self.lock, self._connect() as db:
+            db.execute(
+                "INSERT INTO discussion_messages(role,content,attachments,created) VALUES (?,?,?,?)",
+                (role, redact_text(content), json.dumps(attachments or []), time.time()),
+            )
+
+    def discussion_messages(self, limit: int = 200) -> list[dict[str, Any]]:
+        with self.lock, self._connect() as db:
+            rows = db.execute("SELECT * FROM discussion_messages ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        return [
+            {"id": row["id"], "role": row["role"], "content": row["content"],
+             "attachments": json.loads(row["attachments"]), "created": row["created"]}
+            for row in reversed(rows)
+        ]
+
+    def discussion_excerpt_candidates(self, before_id: int, words: list[str]) -> list[dict[str, Any]]:
+        terms = [word for word in words[:8] if re.fullmatch(r"[a-z0-9]{4,}", word)]
+        query = "SELECT id,role,content FROM discussion_messages WHERE id < ?"
+        args: list[Any] = [before_id]
+        if terms:
+            query += " AND (" + " OR ".join("lower(content) LIKE ?" for _ in terms) + ")"
+            args.extend("%" + word + "%" for word in terms)
+        query += " ORDER BY id DESC LIMIT 20"
+        with self.lock, self._connect() as db:
+            return [dict(row) for row in db.execute(query, args).fetchall()]
 
     def save_checkpoint(self, value: dict[str, Any]) -> None:
         payload = json.dumps(redact_checkpoint_value(value), ensure_ascii=False, separators=(",", ":"))

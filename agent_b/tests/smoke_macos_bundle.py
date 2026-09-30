@@ -54,17 +54,31 @@ def main():
             with urllib.request.urlopen(base, timeout=2) as reply:
                 page = reply.read()
                 assert b"Attach files" in page
-                assert b'id="settings-tab-connections"' in page
+                assert b'id="settings-tab-models"' in page
                 assert b'id="settings-tab-skills"' in page
                 assert b'aria-label="Agent B version">v' in page
                 assert b"{{AGENT_B_VERSION}}" not in page
+                for name in (b"conversation", b"notebook", b"assessment"):
+                    assert b'id="tab-' + name + b'"' in page
+            with urllib.request.urlopen(base + "/api/notebook", timeout=2) as reply:
+                notebook = json.load(reply)
+            assert notebook["burp_context_enabled"] is False
+            update = urllib.request.Request(base + "/api/notebook", data=json.dumps({
+                "revision": notebook["revision"], "objective": "Harmless notebook smoke check",
+            }).encode(), headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(update, timeout=2) as reply:
+                assert json.load(reply)["objective"] == "Harmless notebook smoke check"
+            with urllib.request.urlopen(base + "/api/notebook/export", timeout=2) as reply:
+                assert b"Harmless notebook smoke check" in reply.read()
             with urllib.request.urlopen(base + "/research.html", timeout=2) as reply:
                 page = reply.read()
                 assert reply.url == base + "/", "Legacy research page must return to chat"
                 assert b'id="source-review-panel"' in page
-                assert b'id="target-link-main"' not in page
+                assert b'id="target-link-main"' in page
                 assert b'aria-label="Agent B version">v' in page
                 assert b"{{AGENT_B_VERSION}}" not in page
+                for name in (b"conversation", b"notebook", b"assessment"):
+                    assert b'id="tab-' + name + b'"' in page
             with urllib.request.urlopen(base + "/api/research", timeout=2) as reply:
                 assert json.load(reply)["notes"] == [], "Fresh research notebook must be empty"
             source_request = urllib.request.Request(base + "/api/research/start", data=json.dumps({
@@ -92,7 +106,7 @@ def main():
                 assert reply.read() == fixture
                 assert reply.headers["Content-Disposition"].startswith("attachment;")
                 assert reply.headers["X-Content-Type-Options"] == "nosniff"
-            print("PASS: bundle signature, isolated runtime, empty settings, UI, local uploads/downloads, research import/export")
+            print("PASS: bundle signature, isolated runtime, empty settings, UI, notebook persistence/export, local uploads/downloads, research import/export")
         finally:
             process.terminate()
             try:

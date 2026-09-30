@@ -10,6 +10,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from typing import Any, Callable
+from .policy import path_only
 
 
 REASONING_FIELDS = ("reasoning_content", "reasoning", "thinking", "analysis", "reasoning_text", "reasoning_details")
@@ -98,8 +99,12 @@ def _json_request(
         request.add_header("Content-Type", "application/json")
     for key, value in (headers or {}).items():
         request.add_header(key, value)
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            raise ValueError("API redirects are refused; configure the exact endpoint")
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+        with opener.open(request, timeout=timeout) as response:
             raw = response.read().decode("utf-8", "replace")
             return json.loads(raw) if raw.strip() else {}
     except urllib.error.HTTPError as exc:
@@ -136,9 +141,17 @@ class DoubleAgent:
         body: dict[str, Any] | None = None,
         timeout: int = 60,
     ) -> Any:
-        parsed = urllib.parse.urlsplit(path)
-        if parsed.scheme or parsed.netloc or not parsed.path.startswith("/api/") or ".." in parsed.path:
-            raise ValueError("Only local Double Agent /api/ paths are allowed")
+        path_only(path)
+        if method.upper() == "POST" and (
+            path.split("?", 1)[0] in {
+                "/api/agent/request", "/api/agent/request/http2", "/api/agent/mcp/call",
+                "/api/agent/burp/action", "/api/agent/scanner/active", "/api/agent/scanner/full-app",
+            } or path.startswith("/api/findings") or path.split("?", 1)[0].endswith("/repeater")
+        ):
+            health = _json_request(self.base + "/api/health", timeout=min(timeout, 10))
+            guard = health.get("scope_enforcement", {}) if isinstance(health, dict) else {}
+            if guard.get("version") != 1 or guard.get("fail_closed") is not True:
+                raise ValueError("Target actions require the updated Double Agent scope guard. Reload the extension in Burp.")
         return _json_request(self.base + path, method, body, timeout=timeout)
 
     def get(self, path: str) -> Any:
@@ -442,10 +455,21 @@ class Model:
             finally:
                 self.output = previous_output
             return {"ok": True, "detail": "Bedrock accepted a Converse request", "response": str(message.get("content", ""))[:80]}
+        if self.provider == "openrouter":
+            if not self.key:
+                raise RuntimeError("OpenRouter API key is not configured")
+            # The catalogue is public; listing models does not validate a key.
+            value = _json_request(
+                self.base + "/key", headers={"Authorization": f"Bearer {self.key}"},
+                timeout=min(self.timeout, 10),
+            )
+            if not isinstance(value, dict) or not isinstance(value.get("data"), dict):
+                raise RuntimeError("OpenRouter returned an invalid key-check response")
         models = self.available_models()
         if self.model not in models:
             raise RuntimeError("Connected, but model '%s' was not returned by this provider" % self.model)
-        return {"ok": True, "detail": "Connected and model is available", "model_count": len(models)}
+        detail = "API key accepted and model is listed; inference was not tested" if self.provider == "openrouter" else "Connected and model is available"
+        return {"ok": True, "detail": detail, "model_count": len(models)}
 
     def complete(
         self,

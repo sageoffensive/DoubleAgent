@@ -1,5 +1,7 @@
 # Agent B Harness
 
+Agent B is a provider-neutral model harness for the Double Agent Burp extension. Double Agent remains authoritative for Burp scope, requests, findings, coverage and reporting. The harness supplies a chat interface, model loop, selectable methodology skills, evidence policy, duplicate-call guard and human question/approval channel.
+
 ## Review source together
 
 Choose **Review together** beneath a relevant reply, or **Review source** beside the composer. Checks open inside the chat and remain separate from assessment tools. Check exact package versions or OSV records, preview dependency manifests, import local source or retrieve selected public GitHub files. No code is executed, built or installed. Inspect and export notes without a model connection.
@@ -7,8 +9,6 @@ Choose **Review together** beneath a relevant reply, or **Review source** beside
 Optional **Share this note & request review** displays the configured destination and requires fresh consent. It submits only that note to an isolated, tool-free model call. Expect remediation suggestions and questions, not proof of exploitability; verify model output yourself.
 
 See [the research guide](../docs/wiki/Research.md) for formats, quotas and privacy. Notes persist separately in `research.sqlite3` in the Agent B data directory; clearing chat does not clear this notebook.
-
-Agent B is a provider-neutral model harness for the Double Agent Burp extension. Double Agent remains authoritative for Burp scope, requests, findings, coverage and reporting. The harness supplies a chat interface, model loop, selectable methodology skills, evidence policy, duplicate-call guard and human question/approval channel.
 
 ## Start
 
@@ -20,16 +20,28 @@ Agent B is a provider-neutral model harness for the Double Agent Burp extension.
    ```
 
 3. Open `http://127.0.0.1:4310/`.
-4. Select **New conversation** when starting fresh. New conversations start as regular chats without assessment tools or methodology prompts. For Burp work, select the highlighted **1. Send bootstrap** control first to load Double Agent's operating context from `/api/agent/prompt`; the queue and finding-validation controls remain unavailable until it is loaded.
+4. Select **New conversation** when starting fresh. New conversations start as regular chats without assessment tools or methodology prompts. For Burp work, select the highlighted **Connect to Burp** control first to load Double Agent's operating context from `/api/agent/prompt`; the queue and finding-validation controls remain unavailable until it is loaded.
 5. Select **Fetch Burp queue** or type a specific task in chat.
 
 The chat remains active during a run. Messages receive a visible acknowledgement and are queued for the next response boundary. Answer pending questions in their dedicated card; approvals require an exact button choice. Stopping or restarting cancels unanswered questions and approvals.
 
 ## Working with your teammate
 
+The workspace has three keyboard-accessible tabs: **Conversation** for chat and recommendations, **Notebook** for saved notes and read-only context, and **Assessment** for model activity, coverage, and the plan. The composer stays available in every view, and pending questions stay visible until answered. **Latest messages** takes you back to the end of the transcript without interrupting manual reading. Settings separates **Connections**, **Skills**, and **Run & scope**; Save and Cancel stay visible while each section scrolls. Compact windows use a Controls drawer, with Settings and New conversation always reachable.
+
 **Discuss** is the default composer mode. Use it to review supplied material, ask for explanations, weigh alternatives, and draft questions or summaries. It uses no assessment tools, including after bootstrap. Its conversation history stays separate from assessment tool history. Select **Assessment chat** for the existing Burp workflow; queue controls continue to use that workflow directly.
 
-The **Ideas & recommendations** panel shows existing route recommendations with their rationale, confidence, next step, and supporting evidence. **Discuss** prepares a message for your review; **Save**, **Dismiss**, and **Restore** keep your decisions locally. These controls do not execute proposed actions. Recommendations and decisions survive app restarts and later runs; **New conversation** clears them.
+The **Ideas & recommendations** panel shows existing route recommendations with their rationale, confidence, next step, and supporting evidence. **Discuss** prepares a message for your review; **Save**, **Dismiss**, and **Restore** keep your decisions locally. Discuss retrieves the recommendation by ID, including its stored supporting evidence. Save, Dismiss and Restore produce a visible acknowledgement, and saved/dismissed decisions guide subsequent advice. These controls do not execute proposed actions. Recommendations and decisions survive app restarts and later runs; **New conversation** clears them.
+
+### Engagement notebook and read-only context
+
+Open **Notebook → Edit notes** to keep an objective, confirmed facts, open questions and decisions. Facts are operator-supplied notes, not independent verification. Each section accepts up to 8,000 characters, with a 24,000-character total. Notes, discussion history and file references persist in the local chat database; common text credentials are redacted before storage. **Export notebook** saves the notes, recommendation decisions, file references and last captured snapshot as Markdown.
+
+Enable **Include read-only Burp context in Discuss** when you want grounded advice about the current work. The harness reads only fixed local GET endpoints for the workspace, up to 30 findings and up to 20 queue summaries. It includes candidate status, evidence previews, blockers and source references, with a capture time. It sends no target requests, claims no queue items and supplies no model tools. The snapshot is refreshed before each new Discuss message; **Refresh snapshot** lets you inspect it first. Notes and enabled snapshot data are sent to the selected model connection when you send a discussion message.
+
+Unavailable or incomplete reads are labelled explicitly and replace the previous snapshot. Snapshots are bounded samples, not exhaustive evidence or independent validation. A change to the primary target blocks importing the new context into the existing notebook; start a new conversation for a different engagement. Local paused-work metadata is labelled historical and does not prove Burp completion. A discussion does not clear or finalize a paused assessment checkpoint.
+
+The notebook guides Discuss only. It does not become assessment instructions or approval. Existing assessment controls and pending-question rules continue to apply; stop a running assessment before starting a separate discussion.
 
 ### Files and images
 
@@ -43,11 +55,11 @@ Files are uploaded to local storage first and sent to the selected model connect
 
 Use **Download response** to save a complete response as Markdown, the filename link to download an attachment, or **Export chat** to save the transcript. The Mac app uses native open/save panels. Long responses can also be expanded in place.
 
-Attachments live in `attachments.sqlite3` beside the chat database, with a 64 MB limit per conversation. **New conversation** clears conversation files, including removed draft attachments; removing a chip only removes it from the draft. Discussion context is kept in memory during the session; the last 30 discussion messages and files from the last four attached turns are supplied to the model. After restarting, attach the relevant files again to discuss them. Download/export anything you need before starting a new conversation.
+Attachments live in `attachments.sqlite3` beside the chat database, with a 64 MB limit per conversation. **New conversation** clears conversation files, including removed draft attachments; removing a chip only removes it from the draft. Discussion messages and attachment IDs are restored after restarting. The last 30 messages are supplied as bounded excerpts, alongside the notebook and a small relevance-selected set of older discussion excerpts. Files from the last four attached turns are expanded for model input; **Recent files → Use in message** reuses a stored file without uploading it again. Notebook reference context is bounded to 18,000 characters; long notes and evidence are excerpted and may require a focused follow-up. **New conversation** also clears the notebook and its read-only snapshot preference. Download/export anything you need before starting a new conversation.
 
 Image transport references: [OpenAI vision](https://developers.openai.com/api/docs/guides/images-vision), [Anthropic vision](https://platform.claude.com/docs/en/build-with-claude/vision), and [Bedrock image sources](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_ImageSource.html).
 
-Each run automatically opens **Live model activity** above the chat. It shows provider-exposed reasoning verbatim when the selected model returns a reasoning channel; otherwise it shows the model's concise action commentary and current phase (planning, writing, tool choice, or safety checks). It does not claim access to hidden chain-of-thought, and the operator can collapse the panel at any time.
+The **Assessment** workspace keeps live model activity, coverage, and the current plan together. An activity indicator appears on its tab while a run is active. Open **Assessment → Model activity** to follow the output. It shows provider-exposed reasoning verbatim when the selected model returns a reasoning channel; otherwise it shows the model's concise action commentary and current phase (planning, writing, tool choice, or safety checks). It does not claim access to hidden chain-of-thought, and the operator can collapse the panel at any time.
 
 ## Design
 
@@ -84,14 +96,25 @@ The built-in methods were synthesized from the current OWASP Web Security Testin
 
 ## Configuration
 
-Open **Settings → Add connection** to configure one of the supported transports:
+Open **Settings → Connections → Add connection** to configure one of the supported transports:
 
 - **OpenAI** — hosted Chat Completions API with bearer authentication.
+- **OpenRouter** — Chat Completions at `https://openrouter.ai/api/v1`, using an OpenRouter key and the exact `provider/model` ID.
 - **Anthropic** — native Messages API, including system prompts, tool use and tool results.
 - **Amazon Bedrock** — the provider-neutral Converse API with a Bedrock bearer key. Because Converse works across supported model families, Agent B is not limited to Claude on Bedrock.
 - **Local / OpenAI-compatible** — Ollama, LM Studio, vLLM, oMLX, Splash, llama.cpp and other servers exposing `/models` and `/chat/completions`. A key is optional.
 
-The connection editor pre-fills provider endpoints, reveals only relevant fields, keeps credentials isolated per connection, and offers an explicit **Test connection** action. OpenAI, Anthropic and local tests validate authentication and confirm the exact model appears in the provider's model list. Bedrock tests the configured model with a tiny live Converse request.
+The connection editor pre-fills provider endpoints, reveals only relevant fields, keeps credentials isolated per connection, and offers an explicit **Test connection** action. OpenAI, Anthropic and local tests confirm the exact model appears in the provider's model list. OpenRouter checks `/key` independently of its public catalogue, then checks the exact model ID; it does not make an inference request or prove model capability or available credits. Bedrock tests the configured model with a tiny live Converse request.
+
+### Scope enforcement
+
+Scope enforcement is always enabled and independent of the model's instructions. Burp Suite's exact URL scope decision is authoritative. HTTP/1, HTTP/2 and permitted MCP target actions require `in_scope: true` immediately before dispatch; outside and unavailable scope are blocked without an approval override. Request Host/authority, destination service and the exact checked path must agree.
+
+Agent B has no shell or direct curl target transport. Generated queue requests and authentication retries use Double Agent's enforcement API. Target actions require the updated extension's scope-enforcement capability; reload Double Agent in Burp after updating. API redirects and environment proxy routing are refused.
+
+Models cannot attach `confirmed` approval flags, write engagement permissions, fabricate fixture consent or human confirmations, change Burp configuration through MCP, or invoke unreviewed MCP tools. A human can approve a safety-gated action once only after scope is positively verified. Model-initiated Scanner delegation is disabled because checking only a scan's seed cannot guarantee scope for every generated request. Operate Scanner directly in Burp with its own scope controls.
+
+These controls constrain actions initiated by Agent B. They are not an operating-system sandbox or a firewall for manual Burp/browser traffic, target-side outbound requests, or a compromised local process. Burp scope defines authorization; broad scope authorizes a broad target set. See the [scope review](../docs/agent-b-scope.md).
 
 Environment variables continue to override the built-in local and legacy Bedrock settings:
 

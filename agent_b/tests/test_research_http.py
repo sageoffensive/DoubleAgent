@@ -111,16 +111,17 @@ class ResearchHTTPTests(unittest.TestCase):
                 self.assertIn(b'v9.0.0-beta.1 &lt;test&gt;', data)
                 self.assertNotIn(DISPLAY_VERSION.encode(), data)
 
-    def test_review_stays_in_chat_and_header_has_no_target(self):
+    def test_review_stays_in_chat_with_visible_target_link(self):
         status, headers, _ = self.request('GET', '/research.html')
         self.assertEqual(status, 303)
         self.assertEqual(headers['Location'], '/')
         page = self.request('GET', '/')[2].decode()
         self.assertIn('id="source-review-panel"', page)
         self.assertIn('id="target-link"', page)
-        self.assertNotIn('id="target-link-main"', page)
+        self.assertIn('id="target-link-main"', page)
         self.assertNotIn('href="/research.html"', page)
-        self.assertIn('File details', page)
+        self.assertIn('id="composer-help"', page)
+        self.assertIn('Privacy &amp; limits', page)
         self.assertEqual(self.request('GET', '/research.js')[0], 404)
 
 

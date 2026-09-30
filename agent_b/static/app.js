@@ -14,6 +14,114 @@ let sending = false;
 let latestState = {};
 let questionKey = null;
 let suggestionsKey = null;
+let notebookKey = null;
+let notebookRevision = 0;
+let notebookSaving = false;
+let workspace = 'conversation';
+let settingsSection = 'models';
+let harnessOnline = false;
+let conversationScroll = 0;
+let followConversation = true;
+
+function showNotice(message) {
+  $('#ui-notice-text').textContent = message;
+  $('#ui-notice').classList.remove('hidden');
+}
+$('#dismiss-notice').onclick = () => $('#ui-notice').classList.add('hidden');
+
+function selectWorkspace(name, focus = false) {
+  if (workspace === 'conversation' && name !== workspace) {
+    const timeline = $('#timeline');
+    conversationScroll = timeline.scrollTop;
+    followConversation = timeline.scrollHeight - timeline.scrollTop - timeline.clientHeight < 80;
+  }
+  workspace = name;
+  document.querySelectorAll('[data-workspace]').forEach(button => {
+    const selected = button.dataset.workspace === name;
+    button.setAttribute('aria-selected', String(selected));
+    button.tabIndex = selected ? 0 : -1;
+    $(`#pane-${button.dataset.workspace}`).classList.toggle('hidden', !selected);
+    if (selected && focus) button.focus();
+  });
+  const headings = {
+    conversation: ['Conversation', 'Discuss evidence and decide what comes next.'],
+    notebook: ['Engagement notebook', 'Your objective, evidence, and decisions in one place.'],
+    assessment: ['Assessment', 'Follow the current run and inspect its evidence.'],
+  };
+  $('#workspace-title').textContent = headings[name][0];
+  $('#workspace-subtitle').textContent = headings[name][1];
+  if (name === 'conversation') {
+    const timeline = $('#timeline');
+    timeline.scrollTop = followConversation ? timeline.scrollHeight : conversationScroll;
+    updateScrollControl();
+  }
+}
+
+function selectSettings(name, focus = false) {
+  settingsSection = name;
+  document.querySelectorAll('[data-settings]').forEach(button => {
+    const selected = button.dataset.settings === name;
+    button.setAttribute('aria-selected', String(selected));
+    button.tabIndex = selected ? 0 : -1;
+    $(`#settings-${button.dataset.settings}`).classList.toggle('hidden', !selected);
+    if (selected && focus) button.focus();
+  });
+}
+
+function bindTabs(selector, select, field) {
+  const buttons = [...document.querySelectorAll(selector)];
+  buttons.forEach((button, index) => {
+    button.onclick = () => select(button.dataset[field]);
+    button.onkeydown = event => {
+      let next = index;
+      if (event.key === 'ArrowRight') next = (index + 1) % buttons.length;
+      else if (event.key === 'ArrowLeft') next = (index + buttons.length - 1) % buttons.length;
+      else if (event.key === 'Home') next = 0;
+      else if (event.key === 'End') next = buttons.length - 1;
+      else return;
+      event.preventDefault();
+      select(buttons[next].dataset[field], true);
+    };
+  });
+}
+bindTabs('[data-workspace]', selectWorkspace, 'workspace');
+bindTabs('[data-settings]', selectSettings, 'settings');
+
+function updateScrollControl() {
+  if (workspace !== 'conversation') return;
+  const timeline = $('#timeline');
+  conversationScroll = timeline.scrollTop;
+  followConversation = timeline.scrollHeight - timeline.scrollTop - timeline.clientHeight < 80;
+  $('#jump-latest').classList.toggle('hidden', timeline.scrollHeight - timeline.scrollTop - timeline.clientHeight < 80);
+}
+$('#timeline').addEventListener('scroll', updateScrollControl);
+$('#jump-latest').onclick = () => {
+  const timeline = $('#timeline');
+  timeline.scrollTop = timeline.scrollHeight;
+  updateScrollControl();
+};
+
+function updateComposer() {
+  const active = ['starting', 'running', 'waiting', 'stopping'].includes(latestState.status);
+  const blocked = latestState.status === 'stopping' || Boolean(latestState.pending_question) || !harnessOnline || !latestState.settings?.model || (active && attachmentDrafts.length > 0);
+  const button = $('#composer button[type="submit"]');
+  button.disabled = blocked || uploading || sending || !($('#message').value.trim() || attachmentDrafts.length);
+  button.textContent = sending ? 'Sending…' : active ? 'Send guidance' : 'Send';
+  button.setAttribute('aria-label', active ? 'Send guidance' : 'Send');
+  button.title = latestState.pending_question ? 'Answer the pending question first'
+    : latestState.status === 'stopping' ? 'Wait for the run to stop'
+    : active && attachmentDrafts.length ? 'Remove attachments or wait for the current response'
+    : active ? 'Guide the current run at its next response boundary'
+    : !harnessOnline ? 'Waiting for Agent B to reconnect'
+    : !latestState.settings?.model ? 'Add a model connection in Settings first'
+    : 'Send message';
+  $('#attach-files').disabled = active || Boolean(latestState.pending_question) || !harnessOnline || uploading || sending;
+  $('#connection-guidance').classList.toggle('hidden', Boolean(latestState.settings?.model));
+  $('#conversation-mode').disabled = active || uploading || sending;
+  $('#message').placeholder = active ? 'Guide the current run or add context…' : 'Ask a question, share a file, or paste a screenshot…';
+}
+$('#message').addEventListener('input', updateComposer);
+
 
 function composerStatus(text) { $('#composer-status').textContent = text; }
 
@@ -21,6 +129,7 @@ function renderAttachments() {
   const list = $('#attachment-list');
   list.classList.toggle('hidden', !attachmentDrafts.length);
   list.innerHTML = attachmentDrafts.map((f, index) => `<span class="attachment-chip">${f.mime.startsWith('image/') ? `<img class="attachment-thumbnail" src="/api/files/${encodeURIComponent(f.id)}/preview" alt="${esc(f.name)}">` : ''}${esc(f.name)} · ${Math.ceil(f.size / 1024)} KB <button type="button" data-remove-file="${index}" aria-label="Remove ${esc(f.name)}">×</button></span>`).join('');
+  updateComposer();
   list.querySelectorAll('[data-remove-file]').forEach(button => {
     button.onclick = () => { attachmentDrafts.splice(Number(button.dataset.removeFile), 1); renderAttachments(); };
   });
@@ -33,7 +142,7 @@ async function attachFiles(files) {
   }
   if (attachmentDrafts.length + files.length > 4) { composerStatus('Attach up to four files per message.'); return; }
   uploading = true;
-  $('#attach-files').disabled = true;
+  updateComposer();
   $('#conversation-mode').value = 'discuss';
   try {
     for (const file of files) {
@@ -53,7 +162,7 @@ async function attachFiles(files) {
     }
     composerStatus('Files ready. They will be sent to the selected connection with your message.');
   } catch (error) { composerStatus(error.message); }
-  finally { uploading = false; $('#attach-files').disabled = false; $('#file-picker').value = ''; }
+  finally { uploading = false; updateComposer(); $('#file-picker').value = ''; }
 }
 
 $('#attach-files').onclick = () => $('#file-picker').click();
@@ -71,12 +180,36 @@ function modelOption(id) {
   return modelOptions.find(option => option.id === id);
 }
 
+const compactNavigation = window.matchMedia('(max-width:1000px)');
+function syncNavigation() {
+  const open = compactNavigation.matches && document.querySelector('aside').classList.contains('open');
+  document.querySelector('aside').inert = compactNavigation.matches && !open;
+  document.querySelector('main').inert = open;
+  $('#nav-backdrop').classList.toggle('hidden', !open);
+  $('#open-nav').setAttribute('aria-expanded', String(open));
+}
 function closeNavigation() {
   document.querySelector('aside').classList.remove('open');
+  syncNavigation();
 }
-
-$('#open-nav').onclick = () => document.querySelector('aside').classList.add('open');
-$('#close-nav').onclick = closeNavigation;
+$('#open-nav').onclick = () => {
+  document.querySelector('aside').classList.add('open');
+  syncNavigation();
+  $('#close-nav').focus();
+};
+$('#close-nav').onclick = $('#nav-backdrop').onclick = () => { closeNavigation(); $('#open-nav').focus(); };
+compactNavigation.addEventListener('change', closeNavigation);
+syncNavigation();
+document.addEventListener('keydown', event => {
+  if (!compactNavigation.matches || !document.querySelector('aside').classList.contains('open')) return;
+  if (event.key === 'Escape') { closeNavigation(); $('#open-nav').focus(); }
+  if (event.key === 'Tab') {
+    const items = [...document.querySelector('aside').querySelectorAll('button:not(:disabled), a[href]')];
+    const first = items[0], last = items[items.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  }
+});
 
 async function api(path, options = {}) {
   const response = await fetch(path, {headers: {'Content-Type': 'application/json'}, ...options});
@@ -99,18 +232,19 @@ function visibleMessage(value) {
   const message = String(value ?? '');
   const formatted = text => esc(text).replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
   if (message.length <= 1800) return formatted(message);
-  return `${formatted(message.slice(0, 1600))}<details class="full-response"><summary>Read full response · ${message.length.toLocaleString()} characters</summary>${formatted(message)}</details>`;
+  return `<details class="full-response"><summary aria-label="Toggle full response"><span class="response-preview">${formatted(message.slice(0, 1600))}…</span><span class="response-toggle">Read full response · ${message.length.toLocaleString()} characters</span></summary><div>${formatted(message)}</div></details>`;
 }
 
 function render(value) {
+  const keepFollowing = renderedFeed === null || followConversation;
   latestState = value;
-  $('#composer-help').textContent = $('#conversation-mode').value === 'discuss'
-    ? `No testing. Files go to ${modelOption(value.settings?.model)?.label || 'your model'}.`
-    : 'Uses your Burp context.';
   if (value.settings?.model_options) modelOptions = value.settings.model_options;
+  $('#composer-help').textContent = $('#conversation-mode').value === 'discuss'
+    ? `Discuss uses your notebook and saved decisions${value.notebook?.burp_context_enabled ? ', plus a read-only Burp snapshot' : ''}. Files go to ${modelOption(value.settings?.model)?.label || 'the selected connection'} when sent. Text is redacted for common secrets; check screenshots yourself.`
+    : 'Assessment chat uses the current Burp context. Use Discuss for file and image review.';
   const stopping = value.status === 'stopping';
   const bootstrapped = Boolean(value.burp_prompt_loaded);
-  $('#run-state').textContent = stopping ? 'Waiting for model to stop…' : value.status;
+  $('#run-state').textContent = stopping ? 'Stopping…' : ({idle: 'Ready', waiting: 'Needs your input', running: 'Working', starting: 'Starting…', stopped: 'Stopped', complete: 'Complete', error: 'Needs attention'}[value.status] || value.status);
   $('#step-label').textContent = `Step ${value.step} of ${value.max_steps}`;
   $('#step-meter').style.width = `${Math.min(100, value.step / Math.max(1, value.max_steps) * 100)}%`;
   const findingProgress = value.finding_validation_progress || {};
@@ -118,33 +252,42 @@ function render(value) {
   const linkedFindingCount = Number(findingProgress.linked || 0);
   findingProgressEl.classList.toggle('hidden', linkedFindingCount < 1);
   findingProgressEl.textContent = linkedFindingCount > 0
-    ? `${Number(findingProgress.verdicts_recorded || 0)} of ${linkedFindingCount} linked findings dispositioned`
+    ? `${Number(findingProgress.verdicts_recorded || 0)} of ${linkedFindingCount} findings reviewed`
     : '';
 
   const active = ['starting', 'running', 'waiting', 'stopping'].includes(value.status);
+  if (active) {
+    $('#conversation-mode').value = value.discussion_mode || !bootstrapped ? 'discuss' : 'assessment';
+    $('#composer-help').textContent = value.pending_question ? 'Answer the question above to continue. Approval applies only to the pending action.'
+      : stopping ? 'The current run is stopping. Your draft stays here.'
+      : 'Send guidance for the current run. It will be considered at the next response boundary; wait until the run finishes to attach files or change modes.';
+  }
   $('#run-dot').className = `dot ${value.status === 'running' ? 'ok' : active ? 'warn' : ''}`;
   $('#stop').disabled = !active || stopping;
-  $('#stop').textContent = stopping ? 'Waiting for model to stop…' : 'Stop current run';
+  $('#clear').disabled = active || sending;
+  $('#assessment-activity').classList.toggle('hidden', !active);
+  $('#assessment-empty').classList.toggle('hidden', bootstrapped || Boolean(value.model_stream_length));
+  $('#stop').textContent = stopping ? 'Stopping…' : 'Stop current run';
   $('#fetch').disabled = active || !bootstrapped;
   $('#validate-a').disabled = active || !bootstrapped;
   $('#fetch').classList.toggle('primary', bootstrapped);
   $('#bootstrap').disabled = active || bootstrapped;
   $('#bootstrap').classList.toggle('primary', !bootstrapped);
-  $('#bootstrap').textContent = bootstrapped ? 'Bootstrap sent' : '1. Send bootstrap';
+  $('#bootstrap').textContent = bootstrapped ? 'Burp context loaded' : 'Connect to Burp';
   $('#bootstrap').title = bootstrapped
     ? 'Bootstrap already sent in this conversation'
     : 'Load the Burp context for this conversation';
-  $('#fetch').title = bootstrapped ? 'Fetch the next Double Agent work item' : 'Send bootstrap first';
-  $('#validate-a').title = bootstrapped ? 'Validate current Agent A findings' : 'Send bootstrap first';
+  $('#fetch').title = bootstrapped ? 'Fetch the next Double Agent work item' : 'Connect to Burp first';
+  $('#validate-a').title = bootstrapped ? 'Validate current Agent A findings' : 'Connect to Burp first';
   const targetKnown = Boolean(value.target_url);
   $('#seed-surface').disabled = active || !bootstrapped || !targetKnown;
-  $('#seed-surface').title = !bootstrapped ? 'Send bootstrap first'
+  $('#seed-surface').title = !bootstrapped ? 'Connect to Burp first'
     : !targetKnown ? 'Fetch a target first so seed routes resolve'
     : 'Add OpenAPI/sitemap/URL routes to coverage and discovery';
   const bootstrapGuidance = $('#bootstrap-guidance');
   bootstrapGuidance.textContent = bootstrapped
-    ? 'Bootstrap loaded for this conversation. Burp controls are ready.'
-    : 'For Burp work, start here. Regular chat works without it.';
+    ? 'Burp context loaded. Choose a task below.'
+    : 'Load assessment context before using Burp controls. Discuss is available separately.';
   bootstrapGuidance.classList.toggle('ready', bootstrapped);
   $('#thinking-control').classList.toggle('hidden', !modelOption(value.settings.model)?.supports_thinking || value.burp_prompt_loaded);
   $('#thinking-choice').disabled = active;
@@ -155,19 +298,25 @@ function render(value) {
 
   const doubleAgent = value.health.double_agent;
   dot($('#burp-dot'), doubleAgent.ok);
-  $('#burp-state').textContent = doubleAgent.ok ? 'Connected on 8777' : String(doubleAgent.detail || 'Unavailable').slice(0, 70);
+  $('#burp-state').textContent = doubleAgent.ok ? 'Connected' : 'Unavailable · check Burp extension';
+  $('#burp-state').title = typeof doubleAgent.detail === 'string' ? doubleAgent.detail : value.settings.double_agent_url;
   const model = value.health.model;
   dot($('#model-dot'), model.ok);
-  $('#model-name').textContent = modelOption(value.settings.model)?.label || value.settings.model;
-  $('#model-state').textContent = model.ok ? `${value.settings.model} ready` : String(model.detail || 'Unavailable').slice(0, 70);
+  $('#model-name').textContent = modelOption(value.settings.model)?.label || value.settings.model || 'No model connection';
+  $('#model-state').textContent = model.ok ? (String(model.detail).startsWith('configured') ? 'Configured · test in Settings' : 'Model available') : !value.settings.model ? 'Add a connection in Settings' : 'Unavailable · check connection';
+  $('#model-state').title = String(model.detail || '');
   const targetUrl = value.target_url || '';
   $('#target-row').classList.toggle('hidden', !targetUrl);
+  $('#target-link-main').classList.toggle('hidden', !targetUrl);
   if (targetUrl) {
     $('#target-link').href = targetUrl;
     $('#target-link').textContent = targetUrl;
     $('#target-link').title = `Open ${targetUrl} in your browser`;
+    $('#target-link-main').href = targetUrl;
+    $('#target-link-main').textContent = `Open target · ${targetUrl}`;
+    $('#target-link-main').title = `Open ${targetUrl} in your browser`;
   }
-  $('#live').textContent = active ? 'Live run' : 'Local and idle';
+  $('#live').textContent = value.pending_question ? 'Needs your input' : active ? 'Working' : 'Ready';
   const streamPanel = $('#model-stream-panel');
   const streamDelta = value.model_stream || '';
   const streamOffset = Number(value.model_stream_offset || 0);
@@ -258,7 +407,7 @@ function render(value) {
 
   if (feedKey !== renderedFeed) {
     const position = timeline.scrollTop;
-    const follow = timeline.scrollHeight - position - timeline.clientHeight < 80;
+    const follow = workspace === 'conversation' && timeline.scrollHeight - position - timeline.clientHeight < 80;
     const items = transcript.map(message => {
       const meta = message.metadata || {};
       const harnessMessage = message.role === 'assistant' && (meta.progress || meta.connection || meta.harness_status);
@@ -277,10 +426,11 @@ function render(value) {
     });
 
     timeline.innerHTML = items.length ? items.join('') : `
-      <div class="empty"><div><strong>Agent B is ready</strong>Regular chat is ready. For Burp work, send bootstrap first.</div></div>`;
+      <div class="empty"><div><span class="empty-mark">B</span><strong>Work through it together</strong><p>Ask a question or share evidence in Discuss.<br>For assessment work, connect to Burp first.</p><small>Your notebook keeps the objective and decisions close at hand.</small></div></div>`;
     AgentBReview.bindOffers(timeline, transcript);
     timeline.scrollTop = follow ? timeline.scrollHeight : position;
     renderedFeed = feedKey;
+    updateScrollControl();
   }
 
   const pending = value.pending_question;
@@ -292,7 +442,7 @@ function render(value) {
     question.innerHTML = `<div class="eyebrow">${approval ? 'YOUR APPROVAL IS REQUIRED' : 'A QUESTION FOR YOU'}</div><strong>${esc(pending.question)}</strong><p>${esc(pending.reason)}</p><div>${
       (pending.options || []).map(option => `<button data-answer="${esc(option)}">${esc(option)}</button>`).join('')
     }</div>${approval ? '<p class="hint">Approval applies only to this pending action. Stopping the run cancels it.</p>' : '<form id="question-reply"><input aria-label="Your answer" name="reply" maxlength="4000" required placeholder="Or answer in your own words…"><button type="submit">Reply</button></form>'}`;
-    question.querySelectorAll('button').forEach(button => {
+    question.querySelectorAll('[data-answer]').forEach(button => {
       button.onclick = () => answer(pending.id, button.dataset.answer);
     });
     if (!approval) $('#question-reply').onsubmit = event => { event.preventDefault(); answer(pending.id, event.target.elements.reply.value); };
@@ -301,7 +451,111 @@ function render(value) {
     question.classList.add('hidden');
   }
   renderSuggestions(value.route_recommendations || []);
+  renderNotebook(value.notebook || {}, active);
+  updateComposer();
+  if (workspace === 'conversation' && keepFollowing) requestAnimationFrame(() => {
+    if (workspace !== 'conversation') return;
+    $('#timeline').scrollTop = $('#timeline').scrollHeight;
+    updateScrollControl();
+  });
+  $('#settings-form button[type="submit"]').disabled = active;
+  $('#add-model').disabled = active;
+  $('#edit-model').disabled = active || !modelOption($('#model-choice').value)?.custom;
+  $('#remove-model').disabled = active || !modelOption($('#model-choice').value)?.custom;
 }
+
+function renderNotebook(notebook, active) {
+  const enabled = Boolean(notebook.burp_context_enabled);
+  $('#burp-discussion-context').checked = enabled;
+  $('#burp-discussion-context').disabled = active || notebookSaving;
+  $('#refresh-discussion-context').disabled = !enabled || active || notebookSaving;
+  $('#edit-notebook').disabled = active || notebookSaving;
+  const snapshot = notebook.snapshot || {};
+  const captured = snapshot.captured_at ? new Date(snapshot.captured_at * 1000).toLocaleTimeString() : '';
+  const stale = snapshot.captured_at && Date.now() / 1000 - snapshot.captured_at > 60;
+  $('#snapshot-status').textContent = !enabled ? 'Burp context off' : !snapshot.status ? 'Refresh or send Discuss to capture context'
+    : `${snapshot.status === 'ready' ? 'Snapshot captured' : snapshot.status.replaceAll('_', ' ')}${captured ? ` at ${captured}` : ''}${stale ? ' · refresh before relying on it' : ''}`;
+  const key = JSON.stringify(notebook);
+  if (key === notebookKey) return;
+  notebookKey = key;
+  $('#notebook-summary').textContent = notebook.bound_target || 'Saved on this Mac';
+  $('#notebook-objective').textContent = notebook.objective || 'Add your objective, facts, questions and decisions.';
+  $('#notebook-notes').innerHTML = [['facts', 'Confirmed facts'], ['questions', 'Open questions'], ['decisions', 'Decisions']].filter(([key]) => notebook[key]).map(([key, label]) => `<section><strong>${label}</strong><p>${esc(notebook[key])}</p></section>`).join('');
+  const findings = snapshot.findings || {};
+  const queue = snapshot.queue || {};
+  $('#notebook-snapshot').innerHTML = enabled && snapshot.status ? `
+    ${snapshot.target ? `<p class="hint">Target: ${esc(snapshot.target)}</p>` : ''}
+    ${(snapshot.blockers || []).map(reason => `<p class="snapshot-warning">${esc(reason)}</p>`).join('')}
+    ${snapshot.findings ? `<p class="hint">${esc(findings.shown)} ${findings.shown === 1 ? 'finding' : 'findings'} shown${findings.limited ? ' · bounded sample' : ''} · ${esc(queue.shown || 0)} queue ${queue.shown === 1 ? 'item' : 'items'} shown${queue.limited ? ' · bounded sample' : ''}</p>` : ''}
+    <details class="snapshot-detail"><summary>Source references and captured state</summary><pre>${esc(JSON.stringify(snapshot, null, 2))}</pre></details>` : '';
+  $('#notebook-files').innerHTML = notebook.files?.length ? `<strong class="notebook-files-label">Recent files</strong><div class="notebook-file-list">${notebook.files.map(file => `
+    <div><a class="download-link" href="/api/files/${encodeURIComponent(file.id)}" download>${esc(file.name)}</a><button type="button" data-reuse-file="${esc(file.id)}">Use in message</button></div>`).join('')}</div>` : '';
+  $('#notebook-files').querySelectorAll('[data-reuse-file]').forEach(button => {
+    button.onclick = () => {
+      if (['starting', 'running', 'waiting', 'stopping'].includes(latestState.status) || uploading || sending) {
+        composerStatus('Wait for the response or stop the run before adding a file.'); return;
+      }
+      const file = latestState.notebook?.files?.find(item => item.id === button.dataset.reuseFile);
+      if (!file || attachmentDrafts.some(item => item.id === file.id)) return;
+      if (attachmentDrafts.length >= 4) { composerStatus('Attach up to four files per message.'); return; }
+      if (file.mime.startsWith('image/') && !modelOption(latestState.settings?.model)?.supports_images) {
+        composerStatus('Enable image input on a vision-capable connection before using this image.'); return;
+      }
+      attachmentDrafts.push(file);
+      $('#conversation-mode').value = 'discuss';
+      renderAttachments();
+      composerStatus('Stored file added. It will be sent with your message.');
+      updateComposer();
+      $('#message').focus();
+    };
+  });
+}
+
+const notebookDialog = $('#notebook-dialog');
+$('#edit-notebook').onclick = () => {
+  const notebook = latestState.notebook || {};
+  notebookRevision = notebook.revision || 0;
+  for (const field of ['objective', 'facts', 'questions', 'decisions']) {
+    $('#notebook-form').elements.namedItem(field).value = notebook[field] || '';
+  }
+  $('#notebook-save-status').textContent = '';
+  notebookDialog.showModal();
+};
+$('#close-notebook').onclick = $('#cancel-notebook').onclick = () => notebookDialog.close();
+$('#notebook-form').onsubmit = async event => {
+  event.preventDefault();
+  if (notebookSaving) return;
+  notebookSaving = true;
+  const button = event.target.querySelector('[type="submit"]');
+  button.disabled = true;
+  try {
+    await api('/api/notebook', {method: 'POST', body: JSON.stringify({...Object.fromEntries(new FormData(event.target)), revision: notebookRevision})});
+    notebookDialog.close();
+    composerStatus('Notebook saved for future discussions.');
+    await poll();
+  } catch (error) { $('#notebook-save-status').textContent = error.message; }
+  finally { notebookSaving = false; button.disabled = false; }
+};
+$('#burp-discussion-context').onchange = async event => {
+  notebookSaving = true;
+  event.target.disabled = true;
+  try {
+    await api('/api/notebook', {method: 'POST', body: JSON.stringify({revision: latestState.notebook.revision, burp_context_enabled: event.target.checked})});
+    await poll();
+  } catch (error) { event.target.checked = !event.target.checked; composerStatus(error.message); }
+  finally { notebookSaving = false; event.target.disabled = false; }
+};
+$('#refresh-discussion-context').onclick = async () => {
+  notebookSaving = true;
+  $('#refresh-discussion-context').disabled = true;
+  try {
+    composerStatus('Reading the current Burp findings and queue…');
+    await api('/api/notebook/refresh', {method: 'POST', body: '{}'});
+    await poll();
+    composerStatus('Snapshot refreshed. Its source and capture time are in the notebook.');
+  } catch (error) { composerStatus(error.message); }
+  finally { notebookSaving = false; }
+};
 
 function renderSuggestions(items) {
   const key = JSON.stringify(items);
@@ -322,9 +576,14 @@ function renderSuggestions(items) {
   });
   $('#suggestions').querySelectorAll('[data-discuss]').forEach(button => {
     button.onclick = () => {
+      if (['starting', 'running', 'waiting', 'stopping'].includes(latestState.status)) {
+        composerStatus('Finish or stop the current run before starting a separate discussion.'); return;
+      }
       const s = items.find(item => item.id === button.dataset.discuss);
       $('#conversation-mode').value = 'discuss';
-      $('#message').value = `Let's discuss this recommendation and its uncertainty:\n${s.subject || ''}\n${s.rationale || ''}\nSuggested next step: ${s.next_step || ''}`;
+      selectWorkspace('conversation');
+      $('#message').value = `Let's discuss recommendation ${s.id}: ${s.subject || ''}. Explain its supporting evidence, uncertainty, alternatives and missing information.`;
+      updateComposer();
       $('#message').focus();
     };
   });
@@ -374,9 +633,13 @@ async function poll() {
   if (busy) return;
   busy = true;
   try {
-    render(await api(`/api/state?after=${last}&stream_after=${cache.modelStream.length}`));
+    const value = await api(`/api/state?after=${last}&stream_after=${cache.modelStream.length}`);
+    harnessOnline = true;
+    render(value);
   } catch (error) {
-    $('#live').textContent = 'Harness offline';
+    harnessOnline = false;
+    $('#live').textContent = 'Reconnecting…';
+    updateComposer();
   } finally {
     busy = false;
   }
@@ -384,20 +647,31 @@ async function poll() {
 
 async function send(message, assessment = false) {
   if (sending || uploading) return;
+  if (latestState.status === 'stopping' || latestState.pending_question || (assessment && ['starting', 'running', 'waiting'].includes(latestState.status))) {
+    composerStatus('Wait for the current response or answer the pending question first.'); return;
+  }
+  if (!harnessOnline || !latestState.settings?.model) { composerStatus('Connect a model in Settings before sending.'); return; }
+  const sentDraft = $('#message').value;
+  const sentAttachments = attachmentDrafts.map(file => file.id);
   sending = true;
+  selectWorkspace('conversation');
+  updateComposer();
   $('#composer button[type="submit"]').disabled = true;
   try {
     const mode = $('#thinking-control').classList.contains('hidden') ? 'auto' : $('#thinking-choice').value;
-    await api('/api/chat', {method: 'POST', body: JSON.stringify({message, thinking: mode === 'auto' ? null : mode === 'on', discussion: !assessment && $('#conversation-mode').value === 'discuss', attachments: assessment ? [] : attachmentDrafts.map(f => f.id)})});
-    $('#message').value = '';
-    if (!assessment) { attachmentDrafts = []; renderAttachments(); }
-    composerStatus('Message sent.');
+    const result = await api('/api/chat', {method: 'POST', body: JSON.stringify({message, thinking: mode === 'auto' ? null : mode === 'on', discussion: !assessment && $('#conversation-mode').value === 'discuss', attachments: assessment ? [] : attachmentDrafts.map(f => f.id)})});
+    if (!assessment) {
+      if ($('#message').value === sentDraft) $('#message').value = '';
+      attachmentDrafts = attachmentDrafts.filter(file => !sentAttachments.includes(file.id));
+      renderAttachments();
+    }
+    composerStatus(result.steering ? 'Guidance queued for the next response boundary.' : 'Message sent.');
     await poll();
   } catch (error) {
     composerStatus(error.message);
   } finally {
     sending = false;
-    $('#composer button[type="submit"]').disabled = false;
+    updateComposer();
   }
 }
 
@@ -418,9 +692,9 @@ $('#composer').onsubmit = event => {
   if (message || attachmentDrafts.length) send(message);
 };
 $('#message').onkeydown = event => {
-  if (event.key === 'Enter' && !event.shiftKey) {
+  if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
     event.preventDefault();
-    $('#composer').requestSubmit();
+    if (!$('#composer button[type="submit"]').disabled) $('#composer').requestSubmit();
   }
 };
 $('#fetch').onclick = () => send('Fetch the Double Agent queue, run preflight, select the highest-value actionable item, and complete it using evidence-backed testing. Ask me in chat for any missing fixture or required approval.', true);
@@ -431,7 +705,7 @@ $('#validate-a').onclick = async () => {
     await api('/api/run/validate-findings', {method: 'POST', body: '{}'});
     await poll();
   } catch (error) {
-    alert(error.message);
+    showNotice(error.message);
   }
 };
 const seedDialog = $('#seed-dialog');
@@ -485,7 +759,7 @@ $('#confirm-stop-run').onclick = async () => {
   } catch (error) {
     stopButton.disabled = false;
     stopButton.textContent = 'Stop current run';
-    alert(error.message);
+    showNotice(error.message);
   }
 };
 $('#bootstrap').onclick = async () => {
@@ -495,19 +769,21 @@ $('#bootstrap').onclick = async () => {
     await poll();
   } catch (error) {
     $('#bootstrap').disabled = false;
-    alert(error.message);
+    showNotice(error.message);
   }
 };
 async function clearConversation() {
   try {
     await api('/api/run/clear', {method: 'POST', body: '{}'});
     attachmentDrafts = []; renderAttachments(); composerStatus('');
+    conversationScroll = 0; followConversation = true;
+    selectWorkspace('conversation');
     cache = {messages: [], modelStream: '', modelRun: 0};
     renderedFeed = null;
     last = 0;
     await poll();
   } catch (error) {
-    alert(error.message);
+    showNotice(error.message);
   }
 }
 
@@ -520,35 +796,6 @@ $('#confirm-new-conversation').onclick = async () => {
 };
 
 const dialog = $('#settings-dialog');
-let settingsTab = 'connections';
-function selectSettingsTab(name, focus = false) {
-  const tabs = [...dialog.querySelectorAll('[data-settings-tab]')];
-  const selected = tabs.find(tab => tab.dataset.settingsTab === name);
-  if (!selected) return;
-  settingsTab = name;
-  tabs.forEach(tab => {
-    const active = tab === selected;
-    tab.setAttribute('aria-selected', String(active));
-    tab.tabIndex = active ? 0 : -1;
-    document.getElementById(tab.getAttribute('aria-controls')).hidden = !active;
-  });
-  if (focus) selected.focus();
-}
-dialog.querySelectorAll('[data-settings-tab]').forEach(tab => {
-  tab.onclick = () => selectSettingsTab(tab.dataset.settingsTab);
-  tab.onkeydown = event => {
-    const names = ['connections', 'skills', 'general'];
-    const index = names.indexOf(tab.dataset.settingsTab);
-    const next = {ArrowRight: (index + 1) % names.length, ArrowLeft: (index + names.length - 1) % names.length, Home: 0, End: names.length - 1}[event.key];
-    if (next === undefined) return;
-    event.preventDefault();
-    selectSettingsTab(names[next], true);
-  };
-});
-$('#settings-form').addEventListener('invalid', event => {
-  const panel = event.target.closest('[role="tabpanel"]');
-  if (panel) selectSettingsTab(panel.id.replace('settings-', ''));
-}, true);
 function renderModelDescription() {
   const selected = $('#model-choice').value;
   const option = modelOption(selected);
@@ -556,7 +803,12 @@ function renderModelDescription() {
   const recNote = option?.recommended_max_steps
     ? ` · recommended budget: ${option.recommended_max_steps} steps / ${option.recommended_max_output_tokens} output tokens`
     : '';
-  $('#model-description').textContent = (option?.description || 'Built-in local OpenAI-compatible connection.') + recNote;
+  const hasConnection = Boolean(selected);
+  $('#empty-connections').classList.toggle('hidden', hasConnection);
+  $('#active-connection-row').classList.toggle('hidden', !hasConnection);
+  $('#connection-summary').classList.toggle('hidden', !hasConnection);
+  $('#resolved-endpoint-row').classList.toggle('hidden', !hasConnection);
+  $('#model-description').textContent = (option?.description || 'Local OpenAI-compatible connection.') + recNote;
   $('#provider-badge').textContent = option?.provider_label || provider?.label || 'Local';
   $('#connection-title').textContent = option?.model || selected;
   const isBedrock = option?.provider === 'bedrock' || selected === 'bedrock';
@@ -569,10 +821,11 @@ function renderModelDescription() {
   urlField.disabled = true;
   const region = option?.region || $('#settings-form').elements.namedItem('bedrock_region').value || 'us-east-1';
   urlField.value = isBedrock ? `https://bedrock-runtime.${region}.amazonaws.com` : (option?.url || loadedModelUrl);
-  $('#legacy-model-settings').classList.toggle('hidden', Boolean(option?.custom) || isBedrock);
+  $('#legacy-model-settings').classList.toggle('hidden', !hasConnection || Boolean(option?.custom) || isBedrock);
   // Remove is only available for user-added custom models.
-  $('#remove-model').disabled = !option?.custom;
-  $('#edit-model').disabled = !option?.custom;
+  const active = ['starting', 'running', 'waiting', 'stopping'].includes(latestState.status);
+  $('#remove-model').disabled = active || !option?.custom;
+  $('#edit-model').disabled = active || !option?.custom;
 }
 
 function renderSkillOptions(selectedIds = []) {
@@ -586,7 +839,8 @@ function renderSkillOptions(selectedIds = []) {
     </label>`).join('');
 }
 
-async function openSettings(tab = settingsTab) {
+async function openSettings(section = settingsSection) {
+  $('#settings-status').classList.add('hidden');
   const [value, catalog] = await Promise.all([api('/api/settings'), api('/api/skills')]);
   modelOptions = value.model_options || [];
   providerOptions = value.providers || [];
@@ -606,10 +860,13 @@ async function openSettings(tab = settingsTab) {
   $('#legacy-model-url').value = value.model_url || '';
   renderSkillOptions(value.selected_skills || []);
   renderModelDescription();
-  selectSettingsTab(tab);
+  selectSettings(section);
   dialog.showModal();
+  if (section === 'models' && !modelOptions.length) $('#add-model').focus();
 }
-$('#settings').onclick = () => { closeNavigation(); openSettings('connections'); };
+$('#settings').onclick = () => { closeNavigation(); openSettings().catch(error => showNotice(error.message)); };
+$('#scope-status').onclick = () => openSettings('run').catch(error => showNotice(error.message));
+$('#setup-connection').onclick = () => openSettings('models').then(() => { if (!modelOptions.length) openModelDialog(); }).catch(error => showNotice(error.message));
 // Switching model applies that model's recommended step/output budget so hosted
 // models get room for long runs without manual tuning. The user can still edit
 // the fields before saving; the saved values then win over the recommendation.
@@ -621,6 +878,10 @@ function applyRecommendedLimits(modelId) {
 }
 $('#model-choice').onchange = () => { renderModelDescription(); applyRecommendedLimits($('#model-choice').value); };
 $('#close-settings').onclick = $('#cancel-settings').onclick = () => dialog.close();
+$('#settings-form').addEventListener('invalid', event => {
+  const pane = event.target.closest('.settings-pane');
+  if (pane) selectSettings(pane.id.replace('settings-', ''));
+}, true);
 $('#settings-form').onsubmit = async event => {
   event.preventDefault();
   const body = {};
@@ -636,9 +897,11 @@ $('#settings-form').onsubmit = async event => {
   try {
     await api('/api/settings', {method: 'POST', body: JSON.stringify(body)});
     dialog.close();
+    composerStatus('Settings saved.');
     poll();
   } catch (error) {
-    alert(error.message);
+    $('#settings-status').textContent = error.message;
+    $('#settings-status').classList.remove('hidden');
   }
 };
 
@@ -660,6 +923,7 @@ $('#add-skill').onclick = () => {
   // unsaved selection, close Settings, then restore it when this editor closes.
   pendingSkillSelection = checkedSkillIds();
   dialog.close();
+  $('#skill-status').classList.add('hidden');
   skillDialog.showModal();
 };
 $('#close-skill').onclick = $('#cancel-skill').onclick = returnToSettings;
@@ -678,7 +942,8 @@ $('#skill-form').onsubmit = async event => {
     event.target.reset();
     returnToSettings();
   } catch (error) {
-    alert(error.message);
+    $('#skill-status').textContent = error.message;
+    $('#skill-status').classList.remove('hidden');
   }
 };
 
@@ -711,6 +976,7 @@ function renderProviderFields(setDefaultUrl = false) {
     $('#model-form').elements.namedItem('region').value = 'us-east-1';
   }
   const modelPlaceholders = {
+    openrouter: 'Exact OpenRouter ID: provider/model',
     openai: 'Example: gpt-5.6-sol',
     anthropic: 'Example: claude-sonnet-4-6',
     bedrock: 'Example: global.anthropic.claude-sonnet-4-6',
@@ -762,7 +1028,8 @@ $('#model-form').onsubmit = async event => {
     modelDialog.close();
     await openSettings();
   } catch (error) {
-    alert(error.message);
+    $('#connection-test-result').className = 'connection-test-result failure';
+    $('#connection-test-result').textContent = error.message;
   }
 };
 $('#test-model').onclick = async () => {
@@ -796,7 +1063,7 @@ $('#remove-model').onclick = async () => {
     await api('/api/models/delete', {method: 'POST', body: JSON.stringify({id})});
     await openSettings();
   } catch (error) {
-    alert(error.message);
+    showNotice(error.message);
   }
 };
 

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from double_agent_prelude import *
+from double_agent_scope import validate_raw_destination
 
 class AgentAPIChunk3Chunk2(object):
     def _serialize_scanner_job(self, job_id, job):
@@ -132,12 +133,17 @@ class AgentAPIChunk3Chunk2(object):
         method = str(parsed.get("method", "GET") or "GET").upper()
         scope_guard = self._scope_guard_for_url(url)
         safety_gate = self._safety_gate_for_request(method, url)
+        try:
+            validate_raw_destination(url, host, port, use_https, built.get("raw_request", ""))
+        except Exception:
+            self._send_json(400, {"error": "ambiguous_target", "message": "Scanner target and request authority must match."})
+            return
 
-        if scope_guard.get("in_scope") is False:
+        if scope_guard.get("in_scope") is not True:
             self._send_json(403, {
-                "error": "out_of_scope",
+                "error": "scope_not_verified",
                 "scope_guard": scope_guard,
-                "message": "Burp Scanner delegation refused because target is outside scope."
+                "message": "Burp Scanner delegation refused because target is outside scope or scope could not be verified."
             })
             return
         if scope_guard.get("requires_confirmation") and not self._coerce_bool(body.get("confirmed", False), False):
@@ -574,7 +580,7 @@ class AgentAPIChunk3Chunk2(object):
         else:
             safe_to_auto_test = (
                 transport in ("curl_proxy", "portswigger_mcp_http2") and
-                scope_guard.get("in_scope") is not False and
+                scope_guard.get("in_scope") is True and
                 not scope_guard.get("requires_confirmation", False) and
                 not safety_gate.get("requires_confirmation", False) and
                 not fixture_status.get("blocked", False)
@@ -719,7 +725,7 @@ class AgentAPIChunk3Chunk2(object):
         blocked_reasons = []
         if fixture_status.get("blocked"):
             blocked_reasons.append("fixture_status.blocked")
-        if scope_guard.get("in_scope") is False:
+        if scope_guard.get("in_scope") is not True:
             blocked_reasons.append("scope_guard.in_scope=false")
         if scope_guard.get("requires_confirmation"):
             blocked_reasons.append("scope_guard.requires_confirmation")

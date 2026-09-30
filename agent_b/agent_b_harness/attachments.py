@@ -126,6 +126,11 @@ class Attachments:
         ident, name, mime, data = self.get(file_id)
         return {"id": ident, "name": name, "mime": mime, "size": len(data)}
 
+    def references(self, limit: int = 32) -> list[dict]:
+        with self.lock, sqlite3.connect(self.path) as db:
+            rows = db.execute("SELECT id,name,mime,length(data) FROM files ORDER BY rowid DESC LIMIT ?", (limit,)).fetchall()
+        return [{"id": row[0], "name": row[1], "mime": row[2], "size": row[3]} for row in rows]
+
     def validate(self, ids: list, supports_images: bool) -> list[dict]:
         if not isinstance(ids, list) or len(ids) > 4 or any(not isinstance(i, str) for i in ids):
             raise ValueError("Attach up to four files per message")
