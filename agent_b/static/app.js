@@ -128,11 +128,32 @@ function composerStatus(text) { $('#composer-status').textContent = text; }
 function renderAttachments() {
   const list = $('#attachment-list');
   list.classList.toggle('hidden', !attachmentDrafts.length);
-  list.innerHTML = attachmentDrafts.map((f, index) => `<span class="attachment-chip">${f.mime.startsWith('image/') ? `<img class="attachment-thumbnail" src="/api/files/${encodeURIComponent(f.id)}/preview" alt="${esc(f.name)}">` : ''}${esc(f.name)} · ${Math.ceil(f.size / 1024)} KB <button type="button" data-remove-file="${index}" aria-label="Remove ${esc(f.name)}">×</button></span>`).join('');
+  list.innerHTML = attachmentDrafts.map((f, index) => `<span class="attachment-chip">${f.mime.startsWith('image/') ? `<img class="attachment-thumbnail" src="/api/files/${encodeURIComponent(f.id)}/preview" alt="${esc(f.name)}">` : ''}${esc(f.name)} · ${Math.ceil(f.size / 1024)} KB ${/\.(js|jsx|mjs)$/i.test(f.name) ? `<button type="button" data-analyze-js="${index}" aria-label="Analyze ${esc(f.name)}">Analyze JS</button>` : ''}<button type="button" data-remove-file="${index}" aria-label="Remove ${esc(f.name)}">×</button></span>`).join('');
   updateComposer();
   list.querySelectorAll('[data-remove-file]').forEach(button => {
     button.onclick = () => { attachmentDrafts.splice(Number(button.dataset.removeFile), 1); renderAttachments(); };
   });
+  list.querySelectorAll('[data-analyze-js]').forEach(button => {
+    button.onclick = () => reviewJavaScript(attachmentDrafts[Number(button.dataset.analyzeJs)]);
+  });
+}
+
+const javascriptDialog = $('#javascript-dialog');
+$('#close-javascript').onclick = $('#done-javascript').onclick = () => javascriptDialog.close();
+async function reviewJavaScript(file) {
+  if (!file) return;
+  try {
+    const report = await api(`/api/files/${encodeURIComponent(file.id)}/javascript`);
+    $('#javascript-summary').textContent = `${file.name}: ${report.summary.total} static candidates${report.truncated ? ' · results limited to 100' : ''}.`;
+    const sections = [report.notice];
+    for (const [category, findings] of Object.entries(report.findings)) {
+      if (!findings.length) continue;
+      sections.push(`${category.toUpperCase()} (${findings.length})\n` + findings.map(item => `${item.source}:${item.position.line}:${item.position.column}  ${item.value}${item.kind ? ` (${item.kind})` : ''}`).join('\n'));
+    }
+    $('#javascript-report').textContent = sections.join('\n\n');
+    $('#download-javascript-report').href = `/api/files/${encodeURIComponent(file.id)}/javascript/download`;
+    javascriptDialog.showModal();
+  } catch (error) { composerStatus(error.message); }
 }
 
 async function attachFiles(files) {
@@ -796,6 +817,12 @@ $('#confirm-new-conversation').onclick = async () => {
 };
 
 const dialog = $('#settings-dialog');
+function clearConnectionTestResult() {
+  const result = $('#connection-test-result');
+  result.className = 'connection-test-result hidden';
+  result.textContent = '';
+}
+
 function renderModelDescription() {
   const selected = $('#model-choice').value;
   const option = modelOption(selected);
@@ -824,6 +851,7 @@ function renderModelDescription() {
   $('#legacy-model-settings').classList.toggle('hidden', !hasConnection || Boolean(option?.custom) || isBedrock);
   // Remove is only available for user-added custom models.
   const active = ['starting', 'running', 'waiting', 'stopping'].includes(latestState.status);
+  $('#test-model').disabled = active || !hasConnection;
   $('#remove-model').disabled = active || !option?.custom;
   $('#edit-model').disabled = active || !option?.custom;
 }
@@ -860,6 +888,7 @@ async function openSettings(section = settingsSection) {
   $('#legacy-model-url').value = value.model_url || '';
   renderSkillOptions(value.selected_skills || []);
   renderModelDescription();
+  clearConnectionTestResult();
   selectSettings(section);
   dialog.showModal();
   if (section === 'models' && !modelOptions.length) $('#add-model').focus();
@@ -876,7 +905,11 @@ function applyRecommendedLimits(modelId) {
   if (option?.recommended_max_steps) form.elements.namedItem('max_steps').value = option.recommended_max_steps;
   if (option?.recommended_max_output_tokens) form.elements.namedItem('max_output_tokens').value = option.recommended_max_output_tokens;
 }
-$('#model-choice').onchange = () => { renderModelDescription(); applyRecommendedLimits($('#model-choice').value); };
+$('#model-choice').onchange = () => {
+  renderModelDescription();
+  clearConnectionTestResult();
+  applyRecommendedLimits($('#model-choice').value);
+};
 $('#close-settings').onclick = $('#cancel-settings').onclick = () => dialog.close();
 $('#settings-form').addEventListener('invalid', event => {
   const pane = event.target.closest('.settings-pane');
@@ -985,8 +1018,8 @@ function renderProviderFields(setDefaultUrl = false) {
   $('#connection-model').placeholder = modelPlaceholders[provider.id] || 'Exact model ID';
   const suggestions = isBedrock ? ($('#bedrock-model-list').innerHTML || '') : '';
   $('#connection-model-list').innerHTML = suggestions;
-  $('#connection-test-result').className = 'connection-test-result hidden';
-  $('#connection-test-result').textContent = '';
+  $('#model-status').className = 'form-status hidden';
+  $('#model-status').textContent = '';
 }
 
 function openModelDialog(option = null) {
@@ -1028,30 +1061,28 @@ $('#model-form').onsubmit = async event => {
     modelDialog.close();
     await openSettings();
   } catch (error) {
-    $('#connection-test-result').className = 'connection-test-result failure';
-    $('#connection-test-result').textContent = error.message;
+    $('#model-status').className = 'form-status failure';
+    $('#model-status').textContent = error.message;
   }
 };
 $('#test-model').onclick = async () => {
-  const form = $('#model-form');
-  if (!form.reportValidity()) return;
-  const body = Object.fromEntries(new FormData(form).entries());
-  body.supports_thinking = form.elements.namedItem('supports_thinking').checked;
-  if (editingModelId) body.id = editingModelId;
+  const id = $('#model-choice').value;
+  if (!id) return;
   const result = $('#connection-test-result');
   const button = $('#test-model');
   result.className = 'connection-test-result testing';
   result.textContent = 'Testing credentials, endpoint, and model…';
   button.disabled = true;
   try {
-    const value = await api('/api/models/test', {method: 'POST', body: JSON.stringify(body)});
+    const value = await api('/api/models/test', {method: 'POST', body: JSON.stringify({id})});
     result.className = 'connection-test-result success';
     result.textContent = `Connected · ${value.detail}`;
   } catch (error) {
     result.className = 'connection-test-result failure';
     result.textContent = error.message;
   } finally {
-    button.disabled = false;
+    const active = ['starting', 'running', 'waiting', 'stopping'].includes(latestState.status);
+    button.disabled = active || !$('#model-choice').value;
   }
 };
 $('#remove-model').onclick = async () => {

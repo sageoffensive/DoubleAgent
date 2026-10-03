@@ -137,7 +137,7 @@
           <label for="conversation-mode">Mode</label><select id="conversation-mode"><option value="discuss">Discuss · advice and files</option><option value="assessment">Assessment chat</option></select>
           <button type="button" id="attach-files">Attach files</button>
           <button type="button" id="open-source-review">Review source</button>
-          <input type="file" id="file-picker" class="hidden" multiple accept=".txt,.md,.csv,.json,.log,.xml,.yaml,.yml,.png,.jpg,.jpeg,.webp">
+          <input type="file" id="file-picker" class="hidden" multiple accept=".js,.jsx,.mjs,.txt,.md,.csv,.json,.log,.xml,.yaml,.yml,.png,.jpg,.jpeg,.webp">
         </div>
         <div id="attachment-list" class="attachment-list hidden"></div>
         <textarea id="message" rows="2" aria-describedby="composer-help composer-shortcut" aria-label="Message to Agent B" placeholder="Ask a question, share a file, or paste a screenshot…"></textarea>
@@ -172,7 +172,8 @@
         <label>Bedrock API key<input name="bedrock_api_key" type="password" placeholder="Saved & shared across all Bedrock models; leave blank to keep it"></label>
         <p class="hint">One Amazon Bedrock API key (bearer token) is used for every Claude model on Bedrock — enter it once and it stays when you switch models. For the custom option, copy the exact inference-profile ID from the Bedrock console. Region + key are stored locally with owner-only permissions.</p>
       </div>
-      <div class="model-actions"><button type="button" id="add-model" class="primary">Add connection</button><button type="button" id="edit-model">Edit</button><button type="button" id="remove-model">Remove</button></div>
+      <div class="model-actions"><button type="button" id="add-model" class="primary">Add connection</button><button type="button" id="test-model">Test connection</button><button type="button" id="edit-model">Edit</button><button type="button" id="remove-model">Remove</button></div>
+      <div id="connection-test-result" class="connection-test-result hidden" role="status"></div>
       <details id="legacy-model-settings" class="advanced-settings">
         <summary>Built-in local connection settings</summary>
         <div>
@@ -227,6 +228,16 @@
     </form>
   </dialog>
 
+  <dialog id="javascript-dialog" class="skill-dialog" aria-labelledby="javascript-title">
+    <div class="javascript-review">
+      <div class="modal-head"><div><div class="eyebrow">OFFLINE FILE REVIEW</div><h2 id="javascript-title">JavaScript analysis</h2></div><button type="button" id="close-javascript" class="icon" aria-label="Close JavaScript analysis">×</button></div>
+      <p class="hint">Only the attached file is inspected. Nothing is executed, fetched or sent to a model. Select JavaScript analysis in Settings → Skills to include this report when you send the file in Discuss.</p>
+      <p id="javascript-summary" role="status"></p>
+      <pre id="javascript-report" tabindex="0" aria-label="JavaScript analysis results"></pre>
+      <div class="modal-actions"><a id="download-javascript-report" class="button" download>Download report</a><button type="button" id="done-javascript" class="primary">Done</button></div>
+    </div>
+  </dialog>
+
   <dialog id="model-dialog" class="skill-dialog">
     <form id="model-form">
       <div class="modal-head"><div><div class="eyebrow">MODEL CONNECTION</div><h2>Add a connection</h2></div><button type="button" id="close-model" class="icon" aria-label="Close connection editor">×</button></div>
@@ -244,8 +255,8 @@
       <label><input type="checkbox" name="supports_images"> Supports image input</label>
       <p class="hint">Enable only when both the model and server support vision. Images are sent to this connection when you press Send.</p>
       <p id="connection-thinking-help" class="hint">Only enable this when the server accepts <code>chat_template_kwargs.enable_thinking</code>.</p>
-      <div id="connection-test-result" class="connection-test-result hidden" role="status"></div>
-      <div class="modal-actions split-actions"><button type="button" id="test-model">Test connection</button><span></span><button type="button" id="cancel-model">Cancel</button><button class="primary" type="submit">Save and use</button></div>
+      <p id="model-status" class="form-status hidden" role="status"></p>
+      <div class="modal-actions split-actions"><button type="button" id="cancel-model">Cancel</button><button class="primary" type="submit">Save and use</button></div>
     </form>
   </dialog>
 

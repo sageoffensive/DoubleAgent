@@ -45,7 +45,7 @@ The notebook guides Discuss only. It does not become assessment instructions or 
 
 ### Files and images
 
-In Discuss mode, select **Attach files**, drop files onto the composer, or paste a screenshot. Add up to four files per message. Supported files are UTF-8 text, Markdown, CSV, JSON, logs, XML and YAML (120 KB each; 160 KB total text per message), plus PNG, JPEG and WebP images (3 MB each). PDF, Office files and archives are not supported yet; export their contents to text or images first.
+In Discuss mode, select **Attach files**, drop files onto the composer, or paste a screenshot. Add up to four files per message. Supported files are UTF-8 JavaScript (`.js`, `.jsx`, `.mjs`), text, Markdown, CSV, JSON, logs, XML and YAML (120 KB each; 160 KB total text per message), plus PNG, JPEG and WebP images (3 MB each). PDF, Office files and archives are not supported yet; export their contents to text or images first.
 
 Images are limited to 8000 pixels per side and 20 megapixels. Oversized or unreadable headers are rejected before storage. Resize large screenshots before attaching them.
 
@@ -84,9 +84,19 @@ Open **Settings → Skills** to select any combination. The default is **Bug bou
 
 Choose only the modules relevant to the assessment. Loading every skill adds prompt tokens and can dilute a smaller model's attention.
 
-Use **Add skill** to save a custom methodology. Custom skills are stored as owner-readable JSON under `data/skills/` (or `~/Library/Application Support/Agent B/skills/` in the macOS app), and are sent only to the configured local model. Skills guide planning and interpretation; they cannot override Burp scope, safety gates, the harness state machine, or tool contracts.
+Use **Add skill** to save a custom methodology. Custom skills are stored as owner-readable JSON under `data/skills/` (or `~/Library/Application Support/Agent B/skills/` in the macOS app), and are sent to the selected model connection. Skills guide planning and interpretation; they cannot override Burp scope, safety gates, the harness state machine, or tool contracts.
 
 The built-in methods were synthesized from the current OWASP Web Security Testing Guide, PortSwigger Web Security Academy and research, maintained Nuclei template practices, and the open-source Hermes Web Pentest agent skill. The wording is original and tailored to Agent B's deterministic evidence workflow.
+
+### JavaScript analysis
+
+**JavaScript analysis** adapts [xrip/claude-skill-analyze-js](https://github.com/xrip/claude-skill-analyze-js) at commit `64cb40cd5afaf0b946e2e44065da19c84b4ff69c` (MIT). Its native Python analyzer uses text patterns to identify endpoint references, URLs, masked secret candidates, emails, sensitive file references and bundler signatures/versions. It does not require Bun, Node, npm or `npx`; it never runs the uploaded code or retrieves referenced resources.
+
+Attach a JavaScript file and choose **Analyze JS** on its chip to inspect or download the local report, even without a model connection. Select **Settings → Skills → JavaScript analysis** and save settings to include the report and review instructions when sending the file in Discuss. Other assessment skills are not loaded into Discuss. Sending source or a report uses the selected model connection; previewing the report does not contact a model. Existing skill selections remain unchanged until you choose this module.
+
+Reports preserve line/column locations from the original upload, deduplicate candidates and show at most 100 items, with credential candidates prioritized. A truncated report explicitly labels its counts as a sample. Pattern-detected credentials are completely masked in the stored source, download and report. Redaction remains best effort; inspect source before sharing. No matches does not prove safety, and a route or version match is not a verified vulnerability. Reports cannot authorize testing, alter scope, create findings or supply assessment tools to Discuss.
+
+The upstream skill document, MIT license and pinned provenance are bundled under `agent_b_harness/vendor/analyze_js/`. The original upstream CLI instructions are reference documentation; Agent B uses the bounded offline adaptation above.
 
 ## Tests
 
@@ -104,7 +114,7 @@ Open **Settings → Connections → Add connection** to configure one of the sup
 - **Amazon Bedrock** — the provider-neutral Converse API with a Bedrock bearer key. Because Converse works across supported model families, Agent B is not limited to Claude on Bedrock.
 - **Local / OpenAI-compatible** — Ollama, LM Studio, vLLM, oMLX, Splash, llama.cpp and other servers exposing `/models` and `/chat/completions`. A key is optional.
 
-The connection editor pre-fills provider endpoints, reveals only relevant fields, keeps credentials isolated per connection, and offers an explicit **Test connection** action. OpenAI, Anthropic and local tests confirm the exact model appears in the provider's model list. OpenRouter checks `/key` independently of its public catalogue, then checks the exact model ID; it does not make an inference request or prove model capability or available credits. Bedrock tests the configured model with a tiny live Converse request.
+The connection editor pre-fills provider endpoints, reveals only relevant fields, keeps credentials isolated per connection, and offers an explicit **Test connection** action in the main Connections pane for the selected saved connection. OpenAI, Anthropic and local tests confirm the exact model appears in the provider's model list. OpenRouter checks `/key` independently of its public catalogue, then checks the exact model ID; it does not make an inference request or prove model capability or available credits. Bedrock tests the configured model with a tiny live Converse request.
 
 ### Scope enforcement
 

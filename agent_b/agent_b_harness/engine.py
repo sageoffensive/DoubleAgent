@@ -2762,6 +2762,10 @@ class Engine:
 
     def _run_chat(self, request: str) -> None:
         cfg = config.load()
+        javascript_skill = "analyze-js" in cfg.selected_skills
+        discussion_system = CHAT_SYSTEM
+        if javascript_skill:
+            discussion_system += "\n\n" + render_skill_prompt(config.DATA, ["analyze-js"])
         connection = config.resolve_model_connection(cfg)
         model = Model(connection["base_url"], connection["api_key"], connection["model"], cfg.request_timeout, config.effective_output_tokens(cfg.max_output_tokens, connection["provider"]), connection["provider"])
         supports_thinking = any(
@@ -2776,7 +2780,7 @@ class Engine:
         self.store.discussion_message("user", request, self.chat_attachment_ids)
         with self.lock:
             reference = discussion_context(self.store, self.notebook, self.attachments.references(), request)
-        messages = [{"role": "system", "content": CHAT_SYSTEM},
+        messages = [{"role": "system", "content": discussion_system},
                     {"role": "user", "content": render_reference_context(reference)}, *dialogue]
         try:
             self._set("running")
@@ -2788,7 +2792,7 @@ class Engine:
                     self.step += 1
                     self.model_stream_step = self.step
                     self.model_step_started = time.time()
-                message = model.complete(self.attachments.messages(messages, supports_images(cfg)), [], self._model_delta, "none")
+                message = model.complete(self.attachments.messages(messages, supports_images(cfg), include_javascript=javascript_skill), [], self._model_delta, "none")
                 if self.stop_event.is_set():
                     break
                 content = str(message.get("content") or "")
