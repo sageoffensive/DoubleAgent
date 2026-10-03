@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/xrip/claude-skill-analyze-js",
+  "commit": "64cb40cd5afaf0b946e2e44065da19c84b4ff69c",
+  "package_version": "1.0.2",
+  "license": "MIT",
+  "adaptation": "Native Python static text analyzer. No upstream CLI, Bun, npm, dynamic install, arbitrary directory traversal, evaluation, URL retrieval or target actions. Complete secret masking; bounded operator-uploaded files and findings."
+}

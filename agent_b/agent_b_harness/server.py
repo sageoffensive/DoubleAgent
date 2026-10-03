@@ -57,6 +57,14 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path.startswith("/api/files/"):
             try:
                 file_path = parsed.path[len("/api/files/"):]
+                for suffix in ("/javascript/download", "/javascript"):
+                    if file_path.endswith(suffix):
+                        report = ENGINE.attachments.javascript_report(file_path[:-len(suffix)])
+                        if suffix.endswith("/download"):
+                            self.download("agent-b-javascript-analysis.json", json.dumps(report, ensure_ascii=False, indent=2).encode("utf-8"))
+                        else:
+                            self.json(report)
+                        return
                 preview = file_path.endswith("/preview")
                 ident, name, mime, data = ENGINE.attachments.get(file_path[:-8] if preview else file_path)
                 if preview:

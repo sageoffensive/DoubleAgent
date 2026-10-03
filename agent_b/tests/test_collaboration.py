@@ -186,6 +186,22 @@ class FileHTTPTests(unittest.TestCase):
         self.assertEqual(headers["X-Content-Type-Options"], "nosniff")
         self.assertEqual(self.request("GET", "/api/files/../../settings.json")[0], 404)
 
+    def test_javascript_offline_report_download_and_missing_file(self):
+        status, _, body = self.request("POST", "/api/files", {"name": "bundle.js", "data": base64.b64encode(b'const route="/api/v1/profile";').decode()})
+        self.assertEqual(status, 201)
+        item = json.loads(body)
+        path = "/api/files/" + item["id"] + "/javascript"
+        status, _, body = self.request("GET", path)
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body)["summary"]["endpoints"], 1)
+        status, headers, body = self.request("GET", path + "/download")
+        self.assertEqual(status, 200)
+        self.assertTrue(headers["Content-Disposition"].startswith("attachment;"))
+        self.assertEqual(json.loads(body)["summary"]["endpoints"], 1)
+        self.assertEqual(self.request("GET", "/api/files/../../settings.json/javascript")[0], 404)
+        self.assertEqual(self.request("GET", path, headers={"Origin":"https://other.invalid"})[0], 403)
+
+
     def test_cross_origin_and_bad_host_requests_rejected(self):
         self.assertEqual(self.request("POST", "/api/files", {}, {"Origin": "https://example.test"})[0], 403)
         self.assertEqual(self.request("GET", "/api/export", headers={"Host": "example.test"})[0], 403)

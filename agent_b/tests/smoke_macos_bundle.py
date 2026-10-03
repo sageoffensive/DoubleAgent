@@ -58,6 +58,7 @@ def main():
                 assert b'id="settings-tab-skills"' in page
                 assert b'aria-label="Agent B version">v' in page
                 assert b"{{AGENT_B_VERSION}}" not in page
+                assert b'id="javascript-dialog"' in page
                 for name in (b"conversation", b"notebook", b"assessment"):
                     assert b'id="tab-' + name + b'"' in page
             with urllib.request.urlopen(base + "/api/notebook", timeout=2) as reply:
@@ -106,7 +107,23 @@ def main():
                 assert reply.read() == fixture
                 assert reply.headers["Content-Disposition"].startswith("attachment;")
                 assert reply.headers["X-Content-Type-Options"] == "nosniff"
-            print("PASS: bundle signature, isolated runtime, empty settings, UI, notebook persistence/export, local uploads/downloads, research import/export")
+            with urllib.request.urlopen(base + "/api/skills", timeout=2) as reply:
+                assert any(item["id"] == "analyze-js" for item in json.load(reply)["skills"])
+            javascript = b'const route="/api/v1/profile"; throw new Error("never execute uploaded source");'
+            request = urllib.request.Request(base + "/api/files", data=json.dumps({
+                "name": "bundle.js", "data": base64.b64encode(javascript).decode(),
+            }).encode(), headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(request, timeout=2) as reply:
+                javascript_id = json.load(reply)["id"]
+            report_path = base + "/api/files/" + javascript_id + "/javascript"
+            with urllib.request.urlopen(report_path, timeout=2) as reply:
+                report = json.load(reply)
+                assert report["summary"]["endpoints"] == 1
+                assert report["findings"]["endpoints"][0]["value"] == "/api/v1/profile"
+            with urllib.request.urlopen(report_path + "/download", timeout=2) as reply:
+                assert json.load(reply) == report
+                assert reply.headers["Content-Disposition"].startswith("attachment;")
+            print("PASS: bundle signature, isolated runtime, empty settings, UI, notebook persistence/export, local uploads/downloads, research import/export, offline JavaScript report/export")
         finally:
             process.terminate()
             try:
