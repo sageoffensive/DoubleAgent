@@ -58,8 +58,8 @@ class NotebookTests(unittest.TestCase):
             engine.thread.join(3)
             self.assertFalse(engine.thread.is_alive())
             args = model.return_value.complete.call_args.args
-            self.assertEqual(args[1], [])
-            self.assertEqual(args[3], "none")
+            self.assertEqual([t["function"]["name"] for t in args[1]], ["request_public_reference"])
+            self.assertEqual(args[3], "auto")
             return json.dumps(args[0], ensure_ascii=False)
 
     def test_restart_recovers_notes_dialogue_and_file_contents(self):

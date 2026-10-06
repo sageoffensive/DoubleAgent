@@ -74,7 +74,7 @@ def main():
             with urllib.request.urlopen(base + "/research.html", timeout=2) as reply:
                 page = reply.read()
                 assert reply.url == base + "/", "Legacy research page must return to chat"
-                assert b'id="source-review-panel"' in page
+                assert b'id="source-review-panel"' not in page
                 assert b'id="target-link"' in page
                 assert b'aria-label="Agent B version">v' in page
                 assert b"{{AGENT_B_VERSION}}" not in page
@@ -85,17 +85,11 @@ def main():
             source_request = urllib.request.Request(base + "/api/research/start", data=json.dumps({
                 "kind": "upload", "files": [{"name": "example.py", "data": base64.b64encode(b"value = 42").decode()}],
             }).encode(), headers={"Content-Type": "application/json"})
-            with urllib.request.urlopen(source_request, timeout=2) as reply:
-                research_id = json.load(reply)["id"]
-            for attempt in range(30):
-                with urllib.request.urlopen(base + "/api/research/" + research_id, timeout=2) as reply:
-                    research_note = json.load(reply)
-                if research_note["status"] != "running":
-                    break
-                time.sleep(0.1)
-            assert research_note["status"] == "complete", "Research source import failed"
-            with urllib.request.urlopen(base + "/api/research/" + research_id + "/download", timeout=2) as reply:
-                assert b"value = 42" in reply.read()
+            try:
+                urllib.request.urlopen(source_request, timeout=2)
+                raise AssertionError("Removed research endpoint must not start work")
+            except urllib.error.HTTPError as error:
+                assert error.code == 410
             fixture = b"Harmless release smoke-test note."
             request = urllib.request.Request(base + "/api/files", data=json.dumps({
                 "name": "smoke.txt", "data": base64.b64encode(fixture).decode(),
@@ -123,7 +117,7 @@ def main():
             with urllib.request.urlopen(report_path + "/download", timeout=2) as reply:
                 assert json.load(reply) == report
                 assert reply.headers["Content-Disposition"].startswith("attachment;")
-            print("PASS: bundle signature, isolated runtime, empty settings, UI, notebook persistence/export, local uploads/downloads, research import/export, offline JavaScript report/export")
+            print("PASS: bundle signature, isolated runtime, empty settings, UI, notebook persistence/export, local uploads/downloads, removed research endpoint, offline JavaScript report/export")
         finally:
             process.terminate()
             try:

@@ -42,88 +42,40 @@ class ResearchHTTPTests(unittest.TestCase):
         self.assertEqual(self.request('POST','/api/research/start',{}, {'Sec-Fetch-Site':'cross-site'})[0],403)
         self.assertEqual(self.request('POST','/api/research/start',{}, {'Content-Type':'text/plain'})[0],400)
 
-    def test_local_preview_does_not_fetch_and_start_needs_permission(self):
-        status, _, data = self.request('POST','/api/research/preview-dependencies',{'format':'requirements','text':'demo==1.0'})
-        self.assertEqual(status,200)
-        self.assertEqual(len(json.loads(data)['packages']),1)
-        self.research.request.assert_not_called()
-        self.assertEqual(self.request('POST','/api/research/start',{'kind':'advisory','identifier':'CVE-2024-3094'})[0],400)
-
-    def test_upload_readback_export_and_scoped_delete(self):
-        status, _, data = self.request('POST','/api/research/start',{'kind':'upload','files':[{'name':'example.py','data':base64.b64encode(b'return_value = 42').decode()}]})
-        self.assertEqual(status,202)
-        ident = json.loads(data)['id']; self.research.worker.join(2)
-        status, _, data = self.request('GET','/api/research/'+ident)
-        self.assertEqual(status,200); self.assertEqual(json.loads(data)['status'],'complete')
-        status, headers, data = self.request('GET','/api/research/'+ident+'/download')
-        self.assertEqual(status,200); self.assertIn(b'return_value',data)
-        self.assertTrue(headers['Content-Disposition'].startswith('attachment;'))
-        self.assertEqual(headers['X-Content-Type-Options'],'nosniff')
-        self.assertEqual(self.request('POST','/api/research/delete',{'id':ident})[0],200)
-        self.assertEqual(self.request('GET','/api/research/'+ident)[0],404)
-
-    def test_review_consent_and_connection_change_fail_closed(self):
-        with patch.object(self.server, 'Model') as model:
-            self.assertEqual(self.request('POST','/api/research/start',{'kind':'review','allow_model':False})[0],400)
-            self.assertEqual(self.request('POST','/api/research/start',{'kind':'review','allow_model':True,'connection_fingerprint':'stale'})[0],400)
+    def test_removed_routes_cannot_fetch_or_share_even_with_old_consent_flags(self):
+        with patch.object(self.research, 'start') as start, patch.object(self.server, 'Model') as model:
+            for route in ('start', 'preview-dependencies', 'cancel', 'delete'):
+                status, _, data = self.request('POST', '/api/research/' + route, {
+                    'kind': 'review', 'allow_network': True, 'allow_model': True,
+                    'identifier': 'CVE-2024-3094', 'connection_fingerprint': 'old-consent'})
+                self.assertEqual(status, 410)
+                self.assertIn('removed', json.loads(data)['error'])
+            start.assert_not_called()
             model.assert_not_called()
-        status, _, data = self.request('GET','/api/research')
-        self.assertEqual(status,200)
-        self.assertNotIn('api_key',json.loads(data)['connection'])
+            self.research.request.assert_not_called()
 
-    def test_review_rejects_an_active_assessment(self):
-        self.server.ENGINE.thread = Mock()
-        self.server.ENGINE.thread.is_alive.return_value = True
-        with patch.object(self.server, 'Model') as model:
-            self.assertEqual(self.request('POST','/api/research/start',{'kind':'review','allow_model':True})[0],400)
-            model.assert_not_called()
-
-    def test_review_http_uses_only_selected_note(self):
-        job = self.research.start('upload',{'files':[{'name':'example.py','data':base64.b64encode(b'x = 1').decode()}]})
+    def test_historical_notes_still_readable_without_network(self):
+        job = self.research.start('upload', {'files': [{'name': 'example.py', 'data': base64.b64encode(b'value = 42').decode()}]})
         self.research.worker.join(2)
-        fingerprint = connection_label(config.resolve_model_connection(self.cfg))['fingerprint']
-        with patch.object(self.server, 'Model') as model:
-            model.return_value.complete.return_value = {'content':'No complete audit performed. Review surrounding usage.'}
-            status, _, data = self.request('POST','/api/research/start',{'kind':'review','allow_model':True,'connection_fingerprint':fingerprint,'note_id':job['id']})
-            self.assertEqual(status,202); self.research.worker.join(2)
-            self.assertEqual(self.research.get(json.loads(data)['id'])['status'],'complete')
-            self.assertEqual(model.return_value.complete.call_args.args[1],[])
+        ident = job['id']
+        status, _, data = self.request('GET', '/api/research/' + ident)
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(data)['status'], 'complete')
+        status, headers, data = self.request('GET', '/api/research/' + ident + '/download')
+        self.assertEqual(status, 200)
+        self.assertIn(b'value = 42', data)
+        self.assertTrue(headers['Content-Disposition'].startswith('attachment;'))
+        self.assertEqual(headers['X-Content-Type-Options'], 'nosniff')
+        self.research.request.assert_not_called()
 
-    def test_ui_is_available_and_source_is_not_rendered_as_html(self):
-        for path in ('/', '/source-review.js'):
-            self.assertEqual(self.request('GET',path)[0],200)
-        script = self.request('GET','/source-review.js')[2].decode()
-        self.assertNotIn('innerHTML',script)
-        self.assertIn('textContent',script)
-
-    def test_version_is_visible_without_javascript(self):
-        from agent_b_harness import DISPLAY_VERSION, __version__
-        for path in ('/',):
-            status, headers, data = self.request('GET', path)
-            self.assertEqual(status, 200)
-            self.assertIn(DISPLAY_VERSION.encode(), data)
-            self.assertNotIn(b'{{AGENT_B_VERSION}}', data)
-            self.assertIn('AgentB/' + __version__, headers['Server'])
-            self.assertEqual(int(headers['Content-Length']), len(data))
-        with patch.object(self.server, 'DISPLAY_VERSION', 'v9.0.0-beta.1 <test>'):
-            for path in ('/',):
-                data = self.request('GET', path)[2]
-                self.assertIn(b'v9.0.0-beta.1 &lt;test&gt;', data)
-                self.assertNotIn(DISPLAY_VERSION.encode(), data)
-
-    def test_review_stays_in_chat_with_visible_target_link(self):
+    def test_removed_ui_and_help(self):
+        status, _, data = self.request('GET', '/')
+        self.assertEqual(status, 200)
+        page = data.decode()
+        self.assertNotIn('source-review', page)
+        self.assertNotIn('Review together', page)
+        self.assertIn('Internet access', page)
+        self.assertEqual(self.request('GET', '/source-review.js')[0], 404)
         status, headers, _ = self.request('GET', '/research.html')
         self.assertEqual(status, 303)
         self.assertEqual(headers['Location'], '/')
-        page = self.request('GET', '/')[2].decode()
-        self.assertIn('id="source-review-panel"', page)
-        self.assertIn('id="target-link"', page)
-        self.assertNotIn('id="target-link-main"', page)
-        self.assertNotIn('href="/research.html"', page)
-        self.assertIn('id="composer-status"', page)
-        self.assertIn('Privacy &amp; limits', page)
-        self.assertEqual(self.request('GET', '/research.js')[0], 404)
-
-
-if __name__ == '__main__':
-    unittest.main()

@@ -390,7 +390,7 @@ function render(value) {
   const transcript = cache.messages.filter(message => {
     if (message.role !== 'assistant') return true;
     const m = message.metadata || {};
-    return !(m.intermediate || m.progress);
+    return !(m.intermediate || m.progress || (m.internet_request && m.question_id === value.pending_question?.id));
   });
   const feedKey = transcript.map(message => `message:${message.id}`).join('|');
   const timeline = $('#timeline');
@@ -405,7 +405,7 @@ function render(value) {
       const thinking = message.role === 'assistant' && meta.thinking;
       const speaker = message.role === 'user' ? 'You' : harnessMessage ? 'Harness status' : thinking ? 'Thinking' : 'Agent B';
       const content = message.role === 'assistant'
-        ? String(message.content ?? '').replace(/^(?:[\t ]*\r?\n)+/, '')
+        ? String(meta.internet_request?.summary || message.content || '').replace(/^(?:[\t ]*\r?\n)+/, '')
         : message.content;
       if (thinking) return `
       <details class="message thinking" data-thinking-id="${esc(message.id)}"${expandedThinking.has(String(message.id)) ? ' open' : ''}>
@@ -415,7 +415,7 @@ function render(value) {
       return `
       <div class="message ${esc(message.role)} ${harnessMessage ? 'harness-status' : ''} ${thinking ? 'thinking' : ''}">
         <div class="meta">${speaker}</div>
-        <div class="bubble">${visibleMessage(content)}${message.role === 'assistant' && meta.question_id && meta.reason ? `<details class="question-reason"><summary>More context</summary><p>${esc(meta.reason)}</p></details>` : ''}${(meta.attachments || []).map(f => `<a class="attachment-download" href="/api/files/${encodeURIComponent(f.id)}" download>${f.mime.startsWith('image/') ? `<img class="attachment-thumbnail" src="/api/files/${encodeURIComponent(f.id)}/preview" alt="${esc(f.name)}">` : ''}${esc(f.name)} ↓</a>`).join('')}</div>
+        <div class="bubble">${visibleMessage(content)}${meta.internet_request ? internetDetails(meta.internet_request) : message.role === 'assistant' && meta.question_id && meta.reason ? `<details class="question-reason"><summary>More context</summary><p>${esc(meta.reason)}</p></details>` : ''}${(meta.attachments || []).map(f => `<a class="attachment-download" href="/api/files/${encodeURIComponent(f.id)}" download>${f.mime.startsWith('image/') ? `<img class="attachment-thumbnail" src="/api/files/${encodeURIComponent(f.id)}/preview" alt="${esc(f.name)}">` : ''}${esc(f.name)} ↓</a>`).join('')}</div>
       </div>`;
     });
 
@@ -432,7 +432,9 @@ function render(value) {
     questionKey = pending.id;
     question.classList.toggle('hidden', !(pending.options || []).length);
     const approval = pending.id.startsWith('approval-');
-    question.innerHTML = `<div class="eyebrow">${approval ? 'YOUR APPROVAL IS REQUIRED' : 'CHOOSE AN ANSWER'}</div><div>${
+    question.innerHTML = pending.internet_request
+      ? internetQuestion(pending.internet_request, pending.options || [])
+      : `<div class="eyebrow">${approval ? 'YOUR APPROVAL IS REQUIRED' : 'CHOOSE AN ANSWER'}</div><div>${
       (pending.options || []).map(option => `<button data-answer="${esc(option)}">${esc(option)}</button>`).join('')
     }</div>${approval ? '<p class="hint">Applies once to this action.</p>' : ''}`;
     question.querySelectorAll('[data-answer]').forEach(button => {
@@ -455,6 +457,19 @@ function render(value) {
   $('#test-model').disabled = active || !$('#model-choice').value || pendingActions.has('connection-test');
   $('#edit-model').disabled = active || !modelOption($('#model-choice').value)?.custom;
   $('#remove-model').disabled = active || !modelOption($('#model-choice').value)?.custom || pendingActions.has('remove-model');
+}
+
+function internetDetails(request) {
+  return `<details class="internet-request-details"><summary>Request details</summary><dl>${[
+    ['Destination', request.destination], ['Sending', request.sending],
+    ['Fetching', request.fetching], ['Reason', request.reason], ['Model sharing', request.sharing]
+  ].map(([label, text]) => `<dt>${label}</dt><dd>${esc(text || '')}</dd>`).join('')}</dl></details>`;
+}
+
+function internetQuestion(request, options) {
+  return `<div class="eyebrow">INTERNET ACCESS</div><p class="internet-summary">${esc(request.summary)}</p><div class="internet-choices">${
+    options.map(option => `<button data-answer="${esc(option)}"${option === 'Allow' ? ' class="primary"' : ''}>${esc(option)}</button>`).join('')
+  }</div>${internetDetails(request)}`;
 }
 
 function renderNotebook(notebook, active) {

@@ -45,7 +45,7 @@ No AI system is risk-free. DoubleAgent reduces risk by constraining the model an
 ## Learn more
 
 - [Architecture](Architecture.md)
-- [Read-only research, advisories and source review](Research.md)
+- [Internet permission and public references](Research.md)
 - [PortSwigger MCP integration](PortSwigger-MCP.md)
 - [Why human-in-the-loop](Why-Human-In-The-Loop.md)
 - [Security Model](Security-Model.md)

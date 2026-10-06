@@ -213,11 +213,16 @@ class Store:
             ).fetchall()
         return [self._event(row) for row in rows]
 
-    def ask(self, question: str, reason: str, options: list[str], kind: str = "clarification") -> str:
-        qid = ("approval-" if kind == "approval" else "question-") + str(uuid.uuid4())
+    def ask(self, question: str, reason: str, options: list[str], kind: str = "clarification", *, details: dict | None = None) -> str:
+        prefix = "approval-internet-" if kind == "internet" else "approval-" if kind == "approval" else "question-"
+        qid = prefix + str(uuid.uuid4())
         question = redact_text(question)
         reason = redact_text(reason)
         options = [redact_text(item) for item in options]
+        if kind == "internet":
+            if options != ["Allow", "Deny"] or not isinstance(details, dict):
+                raise ValueError("Internet requests require details and Allow/Deny choices")
+            reason = json.dumps({"text": reason, "request": redact_value(details)}, ensure_ascii=False)
         with self.lock, self._connect() as db:
             db.execute(
                 "INSERT INTO questions(id,question,reason,options,status,created) VALUES(?,?,?,?,?,?)",
@@ -241,6 +246,11 @@ class Store:
     def cancel_questions(self, reason: str) -> None:
         with self.lock, self._connect() as db:
             db.execute("UPDATE questions SET status='cancelled',answer=?,answered=? WHERE status='pending'", (reason, time.time()))
+
+    def cancel_internet_questions(self) -> None:
+        with self.lock, self._connect() as db:
+            db.execute("UPDATE questions SET status='cancelled',answer=?,answered=? WHERE status='pending' AND id LIKE 'approval-internet-%'",
+                       ("Interrupted before internet access; ask again.", time.time()))
 
     def decide_suggestion(self, ident: str, decision: str) -> None:
         if decision not in {"saved", "dismissed", "open"}:
@@ -466,8 +476,13 @@ class Store:
 
     @staticmethod
     def _question(row: sqlite3.Row) -> dict[str, Any]:
-        return {
+        result = {
             "id": row["id"], "question": row["question"], "reason": row["reason"],
             "options": json.loads(row["options"]), "status": row["status"],
             "answer": row["answer"], "created": row["created"],
         }
+        if row["id"].startswith("approval-internet-"):
+            envelope = json.loads(row["reason"])
+            result["reason"] = envelope["text"]
+            result["internet_request"] = envelope["request"]
+        return result

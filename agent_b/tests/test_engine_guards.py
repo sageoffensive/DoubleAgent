@@ -288,8 +288,8 @@ class EngineGuardTests(unittest.TestCase):
             model.return_value.complete.return_value = {"content": "Hello!"}
             self.engine._run("Hello")
             args = model.return_value.complete.call_args.args
-            self.assertEqual(args[1], [])
-            self.assertEqual(args[3], "none")
+            self.assertEqual([t["function"]["name"] for t in args[1]], ["request_public_reference"])
+            self.assertEqual(args[3], "auto")
             self.assertEqual(args[0][0]["content"], CHAT_SYSTEM)
         self.assertEqual(self.engine.state, "completed")
         self.assertEqual(self.engine.context[-1]["content"], "Hello!")

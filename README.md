@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 3.1.0 beta 6" src="https://img.shields.io/badge/version-3.1.0--beta.6-ff9944">
+  <img alt="Version 3.1.0 beta 7" src="https://img.shields.io/badge/version-3.1.0--beta.7-ff9944">
   <img alt="License MIT" src="https://img.shields.io/badge/license-MIT-2ea44f">
   <img alt="Burp Suite" src="https://img.shields.io/badge/Burp%20Suite-Jython-f47b20">
   <img alt="Human in the loop" src="https://img.shields.io/badge/control-human--in--the--loop-ff9944">
@@ -131,7 +131,7 @@ Open [http://127.0.0.1:4310](http://127.0.0.1:4310).
 
 **Agent B macOS application — experimental work in progress**
 
-Download `Agent-B-macOS-arm64-v3.1.0-beta.6.zip` from the [beta release](https://github.com/sageoffensive/DoubleAgent/releases/tag/v3.1.0-beta.6), extract it, and move **Agent B.app** to Applications. This build targets Apple Silicon and includes Python. The release notes state its signing/notarization status and remaining validation limits; the harness remains experimental. Maintainers and developers can build it with:
+Download `Agent-B-macOS-arm64-v3.1.0-beta.7.zip` from the [beta release](https://github.com/sageoffensive/DoubleAgent/releases/tag/v3.1.0-beta.7), extract it, and move **Agent B.app** to Applications. This build targets Apple Silicon and includes Python. The release notes state its signing/notarization status and remaining validation limits; the harness remains experimental. Maintainers and developers can build it with:
 
 ```bash
 cd agent_b
@@ -154,7 +154,7 @@ A fresh install contains no connection and no API key. Use **Test connection** b
 
 1. Confirm the authorized target and scope in Burp.
 2. Start Agent A's API from the **Agent AI** tab.
-3. Paste **Copy Agent B's Prompt** into Claude Code or Codex, or select **Send bootstrap** in the Agent B harness.
+3. Paste **Copy Agent B's Prompt** into Claude Code or Codex, or select **Connect to Burp** in the Agent B harness.
 4. Review the imported target, scope, capabilities, and safety state before asking the agent to test anything.
 
 The [Installation guide](https://github.com/sageoffensive/DoubleAgent/wiki/Installation) includes a complete walkthrough.
@@ -163,17 +163,17 @@ The [Installation guide](https://github.com/sageoffensive/DoubleAgent/wiki/Insta
 
 ### Agent B workspace (work in progress)
 
-The experimental Agent B harness opens as a normal, neutral chat. Burp context and assessment tools are loaded only when you explicitly select **Send bootstrap**.
+The experimental Agent B harness opens as a normal, neutral chat. Burp context and assessment tools are loaded only when you explicitly select **Connect to Burp**.
 
-The **Discuss** mode gives you a place to review notes and screenshots, ask questions, and weigh suggestions without invoking assessment tools. Existing recommendations have evidence, confidence, and save/dismiss controls; questions and one-time approvals have dedicated cards. You can upload text and images, download responses, and export the conversation in both the web and Mac apps. Image input must be enabled for a compatible model connection. See the [file types, limits, and privacy details](agent_b/README.md#files-and-images).
+Regular chat gives you a place to review notes and screenshots, ask questions, and weigh suggestions without invoking assessment tools. Existing recommendations have evidence, confidence, and save/dismiss controls; questions and one-time approvals have dedicated cards. You can upload text and images and export the conversation from the Mac app. Image input must be enabled for a compatible model connection. See the [file types, limits, and privacy details](agent_b/README.md#files-and-images).
 
 ![Agent B operator workspace](docs/images/agent-b-operator.png)
 
-### Read-only research
+### Internet permission
 
-Agent B can offer **Review together** beneath a reply about a possible version-related issue. Choose it—or **Review source** beside the composer—to check an exact package version, CVE/OSV advisory, dependency manifest, or selected local/public GitHub source without leaving the chat. GitHub references resolve to a pinned commit; no source is executed or installed.
+![One-time internet access request](docs/images/agent-b-internet-permission.png)
 
-Inspect the local note first, then explicitly approve a separate, tool-free model review if wanted. The displayed model destination receives only that note—not Burp sessions or assessment history. Reviews focus on applicability, uncertainty, questions and remediation. Research does not create findings, initiate tests or confirm exploitability. See [Research workspace](docs/wiki/Research.md) for supported inputs, privacy and limits.
+In regular chat, Agent B can propose a public-reference lookup. It shows a short summary with **Allow** / **Deny** and collapsed **Request details** explaining the destination, data sent or fetched, reason, and model sharing. Permission applies once; Deny, Stop, and restart prevent the pending retrieval. Supported references are OSV advisories, exact package/version advisory matches and selected public GitHub files at an explicit revision. Arbitrary URLs, redirects, credentials, crawling and code execution remain blocked. Burp's scope and safety checks still govern assessment traffic. See the [internet permission guide](docs/wiki/Research.md) and [release notes](docs/release-notes-v3.1.0-beta.7.md).
 
 ### Bring your own model
 

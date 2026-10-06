@@ -47,7 +47,6 @@
         <button id="clear">New conversation</button>
         <button id="settings">Settings</button>
         <button id="help">Help</button>
-        <button type="button" id="open-source-review">Review together</button>
       </section>
       <footer><span class="app-version" aria-label="Agent B version">{{AGENT_B_VERSION}}</span> · Traffic is executed by Burp and governed by its scope and safety gates.</footer>
     </aside>
@@ -74,25 +73,6 @@
         </details>
       </section>
       <div id="question" class="question hidden" role="region" aria-label="Agent B needs your input"></div>
-      <section id="source-review-panel" class="source-review hidden" aria-label="Review together">
-        <div class="review-heading"><strong>Review together</strong><button type="button" id="close-source-review" aria-label="Close source review">×</button></div>
-        <p class="hint">Read-only. Nothing is fetched or shared until you approve.</p>
-        <form id="review-input-form">
-          <label>What should we check?<select id="review-kind"><option value="version">Package version</option><option value="advisory">CVE / advisory</option><option value="upload">Local source files</option><option value="github">Public GitHub files</option><option value="dependencies">Dependency manifest</option></select></label>
-          <div data-review-kind="version" class="grid2"><label>Package<input id="review-package" placeholder="Package name" maxlength="200"></label><label>Exact version<input id="review-version" placeholder="1.2.3" maxlength="120"></label><label>Ecosystem<select id="review-ecosystem"><option value="pypi">PyPI</option><option value="npm">npm</option><option value="maven">Maven</option><option value="golang">Go</option><option value="cargo">crates.io</option><option value="gem">RubyGems</option><option value="nuget">NuGet</option><option value="composer">Packagist</option></select></label></div>
-          <label data-review-kind="advisory" hidden>Advisory ID<input id="review-advisory" placeholder="CVE-YYYY-NNNN" maxlength="100"></label>
-          <label data-review-kind="upload" hidden>Source files<input type="file" id="review-files" multiple><span class="hint">Up to six UTF-8 files, 120 KB each. Imported locally only.</span></label>
-          <div data-review-kind="github" hidden><div class="grid2"><label>Public repository<input id="review-repository" placeholder="owner/repository" maxlength="201"></label><label>Revision<input id="review-revision" placeholder="Tag or commit" maxlength="200"></label></div><label>Files — one path per line<textarea id="review-paths" rows="2" maxlength="2000"></textarea></label><p class="hint">Up to six files at a pinned commit. No cloning or execution.</p></div>
-          <div data-review-kind="dependencies" hidden><label>Format<select id="review-format"><option value="requirements">Pinned requirements.txt</option><option value="package-lock">npm package-lock v2/v3</option><option value="cyclonedx">CycloneDX JSON</option></select></label><label>Manifest<textarea id="review-manifest" rows="3" maxlength="120000"></textarea></label><button type="button" id="review-preview">Preview locally</button><pre id="review-preview-result" hidden></pre></div>
-          <label class="review-consent" id="review-network-label"><input type="checkbox" id="review-network"><span id="review-network-text">Send this package name and version to OSV.</span></label>
-          <button type="submit" id="review-start">Check version</button>
-        </form>
-        <p id="review-status" class="hint" role="status" aria-live="polite"></p><button type="button" id="review-cancel" hidden>Cancel check</button>
-        <details><summary>Saved checks</summary><label>Local notes<select id="review-notes"><option value="">Choose a note…</option></select></label><p class="hint">Notes remain local across conversations.</p></details>
-        <article id="review-result" hidden><strong id="review-title"></strong><div id="review-evidence"></div><a id="review-download" class="download-link" download>Download note</a><button type="button" id="review-delete">Delete note</button></article>
-        <form id="review-model-form" hidden><p class="hint" id="review-destination"></p><label class="review-consent"><input type="checkbox" id="review-model-consent" required><span>I approve sharing this note with this model. I have checked it for secrets.</span></label><button type="submit" id="review-ask">Ask Agent B about fixes</button></form>
-        <details class="hint"><summary>Privacy &amp; limits</summary><p>Notes are not encrypted. Redaction may miss secrets. Only the selected note goes to the model, without Burp credentials or chat history. Checks cannot run code, send target traffic or create findings. A version match is not proof of exploitability. Cancel cannot recall data already sent.</p></details>
-      </section>
       <form id="composer">
         <div class="composer-toolbar">
           <button type="button" id="attach-files" aria-label="Attach files" title="Attach files">+</button>
@@ -189,6 +169,7 @@
       <section><h3>Files</h3><p>Use +, drag a file, or paste a screenshot when Agent B is idle.</p></section>
       <section><h3>Burp work</h3><p>Connect to Burp, then choose a task from the sidebar. Messages during a run guide that work. Stop ends the run.</p></section>
       <section><h3>Questions &amp; approvals</h3><p>Pick an answer or reply in the message box. Approval requests require an explicit choice for that action.</p></section>
+      <section><h3>Internet access</h3><p>Agent B asks before retrieving public reference data. Choose Allow or Deny. Expand Request details to see the destination, what is sent or fetched, and why. Permission applies once.</p></section>
       <section><h3>Settings</h3><p>Manage connections, skills, and scope. Notes, context, and exports are under Run &amp; scope. Target requests remain governed by Burp scope checks.</p></section>
       <div class="modal-actions"><button type="button" id="done-help">Got it</button></div>
     </div>
@@ -289,7 +270,6 @@
       </div>
     </div>
   </dialog>
-  <script src="/source-review.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

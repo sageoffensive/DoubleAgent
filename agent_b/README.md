@@ -2,13 +2,13 @@
 
 Agent B is a provider-neutral model harness for the Double Agent Burp extension. Double Agent remains authoritative for Burp scope, requests, findings, coverage and reporting. The harness supplies a chat interface, model loop, selectable methodology skills, evidence policy, duplicate-call guard and human question/approval channel.
 
-## Review source together
+## Internet access
 
-Choose **Review together** beneath a relevant reply, or **Review source** beside the composer. Checks open inside the chat and remain separate from assessment tools. Check exact package versions or OSV records, preview dependency manifests, import local source or retrieve selected public GitHub files. No code is executed, built or installed. Inspect and export notes without a model connection.
+In regular chat, Agent B can propose a public-reference lookup. A compact card shows what it wants to fetch with **Allow** and **Deny**. **Request details** is collapsed by default and explains the destination, data sent or fetched, the model's reason, and sharing with your configured model. No retrieval happens before Allow; permission applies only to that request. Deny, Stop, or restarting the app cancels it. Sending a chat message does not approve internet access.
 
-Optional **Share this note & request review** displays the configured destination and requires fresh consent. It submits only that note to an isolated, tool-free model call. Expect remediation suggestions and questions, not proof of exploitability; verify model output yourself.
+Supported lookups are published OSV advisory records, exact package/version advisory matches, and up to six selected public GitHub files at an explicit revision. The harness resolves the revision to one commit after approval. It does not follow redirects, use credentials/cookies/proxies, clone repositories, execute files, crawl sites or fetch arbitrary URLs. Retrieved content is untrusted reference material. Chat reference lookups cannot send target traffic or alter Burp scope. Model-provider calls and Burp's existing scoped assessment requests keep their separate controls.
 
-See [the research guide](../docs/wiki/Research.md) for formats, quotas and privacy. Notes persist separately in `research.sqlite3` in the Agent B data directory; clearing chat does not clear this notebook.
+Review together has been removed. Existing research notes remain saved locally and their read-only exports are preserved.
 
 ## Start
 

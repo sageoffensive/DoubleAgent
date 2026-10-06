@@ -123,7 +123,7 @@ class CollaborationTests(unittest.TestCase):
         self.assertEqual(Store(self.store.path).suggestion_decisions()[item["id"]], "saved")
         self.assertEqual(Engine(self.store).suggestions()[0]["decision"], "saved")
 
-    def test_discussion_attachments_use_no_tools_even_with_bootstrap(self):
+    def test_discussion_attachments_expose_only_consent_proposal_even_with_bootstrap(self):
         item = self.upload("notes.txt", b"This is reference material.")
         cfg = config.Config(model="local", custom_models=({"id": "local", "model": "example", "url": "http://127.0.0.1:8000/v1"},))
         self.engine.burp_prompt_loaded = True
@@ -134,8 +134,8 @@ class CollaborationTests(unittest.TestCase):
             self.assertFalse(self.engine.thread.is_alive())
             self.assertEqual(self.engine.state, "completed")
             args = model.return_value.complete.call_args.args
-            self.assertEqual(args[1], [])
-            self.assertEqual(args[3], "none")
+            self.assertEqual([t["function"]["name"] for t in args[1]], ["request_public_reference"])
+            self.assertEqual(args[3], "auto")
             self.assertIn("reference material", json.dumps(args[0]))
             self.assertEqual(self.engine.discussion_context[0]["attachments"], [item["id"]])
             self.assertNotIn("base64", json.dumps(self.store.messages()))
