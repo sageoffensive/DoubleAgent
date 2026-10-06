@@ -482,6 +482,10 @@ class BurpExtenderChunk7(object):
         }
         if self.AI_PROVIDER in ("OpenRouter", "OpenAI-compatible"):
             request_payload["max_tokens"] = request_payload.pop("max_completion_tokens")
+        compatible_model = (str(self.API_URL or "").rstrip("/"), str(self.MODEL or ""))
+        if (self.AI_PROVIDER == "OpenAI-compatible" and
+                getattr(self, "_compatible_disable_thinking_for", None) == compatible_model):
+            request_payload["chat_template_kwargs"] = {"enable_thinking": False}
         endpoint_path = "/chat/completions"
 
         try:
@@ -583,6 +587,32 @@ class BurpExtenderChunk7(object):
                 if e.code == 400:
                     self.stderr.println("[!] Tip: check model name and API compatibility in Settings")
                 raise
+
+        if self.AI_PROVIDER == "OpenAI-compatible" and endpoint_path == "/chat/completions":
+            choices = data.get("choices", []) if isinstance(data, dict) else []
+            choice = choices[0] if choices and isinstance(choices[0], dict) else {}
+            message = choice.get("message", {})
+            message = message if isinstance(message, dict) else {}
+            no_answer = not message.get("content")
+            reasoning_only = bool(message.get("reasoning_content")) or choice.get("finish_reason") == "length"
+            if no_answer and reasoning_only and "chat_template_kwargs" not in request_payload:
+                # Thinking models can spend the entire completion budget before
+                # producing answer text. Retry once if the server supports the
+                # common chat-template switch, then remember it for this model.
+                retry_payload = dict(request_payload)
+                retry_payload["chat_template_kwargs"] = {"enable_thinking": False}
+                try:
+                    retry_data = _openai_request(retry_payload, endpoint_path)
+                    retry_choices = retry_data.get("choices", []) if isinstance(retry_data, dict) else []
+                    retry_choice = retry_choices[0] if retry_choices and isinstance(retry_choices[0], dict) else {}
+                    retry_message = retry_choice.get("message", {})
+                    if isinstance(retry_message, dict) and retry_message.get("content"):
+                        data = retry_data
+                        self._compatible_disable_thinking_for = compatible_model
+                    else:
+                        self.stderr.println("[!] OpenAI-compatible model returned no answer after a no-thinking retry")
+                except Exception:
+                    self.stderr.println("[!] OpenAI-compatible no-thinking retry failed; check server support and model output")
 
         ai_response = ""
         try:

@@ -153,6 +153,34 @@ class ProviderTests(unittest.TestCase):
         self.assertEqual(payload['max_tokens'], 512)
         self.assertNotIn('max_completion_tokens', payload)
 
+    def test_local_compatible_retries_reasoning_only_output_once_and_remembers_model(self):
+        capture = []
+        replies = [
+            b'{"choices":[{"finish_reason":"length","message":{"content":"","reasoning_content":"thinking"}}]}',
+            b'{"choices":[{"finish_reason":"stop","message":{"content":"[]","reasoning_content":""}}]}',
+            b'{"choices":[{"finish_reason":"stop","message":{"content":"[]","reasoning_content":""}}]}',
+        ]
+        def open_request(request, timeout):
+            capture.append(request)
+            return io.BytesIO(replies.pop(0))
+        cls = load_methods('double_agent_extender_part7.py', {'_ask_openai'},
+                           urllib2=SimpleNamespace(Request=urllib.request.Request, urlopen=open_request), unicode=str)
+        harness = cls()
+        harness.AI_PROVIDER, harness.API_URL = 'OpenAI-compatible', 'http://local.example.test:8888/v1'
+        harness.API_KEY, harness.MODEL = '', 'Qwen3.8-Flash-Next'
+        harness.MAX_TOKENS, harness.AI_REQUEST_TIMEOUT = 512, 5
+        harness._estimate_token_count = lambda text: 1
+        harness._sanitize_ai_json_text = lambda text: text
+        harness._record_token_usage = Mock()
+        harness.stderr = SimpleNamespace(println=Mock())
+        self.assertEqual(harness._ask_openai('Review'), b'[]')
+        self.assertEqual(len(capture), 2)
+        self.assertNotIn('chat_template_kwargs', json.loads(capture[0].data))
+        self.assertEqual(json.loads(capture[1].data)['chat_template_kwargs'], {'enable_thinking': False})
+        self.assertEqual(harness._ask_openai('Review again'), b'[]')
+        self.assertEqual(len(capture), 3)
+        self.assertEqual(json.loads(capture[2].data)['chat_template_kwargs'], {'enable_thinking': False})
+
 
 class ScopeTests(unittest.TestCase):
     def test_authority_service_port_and_path_must_match(self):
