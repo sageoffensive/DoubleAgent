@@ -344,6 +344,8 @@ class BurpExtenderChunk5Chunk2(object):
                 return self._test_ollama_connection()
             elif self.AI_PROVIDER == "OpenAI":
                 return self._test_openai_connection()
+            elif self.AI_PROVIDER == "OpenAI-compatible":
+                return self._test_openai_compatible_connection()
             elif self.AI_PROVIDER == "OpenRouter":
                 return self._test_openrouter_connection()
             elif self.AI_PROVIDER == "Claude":
@@ -438,6 +440,41 @@ class BurpExtenderChunk5Chunk2(object):
             return False
         except Exception as e:
             self.stderr.println("[!] OpenAI connection failed: %s" % self._safe_ascii_text(e))
+            return False
+
+    def _test_openai_compatible_connection(self, require_model=True):
+        """Check an operator-configured /v1 server without requiring a key."""
+        try:
+            api_base = str(self.API_URL or "").rstrip("/")
+            parsed = urlparse.urlsplit(api_base)
+            if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.query or parsed.fragment:
+                self.stderr.println("[!] Enter an HTTP or HTTPS OpenAI-compatible API base URL")
+                return False
+            req = urllib2.Request(api_base + "/models")
+            req.add_header('Accept', 'application/json')
+            if str(self.API_KEY or "").strip():
+                req.add_header('Authorization', 'Bearer ' + self.API_KEY)
+            response = urllib2.urlopen(req, timeout=10)
+            try:
+                data = json.loads(response.read())
+            finally:
+                response.close()
+            if not isinstance(data, dict) or not isinstance(data.get('data'), list):
+                self.stderr.println("[!] Unexpected OpenAI-compatible /models response")
+                return False
+            self.available_models = [str(model['id']) for model in data['data']
+                                     if isinstance(model, dict) and model.get('id')]
+            if not self.available_models:
+                self.stderr.println("[!] OpenAI-compatible server returned no model IDs")
+                return False
+            if require_model and self.MODEL not in self.available_models:
+                self.stderr.println("[!] Selected model is not listed by the server. Click Refresh and choose an exact ID.")
+                return False
+            self.stdout.println("[AI CONNECTION] OpenAI-compatible server listed %d model(s). Inference was not tested." % len(self.available_models))
+            return True
+        except Exception:
+            # Response bodies and URLs may carry credentials; keep diagnostics generic.
+            self.stderr.println("[!] OpenAI-compatible connection failed. Check the base URL, optional key and server availability.")
             return False
 
     def _test_openrouter_connection(self, require_model=True):

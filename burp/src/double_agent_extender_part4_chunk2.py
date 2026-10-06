@@ -48,7 +48,7 @@ class BurpExtenderChunk4Chunk2(object):
         aiPanel.add(JLabel("AI Provider:"), gbc)
         gbc.gridx = 1
         gbc.gridwidth = 2
-        providerCombo = JComboBox(["Ollama", "OpenAI", "OpenRouter", "Claude", "Gemini", "Bedrock", "DeepSeek"])
+        providerCombo = JComboBox(["Ollama", "OpenAI-compatible", "OpenAI", "OpenRouter", "Claude", "Gemini", "Bedrock", "DeepSeek"])
         providerCombo.setSelectedItem(self.AI_PROVIDER)
 
         # Auto-update API URL when provider changes
@@ -63,6 +63,7 @@ class BurpExtenderChunk4Chunk2(object):
                 # Default URLs for each provider
                 default_urls = {
                     "Ollama": "http://localhost:11434",
+                    "OpenAI-compatible": "http://127.0.0.1:8000/v1",
                     "OpenAI": "https://api.openai.com/v1",
                     "OpenRouter": "https://openrouter.ai/api/v1",
                     "Claude": "https://api.anthropic.com/v1",
@@ -126,7 +127,7 @@ class BurpExtenderChunk4Chunk2(object):
         else:
             models_to_show = self.available_models if self.available_models else [self.MODEL]
         modelCombo = JComboBox(models_to_show)
-        modelCombo.setEditable(self.AI_PROVIDER == "OpenRouter")
+        modelCombo.setEditable(self.AI_PROVIDER in ("OpenRouter", "OpenAI-compatible"))
         if self.MODEL in models_to_show:
             modelCombo.setSelectedItem(self.MODEL)
         elif len(models_to_show) > 0:
@@ -135,7 +136,7 @@ class BurpExtenderChunk4Chunk2(object):
 
         def updateModelComboForProvider():
             provider = str(providerCombo.getSelectedItem())
-            modelCombo.setEditable(provider == "OpenRouter")
+            modelCombo.setEditable(provider in ("OpenRouter", "OpenAI-compatible"))
             previous_model = str(modelCombo.getSelectedItem() or "")
             modelCombo.removeAllItems()
 
@@ -175,7 +176,12 @@ class BurpExtenderChunk4Chunk2(object):
                 self.API_URL = apiUrlField.getText().strip()
                 self.API_KEY = "".join(apiKeyField.getPassword())
                 try:
-                    connected = self._test_openrouter_connection(require_model=False) if self.AI_PROVIDER == "OpenRouter" else self.test_ai_connection()
+                    if self.AI_PROVIDER == "OpenRouter":
+                        connected = self._test_openrouter_connection(require_model=False)
+                    elif self.AI_PROVIDER == "OpenAI-compatible":
+                        connected = self._test_openai_compatible_connection(require_model=False)
+                    else:
+                        connected = self.test_ai_connection()
                     if connected:
                         def _update_ui():
                             modelCombo.removeAllItems()
@@ -229,12 +235,12 @@ class BurpExtenderChunk4Chunk2(object):
 
             # Save the key currently in the field for the PREVIOUS provider before swapping
             current_key = "".join(apiKeyField.getPassword())
-            if current_key and _prev_provider[0]:
+            if _prev_provider[0]:
                 self.API_KEYS_PER_PROVIDER[_prev_provider[0]] = current_key
             _prev_provider[0] = provider
 
             is_bedrock = provider == "Bedrock"
-            uses_api_key = provider in ("OpenAI", "OpenRouter", "Claude", "Gemini", "Bedrock", "DeepSeek")
+            uses_api_key = provider in ("OpenAI-compatible", "OpenAI", "OpenRouter", "Claude", "Gemini", "Bedrock", "DeepSeek")
 
             apiKeyLabel.setVisible(uses_api_key)
 
@@ -246,7 +252,9 @@ class BurpExtenderChunk4Chunk2(object):
             else:
                 apiUrlLabel.setVisible(True)
                 apiUrlField.setVisible(True)
-                if provider == "OpenAI":
+                if provider == "OpenAI-compatible":
+                    apiKeyLabel.setText("API Key (optional):")
+                elif provider == "OpenAI":
                     apiKeyLabel.setText("OpenAI API Key:")
                 elif provider == "OpenRouter":
                     apiKeyLabel.setText("OpenRouter API Key:")
@@ -323,8 +331,8 @@ class BurpExtenderChunk4Chunk2(object):
                         error_msg = "Connection failed. Check the console for detailed error messages.\n\nCommon causes:\n- Wrong API URL or port\n- Missing or invalid API key\n- Network connectivity issues\n- AI service not running or blocked"
                     else:
                         if self.save_config():
-                            self.stdout.println("[SETTINGS] Test connection succeeded; credentials saved locally")
-                        success_msg = "Successfully connected to %s!\n\nModel: %s\nCredentials saved to local config." % (self.AI_PROVIDER, self.MODEL)
+                            self.stdout.println("[SETTINGS] Test connection succeeded; settings saved locally")
+                        success_msg = "Successfully connected to %s!\n\nModel: %s\nSettings saved to local config." % (self.AI_PROVIDER, self.MODEL)
                 except Exception as e:
                     error_msg = "Test connection error: %s" % str(e)
                     self.stderr.println("[SETTINGS ERROR] %s" % error_msg)
@@ -375,6 +383,13 @@ class BurpExtenderChunk4Chunk2(object):
                     "Provider: OpenAI\n\n"
                     "URL: https://api.openai.com/v1\n"
                     "Auth: API key required."
+                )
+            elif provider == "OpenAI-compatible":
+                text = (
+                    "Provider: OpenAI-compatible server\n\n"
+                    "URL: your server's /v1 base URL (HTTP or HTTPS).\n"
+                    "Auth: API key optional; sent as a Bearer token when set.\n"
+                    "Model: exact ID returned by /models. Click Refresh to list models."
                 )
             elif provider == "Claude":
                 text = (

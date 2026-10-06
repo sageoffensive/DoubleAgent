@@ -44,6 +44,8 @@ http://127.0.0.1:8000/v1
 
 Use the exact model ID returned by the server's `/models` endpoint. Enable **Supports thinking control** only when the server accepts `chat_template_kwargs.enable_thinking`.
 
+In Agent A, open **Settings → AI Provider**, choose **OpenAI-compatible**, enter the server's `/v1` base URL, and click **Refresh**. Select the exact listed model and click **Test Connection**. The API key is optional; when supplied, Agent A sends it as a Bearer token. The connection test checks `/models`; a scan or analysis makes the first inference request.
+
 ## Credential behavior
 
 - Each connection owns its credential.
