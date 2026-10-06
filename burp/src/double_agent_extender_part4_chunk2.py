@@ -4,6 +4,149 @@ from double_agent_api import AgentAPIHandler
 from double_agent_ui import *
 
 class BurpExtenderChunk4Chunk2(object):
+    def _validate_settings_draft(self, draft):
+        """Validate every field without changing live state, keys or files."""
+        import math
+        import os
+        import re
+        try:
+            from urlparse import urlsplit
+        except ImportError:
+            from urllib.parse import urlsplit
+        values = dict(draft)
+        provider = str(values["AI_PROVIDER"])
+        model = str(values["MODEL"] or "").strip()
+        if not model:
+            raise ValueError("API model: choose or enter a model ID")
+        values["MODEL"] = model
+        if provider == "OpenAI":
+            model_l = model.lower()
+            if not any(name in model_l for name in ("gpt-4o", "gpt-4.1", "gpt-5")):
+                raise ValueError("API model: choose an OpenAI model with at least 120k context")
+        if provider == "Bedrock":
+            if not str(values["API_KEY"] or "").strip():
+                raise ValueError("API key: Bedrock requires a bearer token")
+            if model not in self._bedrock_serverless_models():
+                raise ValueError("API model: refresh and choose an eligible Bedrock serverless model")
+            values["API_URL"] = "https://bedrock-runtime.us-east-1.amazonaws.com"
+        else:
+            try:
+                parsed = urlsplit(str(values["API_URL"] or "").strip())
+                valid_url = parsed.scheme in ("http", "https") and parsed.hostname and not (parsed.username or parsed.password or parsed.query or parsed.fragment)
+                parsed.port
+            except Exception:
+                valid_url = False
+            if not valid_url:
+                raise ValueError("API URL: enter an HTTP or HTTPS URL without credentials, query or fragment")
+            values["API_URL"] = str(values["API_URL"]).strip()
+        limits = [("MAX_TOKENS", "Max tokens", 1, 1000000),
+                  ("AI_REQUEST_TIMEOUT", "Request timeout", 10, 99999),
+                  ("ANALYSIS_WORKERS", "Analysis workers", 1, 10),
+                  ("AI_REQUEST_CONCURRENCY", "AI request concurrency", 1, 5),
+                  ("MAX_PROXY_QUEUED_ANALYSES", "Proxy backlog", 1, 20)]
+        for key, label, low, high in limits:
+            try:
+                number = int(str(values[key]).strip())
+            except (ValueError, TypeError):
+                raise ValueError("%s: enter a whole number from %d to %d" % (label, low, high))
+            if number < low or number > high:
+                raise ValueError("%s: enter a whole number from %d to %d" % (label, low, high))
+            values[key] = number
+        if provider == "Bedrock":
+            values["AI_REQUEST_TIMEOUT"] = max(values["AI_REQUEST_TIMEOUT"], int(getattr(self, "MIN_BEDROCK_REQUEST_TIMEOUT", 120)))
+        try:
+            interval = float(values["PROXY_ANALYSIS_MIN_INTERVAL_SECONDS"])
+        except (ValueError, TypeError):
+            interval = float("nan")
+        if math.isnan(interval) or math.isinf(interval) or not 0 <= interval <= 10:
+            raise ValueError("Proxy intake interval: enter a number from 0 to 10 seconds")
+        values["PROXY_ANALYSIS_MIN_INTERVAL_SECONDS"] = interval
+        pin = str(values["REMOTE_REPORTING_PIN"] or "").strip()
+        if self.REMOTE_REPORTING_PIN_SOURCE == "environment":
+            pin = self.REMOTE_REPORTING_PIN
+        if pin and not re.match(r"^[0-9]{8}$", pin):
+            raise ValueError("Remote reporting PIN: enter exactly eight digits or leave blank")
+        values["REMOTE_REPORTING_PIN"] = pin
+        path = str(values["PROJECT_WORKSPACE_DIR"] or "").strip()
+        if not path:
+            raise ValueError("Project folder: choose a writable folder")
+        path = os.path.abspath(os.path.expanduser(path))
+        parent = path
+        while not os.path.exists(parent):
+            parent = os.path.dirname(parent)
+        if (self._unsafe_persistence_directory(path) or not os.path.isdir(parent)
+                or not os.access(parent, os.W_OK)):
+            raise ValueError("Project folder: choose a safe writable folder")
+        values["PROJECT_WORKSPACE_DIR"] = path
+        return values
+
+    def _commit_settings_draft(self, values):
+        """Persist the validated draft; roll back both files and memory on failure."""
+        import os
+        import tempfile
+        previous = dict((key, getattr(self, key)) for key in values)
+        previous.update(dict((key, getattr(self, key, None)) for key in
+                             ("API_KEYS_PER_PROVIDER", "BEDROCK_REGION", "REMOTE_REPORTING_PIN_SOURCE",
+                              "semaphore", "_ai_request_semaphore", "_project_key_cache")))
+        backups = {}
+        # Read backups before applying anything. Secret bytes stay in memory.
+        paths = [self.config_file]
+        if self.REMOTE_REPORTING_PIN_SOURCE != "environment":
+            paths.append(self.REMOTE_REPORTING_PIN_FILE)
+        for path in paths:
+            if os.path.exists(path):
+                with open(path, "rb") as handle:
+                    backups[path] = handle.read()
+            else:
+                backups[path] = None
+        try:
+            workspace = self._normalize_project_workspace_dir(values["PROJECT_WORKSPACE_DIR"])
+            if not workspace:
+                raise ValueError("Project folder: could not create or access the folder")
+            for key, value in values.items():
+                if key != "REMOTE_REPORTING_PIN":
+                    setattr(self, key, value)
+            self.BEDROCK_REGION = "us-east-1"
+            self.API_KEYS_PER_PROVIDER = dict(previous["API_KEYS_PER_PROVIDER"])
+            self.API_KEYS_PER_PROVIDER[self.AI_PROVIDER] = self.API_KEY
+            self._project_key_cache = None
+            self._store_remote_reporting_pin(values["REMOTE_REPORTING_PIN"])
+            if not self.save_config():
+                raise ValueError("Settings: could not save configuration; your previous settings were restored")
+        except Exception:
+            for key, value in previous.items():
+                setattr(self, key, value)
+            rollback_failed = False
+            for path, data in backups.items():
+                try:
+                    if data is None:
+                        if os.path.exists(path):
+                            os.remove(path)
+                    else:
+                        descriptor, temporary = tempfile.mkstemp(prefix=".double-agent-restore-", dir=os.path.dirname(os.path.abspath(path)))
+                        try:
+                            with os.fdopen(descriptor, "wb") as handle:
+                                handle.write(data)
+                                handle.flush()
+                                os.fsync(handle.fileno())
+                            if hasattr(os, "replace"):
+                                os.replace(temporary, path)
+                            elif os.name == "nt":
+                                from java.nio.file import Files, Paths, StandardCopyOption
+                                Files.move(Paths.get(temporary), Paths.get(path), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+                            else:
+                                os.rename(temporary, path)
+                        finally:
+                            if os.path.exists(temporary):
+                                os.remove(temporary)
+                except Exception:
+                    rollback_failed = True
+            if rollback_failed:
+                raise ValueError("Settings: save failed and a previous settings file could not be restored; check file permissions before retrying")
+            raise ValueError("Settings: could not save; previous settings were restored. Check folder permissions and retry")
+        self.semaphore = threading.Semaphore(self.ANALYSIS_WORKERS)
+        self._ai_request_semaphore = threading.Semaphore(self.AI_REQUEST_CONCURRENCY)
+
     def _do_open_settings(self):
         """Internal method to create and show settings dialog"""
         from javax.swing import JDialog, JTabbedPane, JTextField, JComboBox, JPasswordField, JTextArea, JFileChooser
@@ -48,7 +191,7 @@ class BurpExtenderChunk4Chunk2(object):
         aiPanel.add(JLabel("AI Provider:"), gbc)
         gbc.gridx = 1
         gbc.gridwidth = 2
-        providerCombo = JComboBox(["Ollama", "OpenAI", "OpenRouter", "Claude", "Gemini", "Bedrock", "DeepSeek"])
+        providerCombo = JComboBox(["Ollama", "OpenAI-compatible", "OpenAI", "OpenRouter", "Claude", "Gemini", "Bedrock", "DeepSeek"])
         providerCombo.setSelectedItem(self.AI_PROVIDER)
 
         # Auto-update API URL when provider changes
@@ -63,6 +206,7 @@ class BurpExtenderChunk4Chunk2(object):
                 # Default URLs for each provider
                 default_urls = {
                     "Ollama": "http://localhost:11434",
+                    "OpenAI-compatible": "http://127.0.0.1:8000/v1",
                     "OpenAI": "https://api.openai.com/v1",
                     "OpenRouter": "https://openrouter.ai/api/v1",
                     "Claude": "https://api.anthropic.com/v1",
@@ -126,7 +270,7 @@ class BurpExtenderChunk4Chunk2(object):
         else:
             models_to_show = self.available_models if self.available_models else [self.MODEL]
         modelCombo = JComboBox(models_to_show)
-        modelCombo.setEditable(self.AI_PROVIDER == "OpenRouter")
+        modelCombo.setEditable(self.AI_PROVIDER in ("OpenRouter", "OpenAI-compatible"))
         if self.MODEL in models_to_show:
             modelCombo.setSelectedItem(self.MODEL)
         elif len(models_to_show) > 0:
@@ -135,7 +279,7 @@ class BurpExtenderChunk4Chunk2(object):
 
         def updateModelComboForProvider():
             provider = str(providerCombo.getSelectedItem())
-            modelCombo.setEditable(provider == "OpenRouter")
+            modelCombo.setEditable(provider in ("OpenRouter", "OpenAI-compatible"))
             previous_model = str(modelCombo.getSelectedItem() or "")
             modelCombo.removeAllItems()
 
@@ -175,7 +319,12 @@ class BurpExtenderChunk4Chunk2(object):
                 self.API_URL = apiUrlField.getText().strip()
                 self.API_KEY = "".join(apiKeyField.getPassword())
                 try:
-                    connected = self._test_openrouter_connection(require_model=False) if self.AI_PROVIDER == "OpenRouter" else self.test_ai_connection()
+                    if self.AI_PROVIDER == "OpenRouter":
+                        connected = self._test_openrouter_connection(require_model=False)
+                    elif self.AI_PROVIDER == "OpenAI-compatible":
+                        connected = self._test_openai_compatible_connection(require_model=False)
+                    else:
+                        connected = self.test_ai_connection()
                     if connected:
                         def _update_ui():
                             modelCombo.removeAllItems()
@@ -229,12 +378,12 @@ class BurpExtenderChunk4Chunk2(object):
 
             # Save the key currently in the field for the PREVIOUS provider before swapping
             current_key = "".join(apiKeyField.getPassword())
-            if current_key and _prev_provider[0]:
+            if _prev_provider[0]:
                 self.API_KEYS_PER_PROVIDER[_prev_provider[0]] = current_key
             _prev_provider[0] = provider
 
             is_bedrock = provider == "Bedrock"
-            uses_api_key = provider in ("OpenAI", "OpenRouter", "Claude", "Gemini", "Bedrock", "DeepSeek")
+            uses_api_key = provider in ("OpenAI-compatible", "OpenAI", "OpenRouter", "Claude", "Gemini", "Bedrock", "DeepSeek")
 
             apiKeyLabel.setVisible(uses_api_key)
 
@@ -246,7 +395,9 @@ class BurpExtenderChunk4Chunk2(object):
             else:
                 apiUrlLabel.setVisible(True)
                 apiUrlField.setVisible(True)
-                if provider == "OpenAI":
+                if provider == "OpenAI-compatible":
+                    apiKeyLabel.setText("API Key (optional):")
+                elif provider == "OpenAI":
                     apiKeyLabel.setText("OpenAI API Key:")
                 elif provider == "OpenRouter":
                     apiKeyLabel.setText("OpenRouter API Key:")
@@ -323,8 +474,8 @@ class BurpExtenderChunk4Chunk2(object):
                         error_msg = "Connection failed. Check the console for detailed error messages.\n\nCommon causes:\n- Wrong API URL or port\n- Missing or invalid API key\n- Network connectivity issues\n- AI service not running or blocked"
                     else:
                         if self.save_config():
-                            self.stdout.println("[SETTINGS] Test connection succeeded; credentials saved locally")
-                        success_msg = "Successfully connected to %s!\n\nModel: %s\nCredentials saved to local config." % (self.AI_PROVIDER, self.MODEL)
+                            self.stdout.println("[SETTINGS] Test connection succeeded; settings saved locally")
+                        success_msg = "Successfully connected to %s!\n\nModel: %s\nSettings saved to local config." % (self.AI_PROVIDER, self.MODEL)
                 except Exception as e:
                     error_msg = "Test connection error: %s" % str(e)
                     self.stderr.println("[SETTINGS ERROR] %s" % error_msg)
@@ -375,6 +526,13 @@ class BurpExtenderChunk4Chunk2(object):
                     "Provider: OpenAI\n\n"
                     "URL: https://api.openai.com/v1\n"
                     "Auth: API key required."
+                )
+            elif provider == "OpenAI-compatible":
+                text = (
+                    "Provider: OpenAI-compatible server\n\n"
+                    "URL: your server's /v1 base URL (HTTP or HTTPS).\n"
+                    "Auth: API key optional; sent as a Bearer token when set.\n"
+                    "Model: exact ID returned by /models. Click Refresh to list models."
                 )
             elif provider == "Claude":
                 text = (
@@ -707,200 +865,46 @@ class BurpExtenderChunk4Chunk2(object):
         buttonPanel = JPanel()
 
         def saveSettings(e):
-            def _estimate_openai_context_window(model_name):
-                model_l = str(model_name or "").lower()
-                if "gpt-4o" in model_l or "gpt-4.1" in model_l or "gpt-5" in model_l:
-                    return 128000
-                if model_l.startswith("gpt-4"):
-                    return 8192
-                if "gpt-3.5" in model_l:
-                    return 16385
-                return 0
-
-            # Validate and store the reporting PIN before mutating other
-            # settings. This does not call the remote API.
+            draft = {
+                "AI_PROVIDER": str(providerCombo.getSelectedItem()),
+                "API_URL": apiUrlField.getText(), "API_KEY": "".join(apiKeyField.getPassword()),
+                "MODEL": str(modelCombo.getSelectedItem() or ""), "MAX_TOKENS": maxTokensField.getText(),
+                "PASSIVE_SCANNING_ENABLED": self.passiveScanCheck.isSelected(),
+                "THEME": str(themeCombo.getSelectedItem()), "VERBOSE": verboseCheck.isSelected(),
+                "CUSTOM_SCAN_PROMPT": "" if scanPromptArea.getText().strip() == self._default_scan_prompt().strip() else scanPromptArea.getText().strip(),
+                "AI_REQUEST_TIMEOUT": timeoutField.getText(), "ANALYSIS_WORKERS": workerField.getText(),
+                "AI_REQUEST_CONCURRENCY": aiConcurrencyField.getText(), "MAX_PROXY_QUEUED_ANALYSES": proxyBacklogField.getText(),
+                "PROXY_ANALYSIS_MIN_INTERVAL_SECONDS": proxyIntervalField.getText(),
+                "PROJECT_WORKSPACE_DIR": workspaceDirField.getText(),
+                "REMOTE_REPORTING_PIN": "".join(reportingPinField.getPassword()),
+            }
+            from javax.swing import JOptionPane
             try:
-                self._save_remote_reporting_pin_field(reportingPinField)
-            except ValueError as reporting_error:
-                from javax.swing import JOptionPane
-                JOptionPane.showMessageDialog(
-                    dialog, str(reporting_error), "Remote reporting PIN",
-                    JOptionPane.ERROR_MESSAGE)
+                values = self._validate_settings_draft(draft)
+                self._commit_settings_draft(values)
+            except Exception as error:
+                message = str(error) if isinstance(error, ValueError) else "Settings could not be saved. Check file permissions and retry."
+                JOptionPane.showMessageDialog(dialog, message, "Settings not saved", JOptionPane.ERROR_MESSAGE)
+                controls = {"API model": modelCombo, "API URL": apiUrlField, "API key": apiKeyField,
+                            "Max tokens": maxTokensField, "Request timeout": timeoutField,
+                            "Analysis workers": workerField, "AI request concurrency": aiConcurrencyField,
+                            "Proxy backlog": proxyBacklogField, "Proxy intake interval": proxyIntervalField,
+                            "Project folder": workspaceDirField, "Remote reporting PIN": reportingPinField}
+                control = controls.get(message.split(":", 1)[0])
+                if control is not None:
+                    for index in range(tabbedPane.getTabCount()):
+                        from javax.swing import SwingUtilities
+                        if SwingUtilities.isDescendingFrom(control, tabbedPane.getComponentAt(index)):
+                            tabbedPane.setSelectedIndex(index)
+                            break
+                    control.requestFocusInWindow()
                 return
-
-            # Save AI Provider settings
-            self.AI_PROVIDER = str(providerCombo.getSelectedItem())
-            self.API_URL = apiUrlField.getText()
-            self.API_KEY = "".join(apiKeyField.getPassword())
-            self.MODEL = str(modelCombo.getSelectedItem())
-            self.BEDROCK_REGION = "us-east-1"  # Hardcoded
-
-            # Store API key per-provider so switching doesn't lose keys
-            self.API_KEYS_PER_PROVIDER[self.AI_PROVIDER] = self.API_KEY
-
-            if self.AI_PROVIDER == "Bedrock":
-                self.API_URL = "https://bedrock-runtime.%s.amazonaws.com" % self.BEDROCK_REGION
-
-            if self.AI_PROVIDER == "OpenAI":
-                model_ctx = _estimate_openai_context_window(self.MODEL)
-                if model_ctx < 120000:
-                    self.stderr.println("[!] Selected OpenAI model '%s' is blocked (context window < 120k)." % self.MODEL)
-                    self.stderr.println("[!] Please choose an eligible model with >=120k context window.")
-                    return
-            elif self.AI_PROVIDER == "Bedrock":
-                has_bearer_token = bool(str(self.API_KEY or "").strip())
-                if not has_bearer_token:
-                    self.stderr.println("[!] Bedrock requires API Key (Bearer token)")
-                    return
-                serverless_models = self._bedrock_serverless_models()
-                if self.MODEL not in serverless_models:
-                    self.stderr.println("[!] Bedrock model '%s' is blocked because it is not in the serverless allow-list." % self.MODEL)
-                    self.stderr.println("[!] Click Refresh and choose an ON_DEMAND foundation model or SYSTEM_DEFINED inference profile.")
-                    return
-
-            try:
-                self.MAX_TOKENS = int(maxTokensField.getText())
-            except ValueError:
-                self.MAX_TOKENS = 2048
-                self.stderr.println("[!] Invalid Max Tokens value, using default: 2048")
-
-            # Save Advanced settings
-            self.PASSIVE_SCANNING_ENABLED = self.passiveScanCheck.isSelected()
-            self.THEME = str(themeCombo.getSelectedItem())
-            self.VERBOSE = verboseCheck.isSelected()
-
-            # Save custom system prompts (empty = use default)
-            scan_text = scanPromptArea.getText().strip()
-            self.CUSTOM_SCAN_PROMPT = "" if scan_text == self._default_scan_prompt().strip() else scan_text
-
-            # Apply theme immediately
             self.applyConsoleTheme()
-
-            # Save timeout setting
-            try:
-                timeout = int(timeoutField.getText())
-                if timeout < 10:
-                    self.AI_REQUEST_TIMEOUT = 10
-                    self.stderr.println("[!] Timeout too low, using minimum: 10 seconds")
-                elif timeout > 99999:
-                    self.AI_REQUEST_TIMEOUT = 99999
-                    self.stderr.println("[!] Timeout too high, using maximum: 99999 seconds")
-                else:
-                    self.AI_REQUEST_TIMEOUT = timeout
-            except ValueError:
-                self.AI_REQUEST_TIMEOUT = 60
-                self.stderr.println("[!] Invalid timeout value, using default: 60 seconds")
-
-            # Save analysis worker setting
-            try:
-                worker_count = int(workerField.getText())
-                if worker_count < 1:
-                    self.ANALYSIS_WORKERS = 1
-                    self.stderr.println("[!] Worker count too low, using minimum: 1")
-                elif worker_count > 10:
-                    self.ANALYSIS_WORKERS = 10
-                    self.stderr.println("[!] Worker count too high, using maximum: 10")
-                else:
-                    self.ANALYSIS_WORKERS = worker_count
-            except ValueError:
-                self.ANALYSIS_WORKERS = 1
-                self.stderr.println("[!] Invalid worker count, using default: 1")
-
-            try:
-                ai_concurrency = int(aiConcurrencyField.getText())
-                if ai_concurrency < 1:
-                    self.AI_REQUEST_CONCURRENCY = 1
-                    self.stderr.println("[!] AI request concurrency too low, using minimum: 1")
-                elif ai_concurrency > 5:
-                    self.AI_REQUEST_CONCURRENCY = 5
-                    self.stderr.println("[!] AI request concurrency too high, using maximum: 5")
-                else:
-                    self.AI_REQUEST_CONCURRENCY = ai_concurrency
-            except ValueError:
-                self.AI_REQUEST_CONCURRENCY = 2
-                self.stderr.println("[!] Invalid AI request concurrency, using default: 2")
-
-            if self.AI_PROVIDER == "Bedrock" and int(self.AI_REQUEST_TIMEOUT) < int(getattr(self, "MIN_BEDROCK_REQUEST_TIMEOUT", 120)):
-                self.AI_REQUEST_TIMEOUT = int(getattr(self, "MIN_BEDROCK_REQUEST_TIMEOUT", 120))
-                self.stderr.println("[!] Bedrock timeout too low, using minimum: %d seconds" % int(self.AI_REQUEST_TIMEOUT))
-
-            # Rebuild semaphores with new concurrency
-            self.semaphore = threading.Semaphore(max(1, int(self.ANALYSIS_WORKERS)))
-            self._ai_request_semaphore = threading.Semaphore(max(1, int(self.AI_REQUEST_CONCURRENCY)))
-
-            try:
-                proxy_backlog = int(proxyBacklogField.getText())
-                if proxy_backlog < 1:
-                    self.MAX_PROXY_QUEUED_ANALYSES = 1
-                    self.stderr.println("[!] Proxy backlog too low, using minimum: 1")
-                elif proxy_backlog > 20:
-                    self.MAX_PROXY_QUEUED_ANALYSES = 20
-                    self.stderr.println("[!] Proxy backlog too high, using maximum: 20")
-                else:
-                    self.MAX_PROXY_QUEUED_ANALYSES = proxy_backlog
-            except ValueError:
-                self.MAX_PROXY_QUEUED_ANALYSES = 3
-                self.stderr.println("[!] Invalid proxy backlog, using default: 3")
-
-            try:
-                proxy_interval = float(proxyIntervalField.getText())
-                if proxy_interval < 0:
-                    self.PROXY_ANALYSIS_MIN_INTERVAL_SECONDS = 0.0
-                    self.stderr.println("[!] Proxy interval too low, using minimum: 0")
-                elif proxy_interval > 10:
-                    self.PROXY_ANALYSIS_MIN_INTERVAL_SECONDS = 10.0
-                    self.stderr.println("[!] Proxy interval too high, using maximum: 10")
-                else:
-                    self.PROXY_ANALYSIS_MIN_INTERVAL_SECONDS = proxy_interval
-            except ValueError:
-                self.PROXY_ANALYSIS_MIN_INTERVAL_SECONDS = 1.0
-                self.stderr.println("[!] Invalid proxy interval, using default: 1.0")
-
-            try:
-                workspace_dir = str(workspaceDirField.getText() or "").strip()
-                if not workspace_dir:
-                    self.stderr.println("[!] Project Folder is required")
-                    return
-                resolved_workspace_dir = self._normalize_project_workspace_dir(workspace_dir)
-                if not resolved_workspace_dir:
-                    self.stderr.println("[!] Could not resolve Project Folder")
-                    return
-                self.PROJECT_WORKSPACE_DIR = resolved_workspace_dir
-                self._project_key_cache = None
-            except Exception as e:
-                self.stderr.println("[!] Invalid Project Folder: %s" % self._safe_ascii_text(e))
-                return
-
             self._sync_jev_controls()
-
-            # Log confirmation
-            self.stdout.println("\n[SETTINGS] OK Configuration saved successfully")
-            self.stdout.println("[SETTINGS] AI Provider: %s" % self.AI_PROVIDER)
-            self.stdout.println("[SETTINGS] API URL: %s" % self.API_URL)
-            self.stdout.println("[SETTINGS] Model: %s" % self.MODEL)
-            self.stdout.println("[SETTINGS] Max Tokens: %d" % int(self.MAX_TOKENS))
-            self.stdout.println("[SETTINGS] Request Timeout: %d seconds" % int(self.AI_REQUEST_TIMEOUT))
-            self.stdout.println("[SETTINGS] Analysis Workers: %d" % int(self.ANALYSIS_WORKERS))
-            self.stdout.println("[SETTINGS] AI Request Concurrency: %d" % int(self.AI_REQUEST_CONCURRENCY))
-            self.stdout.println("[SETTINGS] Proxy Auto-Analysis Backlog: %d" % int(self.MAX_PROXY_QUEUED_ANALYSES))
-            self.stdout.println("[SETTINGS] Proxy Intake Interval: %.1fs" % float(self.PROXY_ANALYSIS_MIN_INTERVAL_SECONDS))
-            self.stdout.println("[SETTINGS] Console Theme: %s" % self.THEME)
-            self.stdout.println("[SETTINGS] Verbose Logging: %s" % ("Enabled" if self.VERBOSE else "Disabled"))
-            self.stdout.println("[SETTINGS] Burp traffic analysis: %s" % ("Enabled" if self.PASSIVE_SCANNING_ENABLED else "Disabled"))
-            self.stdout.println("[SETTINGS] Project Folder: %s" % self._workspace_directory())
-            self.stdout.println("[SETTINGS] Remote reporting PIN: %s" % (
-                "Configured" if self.REMOTE_REPORTING_PIN else "Not configured"))
-
-            # Save configuration to disk
-            if self.save_config():
-                self.stdout.println("[SETTINGS] OK Configuration persisted to disk")
+            self.stdout.println("[SETTINGS] Configuration saved successfully")
             self.save_findings()
-            self.stdout.println("[SETTINGS] Findings sidecar: %s" % self._safe_ascii_text(self._eternals_file_path(), 2000))
-
-            # Refresh stats immediately so model and pricing fields reflect new settings
             self._ui_dirty = True
             self.refreshUI()
-
             dialog.dispose()
 
         saveBtn = JButton("Save")

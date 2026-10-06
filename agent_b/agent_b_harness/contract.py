@@ -92,8 +92,9 @@ def build_contract(
             "Refer to findings only by their exact #ID.",
         ]
         contract["done_when"] = [
+            "A complete comparison table with at least two findings and no unresolved linked IDs was supplied.",
             "Every genuine duplicate is recorded with triage_finding (status=duplicate, duplicate_of, evidence match).",
-            "finish is called once no further duplicates remain.",
+            "finish includes every reviewed immutable ID and Double Agent accepts the final queue result.",
         ]
         contract["escalate_when"] = ["Two findings look related but distinct and the operator should decide."]
         contract["deliverable"] = "Duplicate verdicts written back to Double Agent."

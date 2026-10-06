@@ -28,6 +28,10 @@ class AgentAPIChunk4(object):
     def _apply_queue_result_to_findings(self, queue_item, body, outcome, assessment, now):
         updated = []
         update_map = self._finding_update_map_from_result_body(body)
+        # Duplicate verdicts were already applied by triage. Final write-back
+        # must not change the retained canonical findings' validation status.
+        if queue_item.get("source") == "duplicate_review":
+            return []
         explicit_only = bool(queue_item.get("source") == "risk_hunt" or body.get("explicit_finding_updates_only", False))
         if explicit_only:
             finding_ids = sorted(update_map.keys())
@@ -534,6 +538,29 @@ class AgentAPIChunk4(object):
             payload["next_action"] = "Address the message and retry the same result payload."
         return payload
 
+    def _duplicate_review_completion_problem(self, queue_item, body):
+        if queue_item.get("source") != "duplicate_review":
+            return ""
+        review = body.get("duplicate_review", {}) or {}
+        if not isinstance(review, dict) or review.get("status") != "completed":
+            return "Duplicate review requires an explicit completed comparison report."
+        refs = set([str(value) for value in queue_item.get("finding_stable_ids", []) or []])
+        if not refs:
+            refs = set([str(row.get("stable_id", "")) for row in self._queue_findings_full(queue_item)])
+        reviewed = review.get("reviewed_finding_ids", [])
+        if len(refs) < 2 or not isinstance(reviewed, list) or set([str(value) for value in reviewed]) != refs:
+            return "Duplicate review requires the complete linked comparison population and every reviewed immutable ID."
+        with self.extender.findings_lock_ui:
+            present = set([str(finding.get("stable_id", "")) for finding in self.extender.findings_list])
+            deleted_duplicates = set([str(entry.get("stable_id", ""))
+                                      for entry in getattr(self.extender, "finding_audit_log", []) or []
+                                      if entry.get("event") == "deleted" and entry.get("reason") == "duplicate"])
+        if refs - present - deleted_duplicates:
+            return "Some linked findings are unresolved; queue a new duplicate review before completing it."
+        if not refs.intersection(present):
+            return "Duplicate review must retain a canonical finding."
+        return ""
+
     def _handle_queue_result(self, qid):
         try:
             qid = int(qid)
@@ -578,6 +605,11 @@ class AgentAPIChunk4(object):
         # terminal. Rejected results remain claimed and can be retried after
         # supplying the exact PoC request.
         queue_snapshot = self._get_queue_item_snapshot(qid)
+        if queue_snapshot is not None:
+            duplicate_problem = self._duplicate_review_completion_problem(queue_snapshot, body)
+            if duplicate_problem:
+                self._send_json(409, {"error": "duplicate_review_incomplete", "message": duplicate_problem, "queue_id": qid})
+                return
         if queue_snapshot is not None and queue_snapshot.get("status") not in ("pending", "completed", "failed", "cancelled"):
             persistent_goal_problem = self._persistent_goal_problem(queue_snapshot, body)
             risk_hunt_problem = self._risk_hunt_completion_problem(queue_snapshot, body, risk_hunt_goals)
@@ -643,6 +675,12 @@ class AgentAPIChunk4(object):
                     q["assessment"] = assessment
                     q["test_results"] = test_results
                     q["evidence"] = evidence
+                    if q.get("source") == "duplicate_review":
+                        q["duplicate_review_report"] = {
+                            "status": "completed",
+                            "reviewed_finding_ids": list(body["duplicate_review"]["reviewed_finding_ids"]),
+                            "duplicate_verdicts": self._limit_list(body["duplicate_review"].get("duplicate_verdicts", []), 100),
+                        }
                     if risk_hunt_goals:
                         q["risk_hunt_goals"] = risk_hunt_goals
                     if q.get("persistent_agent_goal", {}).get("required"):

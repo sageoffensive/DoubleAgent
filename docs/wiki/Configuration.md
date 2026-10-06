@@ -42,7 +42,7 @@ Typical API base:
 http://127.0.0.1:8000/v1
 ```
 
-Use the exact model ID returned by the server's `/models` endpoint. Enable **Supports thinking control** only when the server accepts `chat_template_kwargs.enable_thinking`.
+Use **Load models** in the connection editor to retrieve IDs from the server, then select one. This does not save the draft or send inference. If the server cannot list models, enter its exact model ID manually. Enable **Supports thinking control** only when the server accepts `chat_template_kwargs.enable_thinking`.
 
 ## Credential behavior
 

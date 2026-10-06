@@ -275,6 +275,15 @@ class BurpExtenderChunk5(object):
             display = status or "untouched"
         return "%s (%s)" % (display, self._agent_status_marker(finding))
 
+    def _duplicate_review_finding_ids(self):
+        # Review already validated findings too: they can be the canonical
+        # counterpart of a new Agent A finding. Capture immutable references
+        # while holding the findings lock, before any deletion shifts indexes.
+        with self.findings_lock_ui:
+            return [self._ensure_finding_stable_id(finding)
+                    for finding in self.findings_list
+                    if not self._finding_hidden_from_normal_view(finding)]
+
     def _automated_testing_finding_ids(self):
         ids = []
         try:

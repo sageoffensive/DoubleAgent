@@ -197,18 +197,31 @@ class AgentAPIChunk2Chunk3(object):
         # Attach full findings detail. Immutable IDs are canonical externally;
         # retain numeric positions only as deprecated compatibility metadata.
         findings_full = self._queue_findings_full(item)
+        requested_refs = list(item.get("finding_stable_ids", []) or item.get("finding_ids", []) or [])
+        resolved_stable_ids = set([str(finding.get("stable_id", "")) for finding in findings_full])
+        item["linked_findings_resolution"] = {
+            "requested_count": len(set([str(value) for value in requested_refs])),
+            "resolved_count": len(findings_full),
+            "unresolved_stable_ids": [str(value) for value in requested_refs
+                                      if str(value).startswith("daf_") and str(value) not in resolved_stable_ids],
+        }
         item["findings"] = findings_full
         item["legacy_numeric_finding_ids"] = [finding.get("legacy_numeric_id") for finding in findings_full
                                               if finding.get("legacy_numeric_id") is not None]
         item["finding_stable_ids"] = [finding.get("stable_id", "") for finding in findings_full if finding.get("stable_id")]
         item["finding_ids"] = list(item["finding_stable_ids"])
         item["next_action"] = self._queue_operational_metadata(item, findings_full)
+        if item.get("source") == "duplicate_review":
+            item["next_action"]["safe_to_auto_test"] = False
+            item["next_action"]["recommended_transport"] = "read_only"
         if item["next_action"].get("recommended_transport") == "curl_proxy":
             status, curl_payload = self._build_queue_curl_payload(item, findings_full, refresh_auth=False)
             if status == 200 and curl_payload.get("commands"):
                 item["target_curl"] = curl_payload.get("commands", [])[0]
         # Add reminder so agent doesn't forget about API docs during long sessions.
-        if item.get("source") == "risk_hunt" and str(item.get("mode", "") or "") == "try_harder":
+        if item.get("source") == "duplicate_review":
+            item["_note_for_agent"] = "Compare the complete linked findings using immutable IDs. No target requests, curl, scanners, or vulnerability validation. If linked findings are missing, block the review and ask the operator to queue it again."
+        elif item.get("source") == "risk_hunt" and str(item.get("mode", "") or "") == "try_harder":
             item["_note_for_agent"] = "TRY HARDER: go beyond validation. Build a threat model, use available security/web/browser skills, and try to find one previously undiscovered High or Critical vulnerability. Create at least 6 category=new_discovery goals for the bounded negative-result path, safely test or Gate at least 5, and stop immediately after the single qualifying finding is confirmed and posted, or after 10 tested/Gated new-discovery goals."
         elif item.get("source") == "risk_hunt" and str(item.get("mode", "") or "").startswith("campaign_"):
             if bool(getattr(self.extender, "AGENT_BROWSEROS_ENABLED", False)):

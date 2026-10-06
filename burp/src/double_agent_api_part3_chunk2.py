@@ -667,20 +667,35 @@ class AgentAPIChunk3Chunk2(object):
 
     def _queue_findings_full(self, item):
         findings_full = []
+        seen_indices = set()
         with self.extender.findings_lock_ui:
             stable_refs = set([str(value) for value in item.get("finding_stable_ids", []) or [] if value])
+            # Some persisted/API queues carry immutable IDs in finding_ids.
+            # Never interpret those as mutable list offsets or fall back to
+            # offsets when an authoritative stable reference is unresolved.
+            if not stable_refs:
+                stable_refs = set([str(value) for value in item.get("finding_ids", []) or []
+                                   if str(value).startswith("daf_")])
             if stable_refs:
                 for idx, finding in enumerate(self.extender.findings_list):
                     if str(finding.get("stable_id", "") or "") in stable_refs:
                         findings_full.append(self._serialize_finding(idx, finding, include_full=True))
                 return findings_full
             for fid in item.get("finding_ids", []):
-                if 0 <= fid < len(self.extender.findings_list):
-                    f = self.extender.findings_list[fid]
-                    findings_full.append(self._serialize_finding(fid, f, include_full=True))
+                try:
+                    idx = int(fid)
+                except (TypeError, ValueError):
+                    continue
+                if 0 <= idx < len(self.extender.findings_list) and idx not in seen_indices:
+                    f = self.extender.findings_list[idx]
+                    findings_full.append(self._serialize_finding(idx, f, include_full=True))
+                    seen_indices.add(idx)
         return findings_full
 
     def _build_queue_curl_payload(self, item, findings_full, refresh_auth=True, step_filter=""):
+        if str(item.get("source", "") or "") == "duplicate_review":
+            return 409, {"error": "duplicate_review_is_read_only",
+                         "message": "Compare linked finding evidence only. Duplicate review sends no target traffic."}
         if bool(item.get("browser_verify", False)):
             return 409, {
                 "error": "browser verification item",

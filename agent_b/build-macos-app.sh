@@ -46,7 +46,17 @@ CLANG_MODULE_CACHE_PATH="$BUILD_DIR/clang-cache" xcrun clang -O2 -fobjc-arc -fmo
   -mmacosx-version-min=13.0 -framework Cocoa -framework WebKit \
   "$ROOT/macos/AgentB.m" -o "$APP/Contents/MacOS/Agent B"
 cp "$ROOT/macos/Info.plist" "$APP/Contents/Info.plist"
-cp "$ROOT/macos/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
+# Derive every icon size from the same mark used by the chat UI.
+CLANG_MODULE_CACHE_PATH="$BUILD_DIR/clang-cache" xcrun clang -O2 -fobjc-arc \
+  -framework Foundation -framework CoreGraphics -framework ImageIO \
+  "$ROOT/macos/make-icon.m" -o "$BUILD_DIR/make-icon"
+ICONSET="$BUILD_DIR/AppIcon.iconset"
+mkdir -p "$ICONSET"
+for SIZE in 16 32 128 256 512; do
+  "$BUILD_DIR/make-icon" "$ICONSET/icon_${SIZE}x${SIZE}.png" "$SIZE" "$ROOT/static/agent-b-logo.png"
+  "$BUILD_DIR/make-icon" "$ICONSET/icon_${SIZE}x${SIZE}@2x.png" "$((SIZE * 2))" "$ROOT/static/agent-b-logo.png"
+done
+iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon-BlackHat.icns"
 cp -R "$ROOT/agent_b_harness" "$APP/Contents/Resources/harness/"
 cp -R "$ROOT/static" "$APP/Contents/Resources/harness/"
 find "$APP" -name __pycache__ -type d -prune -exec rm -rf {} +

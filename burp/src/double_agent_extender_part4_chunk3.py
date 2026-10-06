@@ -316,6 +316,12 @@ class BurpExtenderChunk4Chunk3(object):
             pass
         return None
 
+    def _finding_severity_display(self, severity):
+        value = str(severity or "Information").strip().lower()
+        return {"critical": "Critical", "high": "High", "medium": "Medium",
+                "low": "Low", "information": "Information", "informational": "Information",
+                "info": "Information"}.get(value, str(severity or "Information"))
+
     def _finding_hidden_from_normal_view(self, finding):
         return bool(finding.get("fp", False)) or self._agent_status_value(
             finding.get("agent_status", "")) == "false_positive"
@@ -337,6 +343,9 @@ class BurpExtenderChunk4Chunk3(object):
         deleted_sorted = sorted(set([int(i) for i in deleted_indices]), reverse=True)
         new_ids = []
         for fid in old_ids or []:
+            if str(fid).startswith("daf_"):
+                new_ids.append(fid)
+                continue
             try:
                 fid_int = int(fid)
             except:

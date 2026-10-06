@@ -118,9 +118,9 @@ class ResearchHTTPTests(unittest.TestCase):
         page = self.request('GET', '/')[2].decode()
         self.assertIn('id="source-review-panel"', page)
         self.assertIn('id="target-link"', page)
-        self.assertIn('id="target-link-main"', page)
+        self.assertNotIn('id="target-link-main"', page)
         self.assertNotIn('href="/research.html"', page)
-        self.assertIn('id="composer-help"', page)
+        self.assertIn('id="composer-status"', page)
         self.assertIn('Privacy &amp; limits', page)
         self.assertEqual(self.request('GET', '/research.js')[0], 404)
 

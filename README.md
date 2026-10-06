@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 3.1.0 beta 5" src="https://img.shields.io/badge/version-3.1.0--beta.5-ff9944">
+  <img alt="Version 3.1.0 beta 6" src="https://img.shields.io/badge/version-3.1.0--beta.6-ff9944">
   <img alt="License MIT" src="https://img.shields.io/badge/license-MIT-2ea44f">
   <img alt="Burp Suite" src="https://img.shields.io/badge/Burp%20Suite-Jython-f47b20">
   <img alt="Human in the loop" src="https://img.shields.io/badge/control-human--in--the--loop-ff9944">
@@ -131,7 +131,7 @@ Open [http://127.0.0.1:4310](http://127.0.0.1:4310).
 
 **Agent B macOS application — experimental work in progress**
 
-Download `Agent-B-macOS-arm64-v3.1.0-beta.5.zip` from the [beta release](https://github.com/sageoffensive/DoubleAgent/releases/tag/v3.1.0-beta.5), extract it, and move **Agent B.app** to Applications. This build targets Apple Silicon and includes Python. The release notes state its signing/notarization status and remaining validation limits; the harness remains experimental. Maintainers and developers can build it with:
+Download `Agent-B-macOS-arm64-v3.1.0-beta.6.zip` from the [beta release](https://github.com/sageoffensive/DoubleAgent/releases/tag/v3.1.0-beta.6), extract it, and move **Agent B.app** to Applications. This build targets Apple Silicon and includes Python. The release notes state its signing/notarization status and remaining validation limits; the harness remains experimental. Maintainers and developers can build it with:
 
 ```bash
 cd agent_b

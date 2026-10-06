@@ -172,29 +172,26 @@ class BurpExtenderChunk2Chunk2(object):
 
         dialog.setVisible(True)
 
+    def _confirmFindingRemoval(self, count, clear_all=False):
+        from javax.swing import JOptionPane
+        subject = "all %d findings" % count if clear_all else "%d selected finding(s)" % count
+        return JOptionPane.showConfirmDialog(
+            None, "Delete %s?\n\nThis permanently removes them from this project. To keep a false positive available, mark it as FP instead." % subject,
+            "Delete findings", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE
+        ) == JOptionPane.YES_OPTION
+
     def _deleteFinding(self):
-        """Delete the selected finding from the findings list."""
-        try:
-            row = self.findingsTable.getSelectedRow()
-            if row < 0:
-                return
-            model_row = self.findingsTable.convertRowIndexToModel(row)
-            with self.findings_lock_ui:
-                if model_row < len(self.findings_list):
-                    removed = self.findings_list.pop(model_row)
-                    self.log_to_console("[FINDINGS] Deleted: %s" % str(removed.get("title", ""))[:80])
-            self.save_findings()
-            self._ui_dirty = True
-            self.refreshUI()
-        except Exception as e:
-            self.stderr.println("[FINDINGS] Delete error: %s" % self._safe_ascii_text(e))
+        """Delete the selected finding after confirmation."""
+        self._deleteSelected()
 
     # === False Positive / Severity / Bulk action helpers ===
     def _toggleShowFP(self):
         """Toggle visibility of hidden non-reportable findings in the table."""
         self._show_fp_findings = not self._show_fp_findings
         try:
-            self._showFPBtn.setText("Hide Hidden" if self._show_fp_findings else "Show Hidden")
+            with self.findings_lock_ui:
+                count = sum(1 for finding in self.findings_list if self._finding_hidden_from_normal_view(finding))
+            self._showFPBtn.setText(("Hide hidden (%d)" if self._show_fp_findings else "Show hidden (%d)") % count)
         except:
             pass
         if hasattr(self, "findingsSorter") and self._fp_row_filter is not None:
@@ -297,14 +294,20 @@ class BurpExtenderChunk2Chunk2(object):
             self.stderr.println("[FINDINGS] Severity override error: %s" % self._safe_ascii_text(e))
 
     def _deleteSelected(self):
-        """Delete all currently selected findings."""
+        """Delete only the findings the operator confirmed."""
         try:
             model_rows = self._getSelectedModelRows()
             with self.findings_lock_ui:
-                for model_row in model_rows:
-                    if model_row < len(self.findings_list):
-                        self.findings_list.pop(model_row)
-            self.log_to_console("[FINDINGS] Deleted %d finding(s)" % len(model_rows))
+                selected = [self.findings_list[row] for row in model_rows if 0 <= row < len(self.findings_list)]
+            if not selected or not self._confirmFindingRemoval(len(selected)):
+                return
+            with self.findings_lock_ui:
+                deleted = 0
+                for row in range(len(self.findings_list) - 1, -1, -1):
+                    if any(self.findings_list[row] is finding for finding in selected):
+                        self.findings_list.pop(row)
+                        deleted += 1
+            self.log_to_console("[FINDINGS] Deleted %d finding(s)" % deleted)
             self.save_findings()
             self._ui_dirty = True
             self.refreshUI()

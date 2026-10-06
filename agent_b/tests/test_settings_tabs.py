@@ -52,12 +52,9 @@ class SettingsTabsTests(unittest.TestCase):
     def test_status_and_target_are_reachable_in_the_sidebar(self):
         for ident in ('burp-state', 'model-state', 'active-skills', 'target-link'):
             self.assertTrue(any(tag == 'aside' for tag, _ in self.page.ids[ident][2]))
-        self.assertIn('target-link-main', self.page.ids)
 
-    def test_workspace_tabs_link_to_unique_views(self):
-        for name in ('conversation', 'notebook', 'assessment'):
-            _, tab, _ = self.page.ids['tab-' + name]
-            _, panel, _ = self.page.ids['pane-' + name]
-            self.assertEqual(tab['aria-controls'], panel['id'])
-            self.assertEqual(panel['aria-labelledby'], tab['id'])
-            self.assertEqual(panel['role'], 'tabpanel')
+    def test_single_chat_keeps_notes_in_settings_and_activity_collapsed(self):
+        self.assertIn('pane-conversation', self.page.ids)
+        self.assertFalse(any('tab-' + name in self.page.ids for name in ('conversation', 'notebook', 'assessment')))
+        self.assertNotIn('open', self.page.ids['model-stream-panel'][1])
+        self.assertIn(('dialog', 'settings-dialog'), self.page.ids['edit-notebook'][2])

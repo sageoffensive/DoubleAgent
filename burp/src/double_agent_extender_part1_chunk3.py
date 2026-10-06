@@ -135,16 +135,17 @@ class BurpExtenderChunk1Chunk3(object):
 
         # Findings stats bar
         findingsStatsPanel = JPanel(FlowLayout(FlowLayout.LEFT))
-        self.findingsStatsLabel = JLabel("Total: 0 | Crit: 0 | High: 0 | Medium: 0 | Low: 0 | Info: 0")
+        self.findingsStatsLabel = JLabel("Reportable: 0 | Crit: 0 | High: 0 | Medium: 0 | Low: 0 | Info: 0")
         self.findingsStatsLabel.setFont(Font("Monospaced", Font.BOLD, 11))
-        self._showFPBtn = JButton("Show Hidden")
+        self._showFPBtn = JButton("Show hidden (0)")
+        self._showFPBtn.setToolTipText("Show retained false positives. Deleted duplicates are removed, not hidden.")
         self._showFPBtn.setFont(Font("Monospaced", Font.PLAIN, 11))
         self._showFPBtn.setFocusPainted(False)
         self._showFPBtn.addActionListener(lambda e: self._toggleShowFP())
         findingsStatsPanel.add(self.findingsStatsLabel)
         findingsStatsPanel.add(self._showFPBtn)
         self.jevReviewButton = JButton("Review duplicates", actionPerformed=self._queue_duplicate_review)
-        self.jevReviewButton.setToolTipText("Queue a duplicate-review task for Agent B; it marks genuine duplicates using the model configured in Double Agent. Fetch the queue in Agent B to run it.")
+        self.jevReviewButton.setToolTipText("Queue a duplicate-review task for Agent B; it marks genuine duplicates using the connection selected in Agent B. Fetch the queue in Agent B to run it.")
         findingsStatsPanel.add(self.jevReviewButton)
         self._sync_jev_controls()
         findingsPanel.add(findingsStatsPanel, BorderLayout.NORTH)
@@ -177,7 +178,7 @@ class BurpExtenderChunk1Chunk3(object):
 
         class SeverityComparator(Comparator):
             def __init__(self):
-                self.order = {"Critical": 0, "High": 1, "Medium": 2, "Low": 3, "Information": 4}
+                self.order = {"Critical": 0, "High": 1, "Medium": 2, "Low": 3, "Information": 4, "Informational": 4, "Info": 4}
             def compare(self, o1, o2):
                 return self.order.get(str(o1) if o1 else "", 5) - self.order.get(str(o2) if o2 else "", 5)
 

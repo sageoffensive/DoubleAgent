@@ -485,8 +485,23 @@ class BurpExtenderChunk4(object):
                 "last_saved": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
 
-            with open(self.config_file, 'w') as f:
-                json.dump(config, f, indent=2)
+            import os, tempfile
+            descriptor, temporary = tempfile.mkstemp(prefix=".double-agent-config-", dir=os.path.dirname(os.path.abspath(self.config_file)))
+            try:
+                with os.fdopen(descriptor, "w") as f:
+                    json.dump(config, f, indent=2)
+                    f.flush()
+                    os.fsync(f.fileno())
+                if hasattr(os, "replace"):
+                    os.replace(temporary, self.config_file)
+                elif os.name == "nt":
+                    from java.nio.file import Files, Paths, StandardCopyOption
+                    Files.move(Paths.get(temporary), Paths.get(self.config_file), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+                else:
+                    os.rename(temporary, self.config_file)
+            finally:
+                if os.path.exists(temporary):
+                    os.remove(temporary)
 
             # The config holds the AI provider API key in plaintext. We do not
             # encrypt it (that needs key management with its own failure modes),

@@ -330,6 +330,7 @@ def _validated_connection(
     provider: str,
     api_key: str,
     region: str,
+    *, require_model: bool = True,
 ) -> dict[str, str]:
     from urllib.parse import urlsplit
 
@@ -338,7 +339,7 @@ def _validated_connection(
     api_key, region = str(api_key or "").strip(), str(region or "").strip()
     if provider not in PROVIDERS:
         raise ValueError("Choose a supported provider")
-    if not label or not model:
+    if not label or (require_model and not model):
         raise ValueError("Connection name and API model ID are required")
     if provider == "bedrock":
         region = region or "us-east-1"
@@ -429,7 +430,7 @@ def edit_custom_model(
     return save({"custom_models": models})
 
 
-def connection_candidate(body: dict[str, Any]) -> dict[str, Any]:
+def connection_candidate(body: dict[str, Any], *, require_model: bool = True) -> dict[str, Any]:
     """Build a validated, unsaved connection for the Test connection action.
     An empty key on edit means reuse the stored secret, exactly as Save does."""
     stored = _stored()
@@ -451,6 +452,7 @@ def connection_candidate(body: dict[str, Any]) -> dict[str, Any]:
         provider,
         effective_key,
         str(body.get("region") or existing.get("region") or stored.get("bedrock_region") or ""),
+        require_model=require_model,
     )
     # Bedrock connections fall back to the shared bearer key for the test.
     if provider == "bedrock" and not values["api_key"]:
@@ -461,6 +463,28 @@ def connection_candidate(body: dict[str, Any]) -> dict[str, Any]:
     if provider == "bedrock":
         base_url = "https://bedrock-runtime.%s.amazonaws.com" % values["region"]
     return {**values, "base_url": base_url}
+
+
+def model_catalog_candidate(body: dict[str, Any]) -> dict[str, Any]:
+    """Resolve an editor draft without saving it or requiring a model ID.
+
+    A stored key can only be reused for the same provider and endpoint.
+    """
+    from urllib.parse import urlsplit
+
+    if "url" in body and not str(body["url"] or "").strip():
+        raise ValueError("Enter the API base URL before loading models")
+    candidate = connection_candidate(body, require_model=False)
+    if candidate["provider"] == "bedrock":
+        raise ValueError("Bedrock bearer connections do not support model listing; enter the model ID manually")
+    parsed = urlsplit(candidate["base_url"])
+    if parsed.username or parsed.password or parsed.query or parsed.fragment:
+        raise ValueError("Use an API base URL without credentials, query parameters or a fragment")
+    if body.get("id") and not body.get("api_key") and candidate["api_key"]:
+        saved = connection_candidate({"id": body["id"]}, require_model=False)
+        if (candidate["provider"], candidate["base_url"]) != (saved["provider"], saved["base_url"]):
+            raise ValueError("Enter the API key for the changed server before loading models")
+    return candidate
 
 
 def remove_custom_model(model_id: str) -> "Config":

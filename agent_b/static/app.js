@@ -11,6 +11,20 @@ let loadedModelUrl = '';
 let attachmentDrafts = [];
 let uploading = false;
 let sending = false;
+const pendingActions = new Set();
+function lockAction(key, handler, control) {
+  return async function(event) {
+    if (pendingActions.has(key)) { event?.preventDefault(); return; }
+    pendingActions.add(key);
+    if (control) control.disabled = true;
+    try { return await handler.call(this, event); }
+    finally {
+      pendingActions.delete(key);
+      if (control) control.disabled = false;
+      if (latestState.status) render(latestState);
+    }
+  };
+}
 let latestState = {};
 let questionKey = null;
 let suggestionsKey = null;
@@ -28,34 +42,6 @@ function showNotice(message) {
   $('#ui-notice').classList.remove('hidden');
 }
 $('#dismiss-notice').onclick = () => $('#ui-notice').classList.add('hidden');
-
-function selectWorkspace(name, focus = false) {
-  if (workspace === 'conversation' && name !== workspace) {
-    const timeline = $('#timeline');
-    conversationScroll = timeline.scrollTop;
-    followConversation = timeline.scrollHeight - timeline.scrollTop - timeline.clientHeight < 80;
-  }
-  workspace = name;
-  document.querySelectorAll('[data-workspace]').forEach(button => {
-    const selected = button.dataset.workspace === name;
-    button.setAttribute('aria-selected', String(selected));
-    button.tabIndex = selected ? 0 : -1;
-    $(`#pane-${button.dataset.workspace}`).classList.toggle('hidden', !selected);
-    if (selected && focus) button.focus();
-  });
-  const headings = {
-    conversation: ['Conversation', 'Discuss evidence and decide what comes next.'],
-    notebook: ['Engagement notebook', 'Your objective, evidence, and decisions in one place.'],
-    assessment: ['Assessment', 'Follow the current run and inspect its evidence.'],
-  };
-  $('#workspace-title').textContent = headings[name][0];
-  $('#workspace-subtitle').textContent = headings[name][1];
-  if (name === 'conversation') {
-    const timeline = $('#timeline');
-    timeline.scrollTop = followConversation ? timeline.scrollHeight : conversationScroll;
-    updateScrollControl();
-  }
-}
 
 function selectSettings(name, focus = false) {
   settingsSection = name;
@@ -84,7 +70,6 @@ function bindTabs(selector, select, field) {
     };
   });
 }
-bindTabs('[data-workspace]', selectWorkspace, 'workspace');
 bindTabs('[data-settings]', selectSettings, 'settings');
 
 function updateScrollControl() {
@@ -103,12 +88,13 @@ $('#jump-latest').onclick = () => {
 
 function updateComposer() {
   const active = ['starting', 'running', 'waiting', 'stopping'].includes(latestState.status);
-  const blocked = latestState.status === 'stopping' || Boolean(latestState.pending_question) || !harnessOnline || !latestState.settings?.model || (active && attachmentDrafts.length > 0);
+  const approval = latestState.pending_question?.id.startsWith('approval-');
+  const blocked = latestState.status === 'stopping' || approval || !harnessOnline || !latestState.settings?.model || (active && attachmentDrafts.length > 0);
   const button = $('#composer button[type="submit"]');
   button.disabled = blocked || uploading || sending || !($('#message').value.trim() || attachmentDrafts.length);
-  button.textContent = sending ? 'Sending…' : active ? 'Send guidance' : 'Send';
-  button.setAttribute('aria-label', active ? 'Send guidance' : 'Send');
-  button.title = latestState.pending_question ? 'Answer the pending question first'
+  button.textContent = sending ? 'Sending…' : 'Send';
+  button.setAttribute('aria-label', 'Send');
+  button.title = approval ? 'Choose an approval option above'
     : latestState.status === 'stopping' ? 'Wait for the run to stop'
     : active && attachmentDrafts.length ? 'Remove attachments or wait for the current response'
     : active ? 'Guide the current run at its next response boundary'
@@ -117,8 +103,9 @@ function updateComposer() {
     : 'Send message';
   $('#attach-files').disabled = active || Boolean(latestState.pending_question) || !harnessOnline || uploading || sending;
   $('#connection-guidance').classList.toggle('hidden', Boolean(latestState.settings?.model));
-  $('#conversation-mode').disabled = active || uploading || sending;
-  $('#message').placeholder = active ? 'Guide the current run or add context…' : 'Ask a question, share a file, or paste a screenshot…';
+  $('#composer').classList.toggle('hidden', Boolean(approval));
+  $('#message').placeholder = latestState.pending_question ? 'Reply to Agent B…' : 'Message Agent B…';
+  $('#question').querySelectorAll('button').forEach(option => { option.disabled = sending; });
 }
 $('#message').addEventListener('input', updateComposer);
 
@@ -164,7 +151,6 @@ async function attachFiles(files) {
   if (attachmentDrafts.length + files.length > 4) { composerStatus('Attach up to four files per message.'); return; }
   uploading = true;
   updateComposer();
-  $('#conversation-mode').value = 'discuss';
   try {
     for (const file of files) {
       if (file.size > 3 * 1024 * 1024) throw new Error(`${file.name}: maximum file size is 3 MB.`);
@@ -181,7 +167,7 @@ async function attachFiles(files) {
       attachmentDrafts.push(await api('/api/files', {method: 'POST', body: JSON.stringify({name: file.name, data: encoded})}));
       renderAttachments();
     }
-    composerStatus('Files ready. They will be sent to the selected connection with your message.');
+    composerStatus('');
   } catch (error) { composerStatus(error.message); }
   finally { uploading = false; updateComposer(); $('#file-picker').value = ''; }
 }
@@ -260,9 +246,6 @@ function render(value) {
   const keepFollowing = renderedFeed === null || followConversation;
   latestState = value;
   if (value.settings?.model_options) modelOptions = value.settings.model_options;
-  $('#composer-help').textContent = $('#conversation-mode').value === 'discuss'
-    ? `Discuss uses your notebook and saved decisions${value.notebook?.burp_context_enabled ? ', plus a read-only Burp snapshot' : ''}. Files go to ${modelOption(value.settings?.model)?.label || 'the selected connection'} when sent. Text is redacted for common secrets; check screenshots yourself.`
-    : 'Assessment chat uses the current Burp context. Use Discuss for file and image review.';
   const stopping = value.status === 'stopping';
   const bootstrapped = Boolean(value.burp_prompt_loaded);
   $('#run-state').textContent = stopping ? 'Stopping…' : ({idle: 'Ready', waiting: 'Needs your input', running: 'Working', starting: 'Starting…', stopped: 'Stopped', complete: 'Complete', error: 'Needs attention'}[value.status] || value.status);
@@ -273,26 +256,18 @@ function render(value) {
   const linkedFindingCount = Number(findingProgress.linked || 0);
   findingProgressEl.classList.toggle('hidden', linkedFindingCount < 1);
   findingProgressEl.textContent = linkedFindingCount > 0
-    ? `${Number(findingProgress.verdicts_recorded || 0)} of ${linkedFindingCount} findings reviewed`
+    ? `${Number(findingProgress.verdicts_recorded || 0)} verdicts saved · ${linkedFindingCount} linked`
     : '';
 
   const active = ['starting', 'running', 'waiting', 'stopping'].includes(value.status);
-  if (active) {
-    $('#conversation-mode').value = value.discussion_mode || !bootstrapped ? 'discuss' : 'assessment';
-    $('#composer-help').textContent = value.pending_question ? 'Answer the question above to continue. Approval applies only to the pending action.'
-      : stopping ? 'The current run is stopping. Your draft stays here.'
-      : 'Send guidance for the current run. It will be considered at the next response boundary; wait until the run finishes to attach files or change modes.';
-  }
   $('#run-dot').className = `dot ${value.status === 'running' ? 'ok' : active ? 'warn' : ''}`;
   $('#stop').disabled = !active || stopping;
-  $('#clear').disabled = active || sending;
-  $('#assessment-activity').classList.toggle('hidden', !active);
-  $('#assessment-empty').classList.toggle('hidden', bootstrapped || Boolean(value.model_stream_length));
+  $('#clear').disabled = active || sending || pendingActions.has('clear');
   $('#stop').textContent = stopping ? 'Stopping…' : 'Stop current run';
   $('#fetch').disabled = active || !bootstrapped;
-  $('#validate-a').disabled = active || !bootstrapped;
+  $('#validate-a').disabled = active || !bootstrapped || pendingActions.has('validate');
   $('#fetch').classList.toggle('primary', bootstrapped);
-  $('#bootstrap').disabled = active || bootstrapped;
+  $('#bootstrap').disabled = active || bootstrapped || pendingActions.has('bootstrap');
   $('#bootstrap').classList.toggle('primary', !bootstrapped);
   $('#bootstrap').textContent = bootstrapped ? 'Burp context loaded' : 'Connect to Burp';
   $('#bootstrap').title = bootstrapped
@@ -308,10 +283,8 @@ function render(value) {
   const bootstrapGuidance = $('#bootstrap-guidance');
   bootstrapGuidance.textContent = bootstrapped
     ? 'Burp context loaded. Choose a task below.'
-    : 'Load assessment context before using Burp controls. Discuss is available separately.';
+    : 'Connect to Burp to start assessment work.';
   bootstrapGuidance.classList.toggle('ready', bootstrapped);
-  $('#thinking-control').classList.toggle('hidden', !modelOption(value.settings.model)?.supports_thinking || value.burp_prompt_loaded);
-  $('#thinking-choice').disabled = active;
   const activeSkills = value.active_skills || [];
   $('#active-skills').innerHTML = activeSkills.length
     ? activeSkills.map(skill => `<span title="${esc(skill.description)}">${esc(skill.name)}</span>`).join('')
@@ -328,16 +301,11 @@ function render(value) {
   $('#model-state').title = String(model.detail || '');
   const targetUrl = value.target_url || '';
   $('#target-row').classList.toggle('hidden', !targetUrl);
-  $('#target-link-main').classList.toggle('hidden', !targetUrl);
   if (targetUrl) {
     $('#target-link').href = targetUrl;
     $('#target-link').textContent = targetUrl;
     $('#target-link').title = `Open ${targetUrl} in your browser`;
-    $('#target-link-main').href = targetUrl;
-    $('#target-link-main').textContent = `Open target · ${targetUrl}`;
-    $('#target-link-main').title = `Open ${targetUrl} in your browser`;
   }
-  $('#live').textContent = value.pending_question ? 'Needs your input' : active ? 'Working' : 'Ready';
   const streamPanel = $('#model-stream-panel');
   const streamDelta = value.model_stream || '';
   const streamOffset = Number(value.model_stream_offset || 0);
@@ -346,7 +314,7 @@ function render(value) {
   if (runChanged) {
     cache.modelRun = value.started;
     cache.modelStream = '';
-    if (active && value.started) streamPanel.open = true;
+    streamPanel.open = false;
   }
   if (streamOffset === cache.modelStream.length) {
     cache.modelStream += streamDelta;
@@ -362,13 +330,14 @@ function render(value) {
     streamElement.dataset.length = String(cache.modelStream.length);
     if (followStream) streamElement.scrollTop = streamElement.scrollHeight;
   }
-  const modelElapsed = active && value.model_stream_started
+  const modelElapsed = ['starting', 'running'].includes(value.status) && value.model_stream_started
     ? Math.max(0, Math.floor(Date.now() / 1000 - Number(value.model_stream_started)))
     : 0;
-  const reasoningMode = value.model_reasoning_mode || 'provider output shown verbatim';
   const streamChannel = String(value.model_stream_channel || '');
   let activityLabel = 'Model activity';
-  if (active) {
+  if (value.status === 'waiting') activityLabel = 'Waiting for your answer';
+  else if (stopping) activityLabel = 'Stopping';
+  else if (active) {
     if (streamChannel === 'Thinking') activityLabel = 'Thinking';
     else if (streamChannel === 'Model commentary') activityLabel = 'Planning next action';
     else if (streamChannel === 'Response') activityLabel = 'Writing response';
@@ -379,18 +348,19 @@ function render(value) {
   } else if (streamLength) {
     activityLabel = value.model_reasoning_seen ? 'Reasoning and activity' : 'Last model activity';
   }
-  $('#model-activity-label').textContent = activityLabel;
-  $('#model-activity-dot').className = `activity-dot ${active ? 'active' : streamLength ? 'complete' : ''}`;
+  $('#model-activity-label').textContent = 'Thinking & activity';
+  $('#model-activity-dot').className = `activity-dot ${value.status === 'waiting' ? 'waiting' : active ? 'active' : streamLength ? 'complete' : ''}`;
   $('#model-stream-source').textContent = value.model_reasoning_seen
     ? 'Provider-exposed reasoning'
     : value.model_reasoning_requested
       ? 'Waiting for provider reasoning'
       : 'Action commentary';
   streamPanel.classList.toggle('active', active);
+  streamPanel.classList.toggle('hidden', !active && !streamLength);
   streamPanel.classList.toggle('has-reasoning', Boolean(value.model_reasoning_seen));
-  $('#model-stream-state').textContent = streamLength
-    ? `Step ${value.model_stream_step}${modelElapsed ? ` · ${modelElapsed}s` : ''} · ${reasoningMode}`
-    : `Waiting for ${modelOption(value.settings.model)?.label || 'model'} · ${reasoningMode}`;
+  $('#model-stream-state').textContent = streamLength || active
+    ? value.status === 'waiting' ? activityLabel : `${activityLabel} · Step ${value.model_stream_step}${modelElapsed ? ` · ${modelElapsed}s` : ''}`
+    : `Waiting for ${modelOption(value.settings.model)?.label || 'model'}`;
 
   const plan = value.assessment_plan || {};
   const planPanel = $('#assessment-plan-panel');
@@ -415,9 +385,8 @@ function render(value) {
   cache.messages = value.messages;
   if (value.events.length) last = value.events[value.events.length - 1].id;
 
-  // Operator chat shows the user's messages, the model's small "thinking"
-  // lines, its questions, and final results — but not the big per-step
-  // narration bubbles or progress chatter.
+  // Keep saved thinking collapsible alongside questions and final results.
+  // Per-step narration and progress chatter stay out of the transcript.
   const transcript = cache.messages.filter(message => {
     if (message.role !== 'assistant') return true;
     const m = message.metadata || {};
@@ -428,6 +397,7 @@ function render(value) {
 
   if (feedKey !== renderedFeed) {
     const position = timeline.scrollTop;
+    const expandedThinking = new Set([...timeline.querySelectorAll('details[data-thinking-id][open]')].map(item => item.dataset.thinkingId));
     const follow = workspace === 'conversation' && timeline.scrollHeight - position - timeline.clientHeight < 80;
     const items = transcript.map(message => {
       const meta = message.metadata || {};
@@ -437,18 +407,20 @@ function render(value) {
       const content = message.role === 'assistant'
         ? String(message.content ?? '').replace(/^(?:[\t ]*\r?\n)+/, '')
         : message.content;
+      if (thinking) return `
+      <details class="message thinking" data-thinking-id="${esc(message.id)}"${expandedThinking.has(String(message.id)) ? ' open' : ''}>
+        <summary>Thinking</summary>
+        <div class="bubble">${visibleMessage(content)}</div>
+      </details>`;
       return `
       <div class="message ${esc(message.role)} ${harnessMessage ? 'harness-status' : ''} ${thinking ? 'thinking' : ''}">
         <div class="meta">${speaker}</div>
-        <div class="bubble">${visibleMessage(content)}${(meta.attachments || []).map(f => `<a class="attachment-download" href="/api/files/${encodeURIComponent(f.id)}" download>${f.mime.startsWith('image/') ? `<img class="attachment-thumbnail" src="/api/files/${encodeURIComponent(f.id)}/preview" alt="${esc(f.name)}">` : ''}${esc(f.name)} ↓</a>`).join('')}</div>
-        ${message.role === 'assistant' && !harnessMessage ? `<a class="download-link response-download" href="/api/messages/${encodeURIComponent(message.id)}/download" download>Download response</a>` : ''}
-        ${AgentBReview.offerFor(message) ? `<div class="source-offer" data-review-offer="${esc(message.id)}"><strong>Check the advisory or source?</strong><p>A version match still needs verification.</p><button type="button" data-open-review>Review together</button><button type="button" data-dismiss-review>Not now</button></div>` : ''}
+        <div class="bubble">${visibleMessage(content)}${message.role === 'assistant' && meta.question_id && meta.reason ? `<details class="question-reason"><summary>More context</summary><p>${esc(meta.reason)}</p></details>` : ''}${(meta.attachments || []).map(f => `<a class="attachment-download" href="/api/files/${encodeURIComponent(f.id)}" download>${f.mime.startsWith('image/') ? `<img class="attachment-thumbnail" src="/api/files/${encodeURIComponent(f.id)}/preview" alt="${esc(f.name)}">` : ''}${esc(f.name)} ↓</a>`).join('')}</div>
       </div>`;
     });
 
     timeline.innerHTML = items.length ? items.join('') : `
-      <div class="empty"><div><span class="empty-mark">B</span><strong>Work through it together</strong><p>Ask a question or share evidence in Discuss.<br>For assessment work, connect to Burp first.</p><small>Your notebook keeps the objective and decisions close at hand.</small></div></div>`;
-    AgentBReview.bindOffers(timeline, transcript);
+      <div class="empty"><div><img class="empty-mark" src="/agent-b-logo.png" alt="" width="72" height="72"><strong>How can I help?</strong><p>Send a message or attach a file.</p></div></div>`;
     timeline.scrollTop = follow ? timeline.scrollHeight : position;
     renderedFeed = feedKey;
     updateScrollControl();
@@ -458,15 +430,14 @@ function render(value) {
   const question = $('#question');
   if (pending && questionKey !== pending.id) {
     questionKey = pending.id;
-    question.classList.remove('hidden');
+    question.classList.toggle('hidden', !(pending.options || []).length);
     const approval = pending.id.startsWith('approval-');
-    question.innerHTML = `<div class="eyebrow">${approval ? 'YOUR APPROVAL IS REQUIRED' : 'A QUESTION FOR YOU'}</div><strong>${esc(pending.question)}</strong><p>${esc(pending.reason)}</p><div>${
+    question.innerHTML = `<div class="eyebrow">${approval ? 'YOUR APPROVAL IS REQUIRED' : 'CHOOSE AN ANSWER'}</div><div>${
       (pending.options || []).map(option => `<button data-answer="${esc(option)}">${esc(option)}</button>`).join('')
-    }</div>${approval ? '<p class="hint">Approval applies only to this pending action. Stopping the run cancels it.</p>' : '<form id="question-reply"><input aria-label="Your answer" name="reply" maxlength="4000" required placeholder="Or answer in your own words…"><button type="submit">Reply</button></form>'}`;
+    }</div>${approval ? '<p class="hint">Applies once to this action.</p>' : ''}`;
     question.querySelectorAll('[data-answer]').forEach(button => {
       button.onclick = () => answer(pending.id, button.dataset.answer);
     });
-    if (!approval) $('#question-reply').onsubmit = event => { event.preventDefault(); answer(pending.id, event.target.elements.reply.value); };
   } else if (!pending) {
     questionKey = null;
     question.classList.add('hidden');
@@ -479,10 +450,11 @@ function render(value) {
     $('#timeline').scrollTop = $('#timeline').scrollHeight;
     updateScrollControl();
   });
-  $('#settings-form button[type="submit"]').disabled = active;
+  $('#settings-form button[type="submit"]').disabled = active || pendingActions.has('settings');
   $('#add-model').disabled = active;
+  $('#test-model').disabled = active || !$('#model-choice').value || pendingActions.has('connection-test');
   $('#edit-model').disabled = active || !modelOption($('#model-choice').value)?.custom;
-  $('#remove-model').disabled = active || !modelOption($('#model-choice').value)?.custom;
+  $('#remove-model').disabled = active || !modelOption($('#model-choice').value)?.custom || pendingActions.has('remove-model');
 }
 
 function renderNotebook(notebook, active) {
@@ -494,7 +466,7 @@ function renderNotebook(notebook, active) {
   const snapshot = notebook.snapshot || {};
   const captured = snapshot.captured_at ? new Date(snapshot.captured_at * 1000).toLocaleTimeString() : '';
   const stale = snapshot.captured_at && Date.now() / 1000 - snapshot.captured_at > 60;
-  $('#snapshot-status').textContent = !enabled ? 'Burp context off' : !snapshot.status ? 'Refresh or send Discuss to capture context'
+  $('#snapshot-status').textContent = !enabled ? 'Burp context off' : !snapshot.status ? 'Refresh or send a message to capture context'
     : `${snapshot.status === 'ready' ? 'Snapshot captured' : snapshot.status.replaceAll('_', ' ')}${captured ? ` at ${captured}` : ''}${stale ? ' · refresh before relying on it' : ''}`;
   const key = JSON.stringify(notebook);
   if (key === notebookKey) return;
@@ -523,7 +495,7 @@ function renderNotebook(notebook, active) {
         composerStatus('Enable image input on a vision-capable connection before using this image.'); return;
       }
       attachmentDrafts.push(file);
-      $('#conversation-mode').value = 'discuss';
+      $('#settings-dialog').close();
       renderAttachments();
       composerStatus('Stored file added. It will be sent with your message.');
       updateComposer();
@@ -573,7 +545,7 @@ $('#refresh-discussion-context').onclick = async () => {
     composerStatus('Reading the current Burp findings and queue…');
     await api('/api/notebook/refresh', {method: 'POST', body: '{}'});
     await poll();
-    composerStatus('Snapshot refreshed. Its source and capture time are in the notebook.');
+    composerStatus('Snapshot refreshed. View its source and capture time in Settings.');
   } catch (error) { composerStatus(error.message); }
   finally { notebookSaving = false; }
 };
@@ -601,8 +573,6 @@ function renderSuggestions(items) {
         composerStatus('Finish or stop the current run before starting a separate discussion.'); return;
       }
       const s = items.find(item => item.id === button.dataset.discuss);
-      $('#conversation-mode').value = 'discuss';
-      selectWorkspace('conversation');
       $('#message').value = `Let's discuss recommendation ${s.id}: ${s.subject || ''}. Explain its supporting evidence, uncertainty, alternatives and missing information.`;
       updateComposer();
       $('#message').focus();
@@ -659,7 +629,7 @@ async function poll() {
     render(value);
   } catch (error) {
     harnessOnline = false;
-    $('#live').textContent = 'Reconnecting…';
+    $('#run-state').textContent = 'Reconnecting…';
     updateComposer();
   } finally {
     busy = false;
@@ -668,25 +638,30 @@ async function poll() {
 
 async function send(message, assessment = false) {
   if (sending || uploading) return;
+  const pending = latestState.pending_question;
+  if (pending && !assessment && !pending.id.startsWith('approval-') && latestState.status !== 'stopping') {
+    if (attachmentDrafts.length) { composerStatus('Remove attachments before replying.'); return; }
+    return answer(pending.id, message, true);
+  }
   if (latestState.status === 'stopping' || latestState.pending_question || (assessment && ['starting', 'running', 'waiting'].includes(latestState.status))) {
-    composerStatus('Wait for the current response or answer the pending question first.'); return;
+    composerStatus(pending ? 'Choose an answer above.' : 'Wait for the current response.'); return;
   }
   if (!harnessOnline || !latestState.settings?.model) { composerStatus('Connect a model in Settings before sending.'); return; }
   const sentDraft = $('#message').value;
   const sentAttachments = attachmentDrafts.map(file => file.id);
   sending = true;
-  selectWorkspace('conversation');
   updateComposer();
   $('#composer button[type="submit"]').disabled = true;
   try {
-    const mode = $('#thinking-control').classList.contains('hidden') ? 'auto' : $('#thinking-choice').value;
-    const result = await api('/api/chat', {method: 'POST', body: JSON.stringify({message, thinking: mode === 'auto' ? null : mode === 'on', discussion: !assessment && $('#conversation-mode').value === 'discuss', attachments: assessment ? [] : attachmentDrafts.map(f => f.id)})});
+    const active = ['starting', 'running', 'waiting'].includes(latestState.status);
+    const discussion = !assessment && (!active || latestState.discussion_mode || !latestState.burp_prompt_loaded);
+    await api('/api/chat', {method: 'POST', body: JSON.stringify({message, thinking: null, discussion, attachments: assessment ? [] : attachmentDrafts.map(f => f.id)})});
     if (!assessment) {
       if ($('#message').value === sentDraft) $('#message').value = '';
       attachmentDrafts = attachmentDrafts.filter(file => !sentAttachments.includes(file.id));
       renderAttachments();
     }
-    composerStatus(result.steering ? 'Guidance queued for the next response boundary.' : 'Message sent.');
+    composerStatus('');
     await poll();
   } catch (error) {
     composerStatus(error.message);
@@ -696,14 +671,23 @@ async function send(message, assessment = false) {
   }
 }
 
-async function answer(id, response) {
-  $('#question').querySelectorAll('button,input').forEach(el => { el.disabled = true; });
+async function answer(id, response, fromComposer = false) {
+  if (sending || uploading) return;
+  response = response.trim();
+  if (!response || response.length > 4000) { composerStatus('Keep your reply between 1 and 4000 characters.'); return; }
+  const sentDraft = $('#message').value;
+  sending = true;
+  updateComposer();
   try {
     await api(`/api/questions/${id}/answer`, {method: 'POST', body: JSON.stringify({answer: response})});
+    if (fromComposer && $('#message').value === sentDraft) $('#message').value = '';
+    composerStatus('');
     await poll();
   } catch (error) {
     composerStatus(error.message);
-    $('#question').querySelectorAll('button,input').forEach(el => { el.disabled = false; });
+  } finally {
+    sending = false;
+    updateComposer();
   }
 }
 
@@ -798,8 +782,7 @@ async function clearConversation() {
     await api('/api/run/clear', {method: 'POST', body: '{}'});
     attachmentDrafts = []; renderAttachments(); composerStatus('');
     conversationScroll = 0; followConversation = true;
-    selectWorkspace('conversation');
-    cache = {messages: [], modelStream: '', modelRun: 0};
+      cache = {messages: [], modelStream: '', modelRun: 0};
     renderedFeed = null;
     last = 0;
     await poll();
@@ -851,9 +834,17 @@ function renderModelDescription() {
   $('#legacy-model-settings').classList.toggle('hidden', !hasConnection || Boolean(option?.custom) || isBedrock);
   // Remove is only available for user-added custom models.
   const active = ['starting', 'running', 'waiting', 'stopping'].includes(latestState.status);
-  $('#test-model').disabled = active || !hasConnection;
-  $('#remove-model').disabled = active || !option?.custom;
+  $('#test-model').disabled = active || !hasConnection || pendingActions.has('connection-test');
+  $('#remove-model').disabled = active || !option?.custom || pendingActions.has('remove-model');
   $('#edit-model').disabled = active || !option?.custom;
+}
+
+let connectionTestRequest = 0;
+function clearConnectionTestResult() {
+  connectionTestRequest += 1;
+  const result = $('#connection-test-result');
+  result.className = 'connection-test-result hidden';
+  result.textContent = '';
 }
 
 function renderSkillOptions(selectedIds = []) {
@@ -869,6 +860,7 @@ function renderSkillOptions(selectedIds = []) {
 
 async function openSettings(section = settingsSection) {
   $('#settings-status').classList.add('hidden');
+  $('#settings-form').querySelectorAll('input[type="password"]').forEach(input => { input.value = ''; });
   const [value, catalog] = await Promise.all([api('/api/settings'), api('/api/skills')]);
   modelOptions = value.model_options || [];
   providerOptions = value.providers || [];
@@ -893,8 +885,10 @@ async function openSettings(section = settingsSection) {
   dialog.showModal();
   if (section === 'models' && !modelOptions.length) $('#add-model').focus();
 }
+const helpDialog = $('#help-dialog');
+$('#help').onclick = () => { closeNavigation(); helpDialog.showModal(); };
+$('#close-help').onclick = $('#done-help').onclick = () => helpDialog.close();
 $('#settings').onclick = () => { closeNavigation(); openSettings().catch(error => showNotice(error.message)); };
-$('#scope-status').onclick = () => openSettings('run').catch(error => showNotice(error.message));
 $('#setup-connection').onclick = () => openSettings('models').then(() => { if (!modelOptions.length) openModelDialog(); }).catch(error => showNotice(error.message));
 // Switching model applies that model's recommended step/output budget so hosted
 // models get room for long runs without manual tuning. The user can still edit
@@ -910,7 +904,12 @@ $('#model-choice').onchange = () => {
   clearConnectionTestResult();
   applyRecommendedLimits($('#model-choice').value);
 };
-$('#close-settings').onclick = $('#cancel-settings').onclick = () => dialog.close();
+function closeSettings() {
+  $('#settings-form').querySelectorAll('input[type="password"]').forEach(input => { input.value = ''; });
+  dialog.close();
+}
+$('#close-settings').onclick = $('#cancel-settings').onclick = closeSettings;
+dialog.addEventListener('cancel', () => { $('#settings-form').querySelectorAll('input[type="password"]').forEach(input => { input.value = ''; }); });
 $('#settings-form').addEventListener('invalid', event => {
   const pane = event.target.closest('.settings-pane');
   if (pane) selectSettings(pane.id.replace('settings-', ''));
@@ -984,6 +983,20 @@ $('#skill-form').onsubmit = async event => {
 const modelDialog = $('#model-dialog');
 let editingModelId = null;
 let editingModel = null;
+let modelCatalogRequest = 0;
+
+function resetModelCatalog() {
+  modelCatalogRequest += 1;
+  const isBedrock = selectedProvider().id === 'bedrock';
+  $('#connection-catalog').classList.toggle('hidden', isBedrock);
+  $('#load-models').disabled = isBedrock;
+  $('#load-models').textContent = 'Load models';
+  $('#model-catalog-status').className = 'hint hidden';
+  $('#model-catalog-status').textContent = '';
+  $('#server-models-row').classList.add('hidden');
+  $('#server-models').innerHTML = '<option value="">Choose a model…</option>';
+  $('#connection-model-list').innerHTML = isBedrock ? ($('#bedrock-model-list').innerHTML || '') : '';
+}
 
 function selectedProvider() {
   return providerOptions.find(item => item.id === $('#connection-provider').value) || providerOptions[0] || {};
@@ -1016,8 +1029,7 @@ function renderProviderFields(setDefaultUrl = false) {
     openai_compatible: 'Exact ID returned by /models',
   };
   $('#connection-model').placeholder = modelPlaceholders[provider.id] || 'Exact model ID';
-  const suggestions = isBedrock ? ($('#bedrock-model-list').innerHTML || '') : '';
-  $('#connection-model-list').innerHTML = suggestions;
+  resetModelCatalog();
   $('#model-status').className = 'form-status hidden';
   $('#model-status').textContent = '';
 }
@@ -1041,14 +1053,67 @@ function openModelDialog(option = null) {
   dialog.close();
   modelDialog.showModal();
 }
-$('#connection-provider').onchange = () => renderProviderFields(true);
+$('#connection-provider').onchange = () => {
+  $('#connection-api-key').value = '';
+  renderProviderFields(true);
+};
 $('#add-model').onclick = () => openModelDialog();
 $('#edit-model').onclick = () => {
   const option = modelOption($('#model-choice').value);
   if (option?.custom) openModelDialog(option);
 };
-$('#close-model').onclick = $('#cancel-model').onclick = () => { modelDialog.close(); dialog.showModal(); };
-modelDialog.addEventListener('cancel', event => { event.preventDefault(); modelDialog.close(); dialog.showModal(); });
+$('#close-model').onclick = $('#cancel-model').onclick = () => { resetModelCatalog(); modelDialog.close(); dialog.showModal(); };
+modelDialog.addEventListener('cancel', event => { event.preventDefault(); resetModelCatalog(); modelDialog.close(); dialog.showModal(); });
+$('#model-form').elements.namedItem('url').addEventListener('input', resetModelCatalog);
+$('#connection-api-key').addEventListener('input', resetModelCatalog);
+$('#server-models').onchange = () => {
+  if ($('#server-models').value) $('#connection-model').value = $('#server-models').value;
+};
+$('#connection-model').addEventListener('input', () => { $('#server-models').value = $('#connection-model').value; });
+$('#load-models').onclick = async () => {
+  const form = $('#model-form');
+  const url = form.elements.namedItem('url');
+  if (!url.value.trim()) {
+    $('#model-catalog-status').className = 'hint catalog-error';
+    $('#model-catalog-status').textContent = 'Enter the API base URL before loading models.';
+    url.focus();
+    return;
+  }
+  if (!$('#connection-api-key').reportValidity()) return;
+  resetModelCatalog();
+  const request = modelCatalogRequest;
+  const status = $('#model-catalog-status');
+  const button = $('#load-models');
+  status.className = 'hint';
+  status.textContent = 'Loading models from the server…';
+  button.disabled = true;
+  button.textContent = 'Loading…';
+  const body = {provider: $('#connection-provider').value, url: url.value, api_key: $('#connection-api-key').value};
+  if (editingModelId) body.id = editingModelId;
+  try {
+    const value = await api('/api/models/catalog', {method: 'POST', body: JSON.stringify(body)});
+    if (request !== modelCatalogRequest || !modelDialog.open) return;
+    const models = value.models || [];
+    if (!models.length) {
+      status.textContent = 'The server returned no model IDs. Check the server or enter an ID manually.';
+      return;
+    }
+    const options = models.map(id => `<option value="${esc(id)}">${esc(id)}</option>`).join('');
+    $('#server-models').innerHTML = '<option value="">Choose a model…</option>' + options;
+    $('#connection-model-list').innerHTML = options;
+    $('#server-models-row').classList.remove('hidden');
+    if (!$('#connection-model').value.trim() && models.length === 1) $('#connection-model').value = models[0];
+    $('#server-models').value = $('#connection-model').value;
+    status.textContent = `${models.length} model${models.length === 1 ? '' : 's'} loaded${value.truncated ? ' · showing the first 1,000' : ''}. Choose one below or enter an ID manually.`;
+    $('#server-models').focus();
+  } catch (error) {
+    if (request !== modelCatalogRequest || !modelDialog.open) return;
+    status.className = 'hint catalog-error';
+    status.textContent = error.message;
+  } finally {
+    if (request === modelCatalogRequest) { button.disabled = false; button.textContent = 'Load models'; }
+  }
+};
 $('#model-form').onsubmit = async event => {
   event.preventDefault();
   const body = Object.fromEntries(new FormData(event.target).entries());
@@ -1057,6 +1122,7 @@ $('#model-form').onsubmit = async event => {
   try {
     if (editingModelId) body.id = editingModelId;
     await api(editingModelId ? '/api/models/edit' : '/api/models', {method: 'POST', body: JSON.stringify(body)});
+    resetModelCatalog();
     event.target.reset();
     modelDialog.close();
     await openSettings();
@@ -1068,6 +1134,7 @@ $('#model-form').onsubmit = async event => {
 $('#test-model').onclick = async () => {
   const id = $('#model-choice').value;
   if (!id) return;
+  const request = ++connectionTestRequest;
   const result = $('#connection-test-result');
   const button = $('#test-model');
   result.className = 'connection-test-result testing';
@@ -1075,9 +1142,11 @@ $('#test-model').onclick = async () => {
   button.disabled = true;
   try {
     const value = await api('/api/models/test', {method: 'POST', body: JSON.stringify({id})});
+    if (request !== connectionTestRequest || id !== $('#model-choice').value) return;
     result.className = 'connection-test-result success';
     result.textContent = `Connected · ${value.detail}`;
   } catch (error) {
+    if (request !== connectionTestRequest || id !== $('#model-choice').value) return;
     result.className = 'connection-test-result failure';
     result.textContent = error.message;
   } finally {
@@ -1089,7 +1158,7 @@ $('#remove-model').onclick = async () => {
   const id = $('#model-choice').value;
   const option = modelOption(id);
   if (!option?.custom) return;
-  if (!confirm(`Remove custom model "${option.label || id}"?`)) return;
+  if (!confirm(`Remove connection "${option.label || id}" and its saved API key from this Mac?`)) return;
   try {
     await api('/api/models/delete', {method: 'POST', body: JSON.stringify({id})});
     await openSettings();
@@ -1097,6 +1166,16 @@ $('#remove-model').onclick = async () => {
     showNotice(error.message);
   }
 };
-
+// Keep asynchronous actions locked across the periodic state refresh.
+for (const [selector, event, key] of [
+  ['#bootstrap', 'onclick', 'bootstrap'], ['#validate-a', 'onclick', 'validate'],
+  ['#confirm-new-conversation', 'onclick', 'clear'], ['#test-model', 'onclick', 'connection-test'],
+  ['#remove-model', 'onclick', 'remove-model'], ['#settings-form', 'onsubmit', 'settings'],
+  ['#model-form', 'onsubmit', 'model-save'], ['#skill-form', 'onsubmit', 'skill-save'],
+  ['#seed-form', 'onsubmit', 'seed']
+]) {
+  const element = $(selector);
+  element[event] = lockAction(key, element[event], element.matches('form') ? element.querySelector('[type="submit"]') : element);
+}
 poll();
 setInterval(poll, 500);

@@ -91,6 +91,7 @@ def _json_request(
     body: dict[str, Any] | None = None,
     headers: dict[str, str] | None = None,
     timeout: int = 30,
+    max_response_bytes: int | None = None,
 ) -> Any:
     data = None if body is None else json.dumps(body).encode()
     request = urllib.request.Request(url, data=data, method=method)
@@ -105,10 +106,13 @@ def _json_request(
     try:
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
         with opener.open(request, timeout=timeout) as response:
-            raw = response.read().decode("utf-8", "replace")
+            data = response.read() if max_response_bytes is None else response.read(max_response_bytes + 1)
+            if max_response_bytes is not None and len(data) > max_response_bytes:
+                raise ValueError("Model catalogue is too large; enter the model ID manually")
+            raw = data.decode("utf-8", "replace")
             return json.loads(raw) if raw.strip() else {}
     except urllib.error.HTTPError as exc:
-        raw = exc.read().decode("utf-8", "replace")
+        raw = (exc.read() if max_response_bytes is None else exc.read(max_response_bytes)).decode("utf-8", "replace")
         try:
             value = json.loads(raw)
         except ValueError:
@@ -431,6 +435,7 @@ class Model:
                 self.base + "/models",
                 headers={"x-api-key": self.key, "anthropic-version": "2023-06-01"},
                 timeout=min(self.timeout, 10),
+                max_response_bytes=2_000_000,
             )
             data = value.get("data", []) if isinstance(value, dict) else []
             return [str(item["id"]) for item in data if isinstance(item, dict) and item.get("id")]
@@ -439,6 +444,7 @@ class Model:
             self.base + "/models",
             headers=headers,
             timeout=min(self.timeout, 10),
+            max_response_bytes=2_000_000,
         )
         data = value.get("data", []) if isinstance(value, dict) else []
         return [str(item["id"]) for item in data if isinstance(item, dict) and item.get("id")]

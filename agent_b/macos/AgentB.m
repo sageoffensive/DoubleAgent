@@ -54,6 +54,7 @@
 
 - (void)makeWindow {
     WKWebViewConfiguration *configuration = [[WKWebViewConfiguration alloc] init];
+    configuration.preferences.tabFocusesLinks = YES;
     self.webView = [[WKWebView alloc] initWithFrame:NSZeroRect configuration:configuration];
     self.webView.navigationDelegate = self;
     self.webView.UIDelegate = self;

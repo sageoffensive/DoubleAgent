@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from . import DISPLAY_VERSION, __version__, config
-from .clients import Model
+from .clients import HTTPError, Model
 from .engine import Engine
 from .research import Research, connection_label, parse_dependencies
 from .skills import create_skill, public_catalog
@@ -240,6 +240,27 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 ENGINE.health_cache = None
                 self.json(saved.public(), 201)
+                return
+            if parsed.path == "/api/models/catalog":
+                if ENGINE.thread and ENGINE.thread.is_alive():
+                    raise ValueError("Stop the current run before loading models")
+                candidate = config.model_catalog_candidate(body)
+                client = Model(candidate["base_url"], candidate["api_key"], "", 10, 16, candidate["provider"])
+                try:
+                    models = client.available_models()
+                except HTTPError as exc:
+                    if exc.status in (401, 403):
+                        raise ValueError("The server rejected the API key; check the connection credentials") from None
+                    if exc.status == 404:
+                        raise ValueError("Models endpoint not found; check the API base URL, including /v1 if required") from None
+                    raise ValueError("The server could not list models (HTTP %d); retry or enter the ID manually" % exc.status) from None
+                except Exception:
+                    # Provider responses may echo credentials. Never return raw errors.
+                    raise ValueError("Could not load models; check the server, API base URL and credentials, or enter the ID manually") from None
+                models = sorted({item for item in models if isinstance(item, str) and 0 < len(item) <= 180
+                                 and all(ord(char) >= 32 and ord(char) != 127 for char in item)
+                                 and not (candidate["api_key"] and candidate["api_key"] in item)})
+                self.json({"models": models[:1000], "truncated": len(models) > 1000})
                 return
             if parsed.path == "/api/models/test":
                 if ENGINE.thread and ENGINE.thread.is_alive():

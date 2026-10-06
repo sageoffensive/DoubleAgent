@@ -86,7 +86,7 @@ class JevReviewMixin(object):
         Agent B, which marks genuine duplicates with the model configured in
         Double Agent. Replaces the direct OpenRouter/Jev call."""
         from javax.swing import JOptionPane
-        ids = self._automated_testing_finding_ids()
+        ids = self._duplicate_review_finding_ids()
         if len(ids) < 2:
             JOptionPane.showMessageDialog(self.panel,
                 "Need at least two Agent A findings to review for duplicates.",

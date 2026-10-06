@@ -158,7 +158,7 @@ class BurpExtenderChunk2Chunk3(object):
                 self.stderr.println("[AGENT] Failed to start server; cannot enqueue duplicate review")
                 return None
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        target_finding_ids = self._automated_testing_finding_ids()
+        target_finding_ids = self._duplicate_review_finding_ids()
         with self.agent_queue_lock:
             qid = self.agent_queue_next_id
             self.agent_queue_next_id += 1
@@ -170,6 +170,7 @@ class BurpExtenderChunk2Chunk3(object):
                 "completed_at": None,
                 "finding_ids": target_finding_ids,
                 "summary": "Duplicate review: mark same-issue Agent A findings",
+                "finding_stable_ids": list(target_finding_ids),
                 "assessment": "",
                 "test_results": [],
                 "notes": [],

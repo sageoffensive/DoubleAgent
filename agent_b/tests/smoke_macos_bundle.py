@@ -59,8 +59,8 @@ def main():
                 assert b'aria-label="Agent B version">v' in page
                 assert b"{{AGENT_B_VERSION}}" not in page
                 assert b'id="javascript-dialog"' in page
-                for name in (b"conversation", b"notebook", b"assessment"):
-                    assert b'id="tab-' + name + b'"' in page
+                assert b'id="pane-conversation"' in page
+                assert b'id="tab-notebook"' not in page and b'id="tab-assessment"' not in page
             with urllib.request.urlopen(base + "/api/notebook", timeout=2) as reply:
                 notebook = json.load(reply)
             assert notebook["burp_context_enabled"] is False
@@ -75,11 +75,11 @@ def main():
                 page = reply.read()
                 assert reply.url == base + "/", "Legacy research page must return to chat"
                 assert b'id="source-review-panel"' in page
-                assert b'id="target-link-main"' in page
+                assert b'id="target-link"' in page
                 assert b'aria-label="Agent B version">v' in page
                 assert b"{{AGENT_B_VERSION}}" not in page
-                for name in (b"conversation", b"notebook", b"assessment"):
-                    assert b'id="tab-' + name + b'"' in page
+                assert b'id="pane-conversation"' in page
+                assert b'id="tab-notebook"' not in page and b'id="tab-assessment"' not in page
             with urllib.request.urlopen(base + "/api/research", timeout=2) as reply:
                 assert json.load(reply)["notes"] == [], "Fresh research notebook must be empty"
             source_request = urllib.request.Request(base + "/api/research/start", data=json.dumps({

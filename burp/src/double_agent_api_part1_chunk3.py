@@ -942,6 +942,9 @@ class AgentAPIChunk1Chunk3(object):
                     continue
                 new_ids = []
                 for fid in old_ids:
+                    if str(fid).startswith("daf_"):
+                        new_ids.append(fid)
+                        continue
                     try:
                         fid_int = int(fid)
                     except:

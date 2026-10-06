@@ -208,6 +208,41 @@ class FileHTTPTests(unittest.TestCase):
         self.assertEqual(self.request("GET", "/api/export", headers={"Sec-Fetch-Site": "cross-site"})[0], 403)
         self.assertEqual(self.request("GET", "/api/export", headers={"Host": "[bad"})[0], 403)
 
+    def test_model_catalogue_without_model_filters_ids_and_cannot_infer(self):
+        with patch("agent_b_harness.server.Model") as client, patch.object(config, "SETTINGS", Path(self.temp.name) / "settings.json"):
+            client.return_value.available_models.return_value = ["z-model", "a-model", "z-model", "bad\nmodel", "x" * 181]
+            status, _, body = self.request("POST", "/api/models/catalog", {"url": "http://localhost:8080/v1"})
+            self.assertEqual(status, 200)
+            self.assertEqual(json.loads(body), {"models": ["a-model", "z-model"], "truncated": False})
+            self.assertEqual(client.call_args.args, ("http://localhost:8080/v1", "", "", 10, 16, "openai_compatible"))
+            client.return_value.complete.assert_not_called()
+            client.return_value.test_connection.assert_not_called()
+            self.assertFalse(config.SETTINGS.exists())
+            self.assertEqual(self.request("POST", "/api/models/catalog", {"url": "http://localhost/v1"}, {"Origin": "https://other.invalid"})[0], 403)
+
+    def test_model_catalogue_errors_do_not_echo_remote_credentials(self):
+        from agent_b_harness.clients import HTTPError
+        with patch("agent_b_harness.server.Model") as client, patch.object(config, "SETTINGS", Path(self.temp.name) / "settings.json"):
+            for error in (HTTPError(401, {"error": "private-fixture"}), HTTPError(404, {}), RuntimeError("private-fixture")):
+                client.return_value.available_models.side_effect = error
+                status, _, body = self.request("POST", "/api/models/catalog", {"url": "http://localhost/v1", "api_key": "private-fixture"})
+                self.assertEqual(status, 400)
+                self.assertNotIn(b"private-fixture", body)
+            client.return_value.available_models.side_effect = None
+            client.return_value.available_models.return_value = ["private-fixture", *["model-%04d" % i for i in range(1001)]]
+            status, _, body = self.request("POST", "/api/models/catalog", {"url": "http://localhost/v1", "api_key": "private-fixture"})
+            result = json.loads(body)
+            self.assertEqual(status, 200)
+            self.assertTrue(result["truncated"])
+            self.assertEqual(len(result["models"]), 1000)
+            self.assertNotIn(b"private-fixture", body)
+
+    def test_model_catalogue_is_blocked_during_active_run(self):
+        with patch.object(self.engine, "thread") as thread, patch("agent_b_harness.server.Model") as client:
+            thread.is_alive.return_value = True
+            self.assertEqual(self.request("POST", "/api/models/catalog", {"url": "http://localhost/v1"})[0], 400)
+            client.assert_not_called()
+
     def test_preview_is_image_only(self):
         item = self.engine.attachments.add("screen.png", base64.b64encode(PNG).decode())
         status, headers, body = self.request("GET", "/api/files/" + item["id"] + "/preview")
@@ -224,6 +259,18 @@ class FileHTTPTests(unittest.TestCase):
             self.assertEqual(status, 200)
             self.assertIn(b"A useful response", body)
             self.assertNotIn(b"example-secret-value", body)
+
+    def test_notebook_api_export_and_revision_conflict(self):
+        status, _, body = self.request("POST", "/api/notebook", {"revision": 0, "objective": "Review fixture notes", "facts": "API_key=secret-notebook-fixture"})
+        self.assertEqual(status, 200)
+        self.assertNotIn(b"secret-notebook-fixture", body)
+        self.assertEqual(self.request("POST", "/api/notebook", {"revision": 0, "objective": "overwrite"})[0], 400)
+        status, _, body = self.request("GET", "/api/notebook/export")
+        self.assertEqual(status, 200)
+        self.assertIn(b"Review fixture notes", body)
+        self.assertNotIn(b"secret-notebook-fixture", body)
+        self.assertEqual(self.request("POST", "/api/notebook/refresh", {})[0], 400)
+        self.assertEqual(self.request("POST", "/api/notebook", {"revision": 1}, {"Origin": "https://example.test"})[0], 403)
 
 
 if __name__ == "__main__":

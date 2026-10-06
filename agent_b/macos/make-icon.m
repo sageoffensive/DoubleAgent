@@ -1,78 +1,59 @@
-// Renders the Agent B app icon (dark rounded square + orange "B")
-// to a 1024x1024 PNG, matching the harness brand mark in static/styles.css.
-// Uses CoreGraphics/CoreText/ImageIO so it renders headless (no WindowServer).
-//   clang -fobjc-arc -framework Foundation -framework CoreGraphics \
-//         -framework CoreText -framework ImageIO make-icon.m -o make-icon
-//   ./make-icon out.png
+// Resamples the shared transparent fedora mark into macOS iconset PNGs.
+// Uses CoreGraphics/ImageIO so it runs without a WindowServer.
+// clang -fobjc-arc -framework Foundation -framework CoreGraphics \
+//       -framework ImageIO make-icon.m -o make-icon
+// ./make-icon out.png 1024 ../static/agent-b-logo.png
 #import <Foundation/Foundation.h>
 #import <CoreGraphics/CoreGraphics.h>
-#import <CoreText/CoreText.h>
 #import <ImageIO/ImageIO.h>
 
 int main(int argc, const char *argv[]) {
     @autoreleasepool {
-        NSString *outPath = (argc > 1) ? [NSString stringWithUTF8String:argv[1]] : @"icon-1024.png";
-        const CGFloat S = (argc > 2) ? atof(argv[2]) : 1024.0;
-
-        CGColorSpaceRef cs = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
-        CGContextRef ctx = CGBitmapContextCreate(NULL, (size_t)S, (size_t)S, 8, 0, cs,
+        if (argc != 4) {
+            fprintf(stderr, "usage: make-icon output.png size logo.png\n");
+            return 1;
+        }
+        NSString *outPath = [NSString stringWithUTF8String:argv[1]];
+        const NSInteger size = atoi(argv[2]);
+        if (size < 16 || size > 4096) {
+            fprintf(stderr, "invalid icon size\n");
+            return 1;
+        }
+        NSURL *sourceURL = [NSURL fileURLWithPath:[NSString stringWithUTF8String:argv[3]]];
+        CGImageSourceRef source = CGImageSourceCreateWithURL((__bridge CFURLRef)sourceURL, NULL);
+        CGImageRef mark = source ? CGImageSourceCreateImageAtIndex(source, 0, NULL) : NULL;
+        if (!mark) {
+            if (source) CFRelease(source);
+            fprintf(stderr, "cannot read logo\n");
+            return 1;
+        }
+        CGColorSpaceRef space = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+        CGContextRef context = CGBitmapContextCreate(NULL, size, size, 8, 0, space,
             kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder32Big);
-        if (!ctx) { fprintf(stderr, "no context\n"); return 1; }
-
-        // Rounded-square plate with standard macOS icon padding.
-        CGFloat margin = S * 0.086;
-        CGRect plate = CGRectMake(margin, margin, S - 2 * margin, S - 2 * margin);
-        CGFloat radius = plate.size.width * 0.2237; // macOS "squircle" corner ratio
-        CGPathRef platePath = CGPathCreateWithRoundedRect(plate, radius, radius, NULL);
-
-        // Soft drop shadow under the plate.
-        CGContextSaveGState(ctx);
-        CGContextSetShadowWithColor(ctx, CGSizeMake(0, -S * 0.012), S * 0.03,
-            CGColorCreateGenericRGB(0, 0, 0, 0.28));
-        CGContextAddPath(ctx, platePath);
-        CGContextSetRGBFillColor(ctx, 0, 0, 0, 1);
-        CGContextFillPath(ctx);
-        CGContextRestoreGState(ctx);
-
-        // Charcoal gradient plate.
-        CGContextSaveGState(ctx);
-        CGContextAddPath(ctx, platePath);
-        CGContextClip(ctx);
-        CGFloat comps[8] = {
-            0x29/255.0, 0x29/255.0, 0x29/255.0, 1.0,   // charcoal
-            0x10/255.0, 0x10/255.0, 0x10/255.0, 1.0,   // near black
-        };
-        CGFloat locs[2] = {0.0, 1.0};
-        CGGradientRef grad = CGGradientCreateWithColorComponents(cs, comps, locs, 2);
-        // angle ~ -55deg from top-left toward bottom-right
-        CGPoint start = CGPointMake(plate.origin.x, CGRectGetMaxY(plate));
-        CGPoint end   = CGPointMake(CGRectGetMaxX(plate), plate.origin.y);
-        CGContextDrawLinearGradient(ctx, grad, start, end, 0);
-        CGContextRestoreGState(ctx);
-
-        // Bold orange B, centered.
-        CGFloat fontSize = S * 0.6;
-        CTFontRef font = CTFontCreateWithName(CFSTR("HelveticaNeue-Bold"), fontSize, NULL);
-        CGColorRef ink = CGColorCreateGenericRGB(0xff/255.0, 0x80/255.0, 0x35/255.0, 1.0);
-        CFStringRef keys[]   = { kCTFontAttributeName, kCTForegroundColorAttributeName };
-        CFTypeRef   values[] = { font, ink };
-        CFDictionaryRef attrs = CFDictionaryCreate(NULL, (const void **)keys, (const void **)values, 2,
-            &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-        CFAttributedStringRef attr = CFAttributedStringCreate(NULL, CFSTR("B"), attrs);
-        CTLineRef line = CTLineCreateWithAttributedString(attr);
-        CGRect glyphRect = CTLineGetBoundsWithOptions(line, kCTLineBoundsUseGlyphPathBounds);
-        CGFloat tx = (S - glyphRect.size.width) / 2.0 - glyphRect.origin.x;
-        CGFloat ty = (S - glyphRect.size.height) / 2.0 - glyphRect.origin.y;
-        CGContextSetTextPosition(ctx, tx, ty);
-        CTLineDraw(line, ctx);
-
-        CGImageRef image = CGBitmapContextCreateImage(ctx);
-        CFURLRef url = (__bridge CFURLRef)[NSURL fileURLWithPath:outPath];
-        CGImageDestinationRef dest = CGImageDestinationCreateWithURL(url, CFSTR("public.png"), 1, NULL);
-        if (!dest) { fprintf(stderr, "no destination\n"); return 1; }
-        CGImageDestinationAddImage(dest, image, NULL);
-        if (!CGImageDestinationFinalize(dest)) { fprintf(stderr, "failed to write %s\n", outPath.UTF8String); return 1; }
-        fprintf(stdout, "wrote %s\n", outPath.UTF8String);
+        if (!context) {
+            CGImageRelease(mark); CFRelease(source); CGColorSpaceRelease(space);
+            fprintf(stderr, "cannot create image context\n");
+            return 1;
+        }
+        CGFloat width = CGImageGetWidth(mark), height = CGImageGetHeight(mark);
+        CGFloat scale = MIN(size / width, size / height);
+        CGRect bounds = CGRectMake((size - width * scale) / 2,
+            (size - height * scale) / 2, width * scale, height * scale);
+        CGContextSetInterpolationQuality(context, kCGInterpolationHigh);
+        CGContextDrawImage(context, bounds, mark);
+        CGImageRef image = CGBitmapContextCreateImage(context);
+        NSURL *outputURL = [NSURL fileURLWithPath:outPath];
+        CGImageDestinationRef destination = CGImageDestinationCreateWithURL(
+            (__bridge CFURLRef)outputURL, CFSTR("public.png"), 1, NULL);
+        BOOL success = NO;
+        if (destination) {
+            CGImageDestinationAddImage(destination, image, NULL);
+            success = CGImageDestinationFinalize(destination);
+            CFRelease(destination);
+        }
+        CGImageRelease(image); CGContextRelease(context); CGColorSpaceRelease(space);
+        CGImageRelease(mark); CFRelease(source);
+        if (!success) fprintf(stderr, "cannot write icon PNG\n");
+        return success ? 0 : 1;
     }
-    return 0;
 }

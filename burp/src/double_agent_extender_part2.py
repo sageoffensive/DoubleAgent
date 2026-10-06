@@ -74,7 +74,7 @@ class BurpExtenderChunk2(object):
                         comp.setFont(Font("Monospaced", Font.BOLD, 17))
                     elif "AI-Powered" in text:
                         comp.setForeground(fg_info)
-                    elif "Total:" in text and "Crit:" in text:
+                    elif ("Total:" in text or "Reportable:" in text) and "Crit:" in text:
                         comp.setForeground(fg_info)
                         comp.setFont(Font("Monospaced", Font.BOLD, 11))
 
@@ -375,7 +375,7 @@ class BurpExtenderChunk2(object):
                         hidden_count = 0
                         for fid, finding in enumerate(self.extender.findings_list):
                             is_hidden = self.extender._finding_hidden_from_normal_view(finding)
-                            severity = finding.get("severity", "Information")
+                            severity = self.extender._finding_severity_display(finding.get("severity", "Information"))
                             if is_hidden:
                                 hidden_count += 1
                             else:
@@ -474,9 +474,10 @@ class BurpExtenderChunk2(object):
                     timings.append(("findings table", int((time.time() - phase_start) * 1000)))
 
                     phase_start = time.time()
-                    hidden_label = "  |  Hidden: %d" % hidden_count if hidden_count > 0 else ""
+                    hidden_label = "  |  Hidden: %d" % hidden_count
+                    self.extender._showFPBtn.setText(("Hide hidden (%d)" if self.extender._show_fp_findings else "Show hidden (%d)") % hidden_count)
                     self.extender.findingsStatsLabel.setText(
-                        "Total: %d | Crit: %d | High: %d | Medium: %d | Low: %d | Info: %d%s" %
+                        "Reportable: %d | Crit: %d | High: %d | Medium: %d | Low: %d | Info: %d%s" %
                         (total_findings, severity_counts["Critical"], severity_counts["High"], severity_counts["Medium"],
                          severity_counts["Low"], severity_counts["Information"], hidden_label)
                     )
@@ -782,6 +783,10 @@ class BurpExtenderChunk2(object):
 
     def clearFindings(self, event):
         """Clear all findings from the findings table"""
+        with self.findings_lock_ui:
+            count = len(self.findings_list)
+        if not count or not self._confirmFindingRemoval(count, clear_all=True):
+            return
         with self.findings_lock_ui:
             self.findings_list = []
         with self.findings_lock:

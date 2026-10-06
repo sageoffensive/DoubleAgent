@@ -11,7 +11,7 @@
   <div class="shell">
     <aside id="navigation" aria-label="Assessment controls">
       <header class="brand">
-        <div class="mark">B</div>
+        <img class="mark" src="/agent-b-logo.png" alt="Agent B black hat logo" width="40" height="40">
         <div><strong>Agent B</strong><span>Your assessment teammate</span></div>
         <button type="button" id="close-nav" class="icon nav-close" aria-label="Close menu">×</button>
       </header>
@@ -46,63 +46,16 @@
       <section class="sidebar-utilities" aria-label="Conversation and settings">
         <button id="clear">New conversation</button>
         <button id="settings">Settings</button>
+        <button id="help">Help</button>
+        <button type="button" id="open-source-review">Review together</button>
       </section>
-      <footer>Traffic is executed by Burp and governed by its scope and safety gates.</footer>
+      <footer><span class="app-version" aria-label="Agent B version">{{AGENT_B_VERSION}}</span> · Traffic is executed by Burp and governed by its scope and safety gates.</footer>
     </aside>
 
     <main>
-      <header class="topbar">
-        <div class="workspace-heading"><div class="eyebrow">DOUBLE AGENT</div><h1 id="workspace-title">Conversation</h1><p id="workspace-subtitle">Discuss evidence and decide what comes next.</p><small class="app-version" aria-label="Agent B version">{{AGENT_B_VERSION}}</small></div>
-        <div class="topbar-actions">
-          <a class="download-link" href="/api/export" download>Export chat</a>
-          <button type="button" id="open-nav" class="mobile-menu" aria-label="Open controls" aria-controls="navigation" aria-expanded="false">Controls</button>
-          <a id="target-link-main" class="target-link-main hidden" href="#" target="_blank" rel="noopener noreferrer">Open target</a>
-          <button type="button" id="scope-status" class="scope-status" title="View scope enforcement in Settings">Scope enforced</button><div id="live" class="pill" role="status">Connecting</div>
-        </div>
-      </header>
-      <div class="workspace-tabs" role="tablist" aria-label="Workspace">
-        <button type="button" id="tab-conversation" role="tab" aria-controls="pane-conversation" aria-selected="true" data-workspace="conversation">Conversation</button>
-        <button type="button" id="tab-notebook" role="tab" aria-controls="pane-notebook" aria-selected="false" tabindex="-1" data-workspace="notebook">Notebook</button>
-        <button type="button" id="tab-assessment" role="tab" aria-controls="pane-assessment" aria-selected="false" tabindex="-1" data-workspace="assessment">Assessment <span id="assessment-activity" class="tab-indicator hidden" aria-label="Run active"></span></button>
-      </div>
+      <button type="button" id="open-nav" class="mobile-menu" aria-label="Open controls" aria-controls="navigation" aria-expanded="false">Controls</button>
       <div id="ui-notice" class="ui-notice hidden" role="status"><span id="ui-notice-text"></span><button type="button" id="dismiss-notice" aria-label="Dismiss message">×</button></div>
-      <section id="pane-assessment" class="workspace-pane hidden" role="tabpanel" aria-labelledby="tab-assessment" tabindex="0">
-        <div class="pane-intro"><h2>Assessment details</h2><p>Follow model activity, coverage, and the current plan.</p></div>
-      <details id="model-stream-panel" class="model-stream-panel" open>
-        <summary>
-          <span class="model-activity-title"><i id="model-activity-dot" class="activity-dot"></i><span id="model-activity-label">Model activity</span></span>
-          <small id="model-stream-state" aria-live="polite">Waiting for model</small>
-        </summary>
-        <div class="model-stream-note"><strong id="model-stream-source">Action commentary</strong><span>Provider-exposed reasoning is shown when available. Agent B never invents or exposes hidden chain-of-thought.</span></div>
-        <pre id="model-stream" aria-label="Live model activity">No model output yet.</pre>
-      </details>
-      <details id="coverage-panel" class="coverage-panel hidden">
-        <summary><span id="coverage-title">Coverage</span><small id="coverage-sub">Discovered surface reached &amp; tested</small></summary>
-        <div id="coverage-body"></div>
-      </details>
-      <details id="assessment-plan-panel" class="assessment-plan-panel hidden">
-        <summary><span id="assessment-plan-title">Plan of attack</span><small>Prepared before active testing</small></summary>
-        <div id="assessment-plan"></div>
-      </details>
-        <p id="assessment-empty" class="hint">Connect to Burp to load assessment context. Model activity appears here when a conversation or assessment runs.</p>
-      </section>
-      <section id="pane-notebook" class="workspace-pane hidden" role="tabpanel" aria-labelledby="tab-notebook" tabindex="0">
-        <div class="pane-intro"><h2>Keep your teammate up to date</h2><p>Capture the objective, evidence, and decisions you want to carry forward.</p></div>
-      <details id="notebook-panel" class="notebook-panel" open>
-        <summary>Engagement notebook <small id="notebook-summary">Saved on this Mac</small></summary>
-        <div class="notebook-body">
-          <div class="notebook-actions"><button type="button" id="edit-notebook">Edit notes</button><a class="download-link" href="/api/notebook/export" download>Export notebook</a></div>
-          <p id="notebook-objective" class="hint">Add your objective, facts, questions and decisions.</p>
-          <div id="notebook-notes" class="notebook-notes"></div>
-          <label class="snapshot-choice"><input type="checkbox" id="burp-discussion-context"> Include read-only Burp context in Discuss</label>
-          <p class="hint">When enabled, a snapshot of findings and queue status is refreshed when you send a Discuss message and sent to your selected model. Notes and file references survive app restarts.</p>
-          <div class="snapshot-controls"><button type="button" id="refresh-discussion-context">Refresh snapshot</button><span id="snapshot-status" role="status" aria-live="polite">Burp context off</span></div>
-          <div id="notebook-snapshot"></div>
-          <div id="notebook-files"></div>
-        </div>
-      </details>
-      </section>
-      <section id="pane-conversation" class="conversation-pane" role="tabpanel" aria-labelledby="tab-conversation">
+      <section id="pane-conversation" class="conversation-pane" aria-label="Chat">
         <div id="connection-guidance" class="connection-guidance hidden"><span>Add a model connection to start a conversation.</span><button type="button" id="setup-connection">Add connection</button></div>
       <details id="suggestions-panel" class="suggestions-panel hidden">
         <summary>Ideas &amp; recommendations <span id="suggestion-count"></span></summary>
@@ -111,6 +64,14 @@
       </details>
       <div id="timeline" class="timeline" aria-label="Conversation"></div>
         <button type="button" id="jump-latest" class="jump-latest hidden">Latest messages ↓</button>
+        <details id="model-stream-panel" class="model-stream-panel">
+          <summary>
+            <span class="model-activity-title"><i id="model-activity-dot" class="activity-dot"></i><span id="model-activity-label">Thinking &amp; activity</span></span>
+            <small id="model-stream-state" aria-live="polite">Waiting for model</small>
+          </summary>
+          <div class="model-stream-note"><strong id="model-stream-source">Model activity</strong><span>Live output from your model.</span></div>
+          <pre id="model-stream" aria-label="Live thinking and model activity">No model output yet.</pre>
+        </details>
       </section>
       <div id="question" class="question hidden" role="region" aria-label="Agent B needs your input"></div>
       <section id="source-review-panel" class="source-review hidden" aria-label="Review together">
@@ -134,25 +95,20 @@
       </section>
       <form id="composer">
         <div class="composer-toolbar">
-          <label for="conversation-mode">Mode</label><select id="conversation-mode"><option value="discuss">Discuss · advice and files</option><option value="assessment">Assessment chat</option></select>
-          <button type="button" id="attach-files">Attach files</button>
-          <button type="button" id="open-source-review">Review source</button>
+          <button type="button" id="attach-files" aria-label="Attach files" title="Attach files">+</button>
           <input type="file" id="file-picker" class="hidden" multiple accept=".js,.jsx,.mjs,.txt,.md,.csv,.json,.log,.xml,.yaml,.yml,.png,.jpg,.jpeg,.webp">
         </div>
         <div id="attachment-list" class="attachment-list hidden"></div>
-        <textarea id="message" rows="2" aria-describedby="composer-help composer-shortcut" aria-label="Message to Agent B" placeholder="Ask a question, share a file, or paste a screenshot…"></textarea>
-        <label id="thinking-control" class="hidden">Thinking<select id="thinking-choice" aria-label="Thinking mode"><option value="auto">Auto</option><option value="on">On</option><option value="off">Off</option></select></label>
+        <textarea id="message" rows="2" aria-label="Message to Agent B" placeholder="Message Agent B…"></textarea>
         <button type="submit" aria-label="Send">Send</button>
-        <p id="composer-help" class="composer-help"></p>
-        <p id="composer-shortcut" class="composer-shortcut">Enter to send · Shift + Enter for a new line</p>
         <p id="composer-status" class="composer-help" role="status" aria-live="polite"></p>
       </form>
     </main>
   </div>
 
-  <dialog id="settings-dialog">
+  <dialog id="settings-dialog" aria-labelledby="settings-dialog-heading">
     <form id="settings-form">
-      <div class="modal-head"><div><div class="eyebrow">AGENT B</div><h2>Settings</h2><small class="app-version" aria-label="Agent B version">{{AGENT_B_VERSION}}</small></div><button type="button" id="close-settings" class="icon" aria-label="Close settings">×</button></div>
+      <div class="modal-head"><div><div class="eyebrow">AGENT B</div><h2 id="settings-dialog-heading">Settings</h2></div><button type="button" id="close-settings" class="icon" aria-label="Close settings">×</button></div>
       <div class="settings-tabs" role="tablist" aria-label="Settings sections">
         <button type="button" id="settings-tab-models" role="tab" data-settings="models" aria-controls="settings-models" aria-selected="true">Connections</button>
         <button type="button" id="settings-tab-skills" role="tab" data-settings="skills" aria-controls="settings-skills" aria-selected="false" tabindex="-1">Skills</button>
@@ -197,28 +153,63 @@
       <label>Double Agent URL<input name="double_agent_url" placeholder="http://127.0.0.1:8777"></label>
       <div class="grid2"><label>Maximum steps<input name="max_steps" type="number" min="1" max="120"></label><label>Maximum output tokens<input name="max_output_tokens" type="number" min="512" max="32768"></label></div>
       <p class="hint">Each saved connection keeps its own credential. Secrets stay in the local settings file with owner-only permissions and are never returned to this page.</p>
+      <div class="context-settings">
+      <details id="notebook-panel" class="notebook-panel">
+        <summary>Notes &amp; context <small id="notebook-summary">Saved on this Mac</small></summary>
+        <div class="notebook-body">
+          <div class="notebook-actions"><button type="button" id="edit-notebook">Edit notes</button><a class="download-link" href="/api/notebook/export" download>Export notes</a><a class="download-link" href="/api/export" download>Export chat</a></div>
+          <p id="notebook-objective" class="hint">Add your objective, facts, questions and decisions.</p>
+          <div id="notebook-notes" class="notebook-notes"></div>
+          <label class="snapshot-choice"><input type="checkbox" id="burp-discussion-context"> Include read-only Burp context in chat</label>
+          <p class="hint">When enabled, a snapshot of findings and queue status is refreshed when you send a message and sent to your selected model. Notes and file references survive app restarts.</p>
+          <div class="snapshot-controls"><button type="button" id="refresh-discussion-context">Refresh snapshot</button><span id="snapshot-status" role="status" aria-live="polite">Burp context off</span></div>
+          <div id="notebook-snapshot"></div>
+          <div id="notebook-files"></div>
+        </div>
+      </details>
+      <details id="coverage-panel" class="coverage-panel hidden">
+        <summary><span id="coverage-title">Coverage</span><small id="coverage-sub">Discovered surface reached &amp; tested</small></summary>
+        <div id="coverage-body"></div>
+      </details>
+      <details id="assessment-plan-panel" class="assessment-plan-panel hidden">
+        <summary><span id="assessment-plan-title">Plan of attack</span><small>Prepared before active testing</small></summary>
+        <div id="assessment-plan"></div>
+      </details>
+      </div>
       </section>
       <p id="settings-status" class="form-status hidden" role="status"></p>
       <div class="modal-actions"><button type="button" id="cancel-settings">Cancel</button><button class="primary" type="submit">Save settings</button></div>
     </form>
   </dialog>
 
-  <dialog id="notebook-dialog" class="skill-dialog">
+  <dialog id="help-dialog" aria-labelledby="help-title">
+    <div class="help-content">
+      <div class="modal-head"><h2 id="help-title">Help</h2><button type="button" id="close-help" class="icon" aria-label="Close help">×</button></div>
+      <section><h3>Chat</h3><p>Type a message and press Enter. Use Shift + Enter for a new line. No mode to choose.</p></section>
+      <section><h3>Files</h3><p>Use +, drag a file, or paste a screenshot when Agent B is idle.</p></section>
+      <section><h3>Burp work</h3><p>Connect to Burp, then choose a task from the sidebar. Messages during a run guide that work. Stop ends the run.</p></section>
+      <section><h3>Questions &amp; approvals</h3><p>Pick an answer or reply in the message box. Approval requests require an explicit choice for that action.</p></section>
+      <section><h3>Settings</h3><p>Manage connections, skills, and scope. Notes, context, and exports are under Run &amp; scope. Target requests remain governed by Burp scope checks.</p></section>
+      <div class="modal-actions"><button type="button" id="done-help">Got it</button></div>
+    </div>
+  </dialog>
+
+  <dialog id="notebook-dialog" class="skill-dialog" aria-labelledby="notebook-dialog-heading">
     <form id="notebook-form">
-      <div class="modal-head"><div><div class="eyebrow">ENGAGEMENT NOTEBOOK</div><h2>Keep your teammate up to date</h2></div><button type="button" id="close-notebook" class="icon" aria-label="Close notebook">×</button></div>
+      <div class="modal-head"><div><div class="eyebrow">ENGAGEMENT NOTEBOOK</div><h2 id="notebook-dialog-heading">Keep your teammate up to date</h2></div><button type="button" id="close-notebook" class="icon" aria-label="Close notebook">×</button></div>
       <label>Objective<textarea name="objective" rows="3" maxlength="8000" placeholder="What are we trying to achieve?"></textarea></label>
       <label>Confirmed facts<textarea name="facts" rows="4" maxlength="8000" placeholder="Record facts and cite finding IDs or filenames. These are your notes, not independent verification."></textarea></label>
       <label>Open questions<textarea name="questions" rows="3" maxlength="8000" placeholder="What remains unclear or needs your input?"></textarea></label>
       <label>Decisions<textarea name="decisions" rows="3" maxlength="8000" placeholder="What have we agreed, ruled out, or deferred? Include why."></textarea></label>
-      <p class="hint">These notes guide Discuss. Saving notes or recommendations does not approve assessment actions. New conversation clears this notebook and its files; export anything you need first.</p>
+      <p class="hint">These notes guide chat. Saving notes or recommendations does not approve assessment actions. New conversation clears this notebook and its files; export anything you need first.</p>
       <p id="notebook-save-status" role="status" aria-live="polite"></p>
       <div class="modal-actions"><button type="button" id="cancel-notebook">Cancel</button><button type="submit" class="primary">Save notebook</button></div>
     </form>
   </dialog>
 
-  <dialog id="skill-dialog" class="skill-dialog">
+  <dialog id="skill-dialog" class="skill-dialog" aria-labelledby="skill-dialog-heading">
     <form id="skill-form">
-      <div class="modal-head"><div><div class="eyebrow">CUSTOM METHODOLOGY</div><h2>Add a skill</h2></div><button type="button" id="close-skill" class="icon" aria-label="Close skill editor">×</button></div>
+      <div class="modal-head"><div><div class="eyebrow">CUSTOM METHODOLOGY</div><h2 id="skill-dialog-heading">Add a skill</h2></div><button type="button" id="close-skill" class="icon" aria-label="Close skill editor">×</button></div>
       <label>Name<input name="name" maxlength="80" placeholder="Example: SaaS tenant isolation" required></label>
       <label>Description<input name="description" maxlength="240" placeholder="When and why this skill should guide the model"></label>
       <label>Instructions<textarea name="instructions" rows="12" maxlength="12000" placeholder="Give concrete methodology, evidence requirements, stop conditions, and reporting guidance…" required></textarea></label>
@@ -231,16 +222,16 @@
   <dialog id="javascript-dialog" class="skill-dialog" aria-labelledby="javascript-title">
     <div class="javascript-review">
       <div class="modal-head"><div><div class="eyebrow">OFFLINE FILE REVIEW</div><h2 id="javascript-title">JavaScript analysis</h2></div><button type="button" id="close-javascript" class="icon" aria-label="Close JavaScript analysis">×</button></div>
-      <p class="hint">Only the attached file is inspected. Nothing is executed, fetched or sent to a model. Select JavaScript analysis in Settings → Skills to include this report when you send the file in Discuss.</p>
+      <p class="hint">Only the attached file is inspected. Nothing is executed, fetched or sent to a model. Select JavaScript analysis in Settings → Skills to include this report when you send the file in chat.</p>
       <p id="javascript-summary" role="status"></p>
       <pre id="javascript-report" tabindex="0" aria-label="JavaScript analysis results"></pre>
       <div class="modal-actions"><a id="download-javascript-report" class="button" download>Download report</a><button type="button" id="done-javascript" class="primary">Done</button></div>
     </div>
   </dialog>
 
-  <dialog id="model-dialog" class="skill-dialog">
+  <dialog id="model-dialog" class="skill-dialog" aria-labelledby="model-dialog-heading">
     <form id="model-form">
-      <div class="modal-head"><div><div class="eyebrow">MODEL CONNECTION</div><h2>Add a connection</h2></div><button type="button" id="close-model" class="icon" aria-label="Close connection editor">×</button></div>
+      <div class="modal-head"><div><div class="eyebrow">MODEL CONNECTION</div><h2 id="model-dialog-heading">Add a connection</h2></div><button type="button" id="close-model" class="icon" aria-label="Close connection editor">×</button></div>
       <label>Provider<select name="provider" id="connection-provider"></select></label>
       <p id="provider-description" class="hint provider-description"></p>
       <div class="grid2">
@@ -251,18 +242,23 @@
       <label id="connection-url-row">API base URL<input name="url" maxlength="300" placeholder="http://host:port/v1"></label>
       <label id="connection-region-row" class="hidden">AWS region<input name="region" placeholder="us-east-1"></label>
       <label><span id="connection-key-label">API key</span><input name="api_key" id="connection-api-key" type="password" autocomplete="new-password"><small id="connection-key-state" class="field-note"></small></label>
+      <div id="connection-catalog" class="model-catalog">
+        <div class="model-catalog-action"><button type="button" id="load-models">Load models</button><span class="hint">Get the model IDs available from this server.</span></div>
+        <p id="model-catalog-status" class="hint hidden" role="status" aria-live="polite"></p>
+        <label id="server-models-row" class="hidden">Models on server<select id="server-models"><option value="">Choose a model…</option></select></label>
+      </div>
       <label id="connection-thinking-row"><input type="checkbox" name="supports_thinking"> Supports <code>enable_thinking</code></label>
       <label><input type="checkbox" name="supports_images"> Supports image input</label>
       <p class="hint">Enable only when both the model and server support vision. Images are sent to this connection when you press Send.</p>
       <p id="connection-thinking-help" class="hint">Only enable this when the server accepts <code>chat_template_kwargs.enable_thinking</code>.</p>
       <p id="model-status" class="form-status hidden" role="status"></p>
-      <div class="modal-actions split-actions"><button type="button" id="cancel-model">Cancel</button><button class="primary" type="submit">Save and use</button></div>
+      <div class="modal-actions"><button type="button" id="cancel-model">Cancel</button><button class="primary" type="submit">Save and use</button></div>
     </form>
   </dialog>
 
-  <dialog id="seed-dialog" class="skill-dialog">
+  <dialog id="seed-dialog" class="skill-dialog" aria-labelledby="seed-dialog-heading">
     <form id="seed-form">
-      <div class="modal-head"><div><div class="eyebrow">COVERAGE SEED</div><h2>Seed the attack surface</h2></div><button type="button" id="close-seed" class="icon" aria-label="Close coverage editor">×</button></div>
+      <div class="modal-head"><div><div class="eyebrow">COVERAGE SEED</div><h2 id="seed-dialog-heading">Seed the attack surface</h2></div><button type="button" id="close-seed" class="icon" aria-label="Close coverage editor">×</button></div>
       <p class="hint">Paste an OpenAPI/Swagger JSON, a <code>sitemap.xml</code>, <code>robots.txt</code>, or a list of URLs/paths (one per line). Same-origin routes are added to coverage and discovery so Agent B tests beyond what reached Burp's history. <code>robots.txt</code>, <code>sitemap.xml</code> and common OpenAPI paths are also fetched automatically at the start of a Full App assessment.</p>
       <label>Source<textarea name="text" rows="12" placeholder="Paste OpenAPI JSON, sitemap XML, robots.txt, or one URL/path per line…" required></textarea></label>
       <div id="seed-result" class="connection-test-result hidden" role="status"></div>
@@ -270,10 +266,10 @@
     </form>
   </dialog>
 
-  <dialog id="new-conversation-dialog" class="confirm-dialog">
+  <dialog id="new-conversation-dialog" class="confirm-dialog" aria-labelledby="new-conversation-dialog-heading">
     <div class="confirm-body">
       <div class="eyebrow">NEW CONVERSATION</div>
-      <h2>Clear this conversation?</h2>
+      <h2 id="new-conversation-dialog-heading">Clear this conversation?</h2>
       <p>This clears the chat, activity log, engagement notebook, recommendations and stored files. Export anything you need first. For Burp work in the new conversation, choose Connect to Burp.</p>
       <div class="modal-actions">
         <button type="button" id="cancel-new-conversation">Cancel</button>
@@ -282,10 +278,10 @@
     </div>
   </dialog>
 
-  <dialog id="stop-run-dialog" class="confirm-dialog">
+  <dialog id="stop-run-dialog" class="confirm-dialog" aria-labelledby="stop-run-dialog-heading">
     <div class="confirm-body">
       <div class="eyebrow">STOP CURRENT RUN</div>
-      <h2>Stop Agent B?</h2>
+      <h2 id="stop-run-dialog-heading">Stop Agent B?</h2>
       <p>The current model request will be cancelled. Agent B may take a while to release the connection and finish stopping.</p>
       <div class="modal-actions">
         <button type="button" id="cancel-stop-run">Keep running</button>
