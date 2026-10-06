@@ -41,7 +41,8 @@ class ProviderTests(unittest.TestCase):
             return io.BytesIO(json.dumps(value).encode())
         api = SimpleNamespace(Request=urllib.request.Request, urlopen=open_request)
         cls = load_methods('double_agent_extender_part5_chunk2.py',
-                           {'_test_openrouter_connection', '_test_openai_connection', 'test_ai_connection'}, urllib2=api)
+                           {'_test_openrouter_connection', '_test_openai_connection',
+                            '_test_openai_compatible_connection', 'test_ai_connection'}, urllib2=api)
         harness = cls()
         harness.AI_PROVIDER, harness.API_URL = 'OpenRouter', 'https://openrouter.ai/api/v1'
         harness.API_KEY, harness.MODEL = 'synthetic-key', 'vendor/example-model'
@@ -81,6 +82,33 @@ class ProviderTests(unittest.TestCase):
         self.assertTrue(harness.test_ai_connection())
         self.assertEqual(calls[0].full_url, harness.API_URL + '/models')
 
+    def test_local_compatible_lists_exact_model_without_key_or_gpt_filter(self):
+        harness, calls = self.harness([{'data': [{'id': 'Qwen3.8-Flash-Next'}]}])
+        harness.AI_PROVIDER, harness.API_URL = 'OpenAI-compatible', 'http://local.example.test:8888/v1/'
+        harness.API_KEY, harness.MODEL = '', 'Qwen3.8-Flash-Next'
+        self.assertTrue(harness.test_ai_connection())
+        self.assertEqual(harness.available_models, ['Qwen3.8-Flash-Next'])
+        self.assertEqual(calls[0].full_url, 'http://local.example.test:8888/v1/models')
+        self.assertIsNone(calls[0].get_header('Authorization'))
+
+    def test_local_compatible_requires_selected_model_and_uses_optional_key(self):
+        harness, calls = self.harness([{'data': [{'id': 'other-model'}]}])
+        harness.AI_PROVIDER, harness.API_URL = 'OpenAI-compatible', 'https://local.example.test/v1'
+        harness.API_KEY, harness.MODEL = 'synthetic-key', 'Qwen3.8-Flash-Next'
+        self.assertFalse(harness.test_ai_connection())
+        self.assertEqual(harness.MODEL, 'Qwen3.8-Flash-Next')
+        self.assertEqual(calls[0].get_header('Authorization'), 'Bearer synthetic-key')
+        harness, _ = self.harness([{'data': [{'id': 'other-model'}]}])
+        harness.AI_PROVIDER, harness.API_URL = 'OpenAI-compatible', 'https://local.example.test/v1'
+        self.assertTrue(harness._test_openai_compatible_connection(require_model=False))
+
+    def test_local_compatible_rejects_invalid_base_url_before_request(self):
+        for base in ('file:///tmp/v1', 'http://local.example.test/v1?token=secret'):
+            harness, calls = self.harness([])
+            harness.AI_PROVIDER, harness.API_URL = 'OpenAI-compatible', base
+            self.assertFalse(harness.test_ai_connection())
+            self.assertEqual(calls, [])
+
     def test_openrouter_completion_uses_custom_base_bearer_and_max_tokens(self):
         capture = []
         def open_request(request, timeout):
@@ -99,6 +127,28 @@ class ProviderTests(unittest.TestCase):
         request = capture[0]
         self.assertEqual(request.full_url, harness.API_URL + '/chat/completions')
         payload = json.loads(request.data)
+        self.assertEqual(payload['model'], harness.MODEL)
+        self.assertEqual(payload['max_tokens'], 512)
+        self.assertNotIn('max_completion_tokens', payload)
+
+    def test_local_compatible_completion_omits_empty_auth_and_uses_max_tokens(self):
+        capture = []
+        def open_request(request, timeout):
+            capture.append(request)
+            return io.BytesIO(b'{"choices":[{"message":{"content":"OK","reasoning_content":"hidden"}}]}')
+        cls = load_methods('double_agent_extender_part7.py', {'_ask_openai'},
+                           urllib2=SimpleNamespace(Request=urllib.request.Request, urlopen=open_request), unicode=str)
+        harness = cls()
+        harness.AI_PROVIDER, harness.API_URL = 'OpenAI-compatible', 'http://local.example.test:8888/v1'
+        harness.API_KEY, harness.MODEL = '', 'Qwen3.8-Flash-Next'
+        harness.MAX_TOKENS, harness.AI_REQUEST_TIMEOUT = 512, 5
+        harness._estimate_token_count = lambda text: 1
+        harness._sanitize_ai_json_text = lambda text: text
+        harness._record_token_usage = Mock()
+        self.assertEqual(harness._ask_openai('Say OK'), b'OK')
+        self.assertEqual(capture[0].full_url, harness.API_URL + '/chat/completions')
+        self.assertIsNone(capture[0].get_header('Authorization'))
+        payload = json.loads(capture[0].data)
         self.assertEqual(payload['model'], harness.MODEL)
         self.assertEqual(payload['max_tokens'], 512)
         self.assertNotIn('max_completion_tokens', payload)

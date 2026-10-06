@@ -298,7 +298,7 @@ class BurpExtenderChunk7(object):
         try:
             if self.AI_PROVIDER == "Ollama":
                 response = self._ask_ollama(prompt)
-            elif self.AI_PROVIDER in ("OpenAI", "OpenRouter"):
+            elif self.AI_PROVIDER in ("OpenAI", "OpenRouter", "OpenAI-compatible"):
                 response = self._ask_openai(prompt)
             elif self.AI_PROVIDER == "Claude":
                 response = self._ask_claude(prompt)
@@ -409,6 +409,10 @@ class BurpExtenderChunk7(object):
 
     def _ask_openai(self, prompt):
         """Send request to OpenAI with configurable timeout"""
+        if self.AI_PROVIDER == "OpenAI-compatible":
+            parsed = urlparse.urlsplit(str(self.API_URL or ""))
+            if parsed.scheme not in ("http", "https") or not parsed.hostname or parsed.query or parsed.fragment:
+                raise ValueError("Enter an HTTP or HTTPS OpenAI-compatible API base URL")
         if self.AI_PROVIDER == "OpenRouter":
             parsed = urlparse.urlsplit(str(self.API_URL or ""))
             if parsed.scheme != "https" or not parsed.hostname:
@@ -449,13 +453,13 @@ class BurpExtenderChunk7(object):
             return text[:char_budget] + "\n...[truncated]"
 
         def _openai_request(payload, endpoint_path="/chat/completions"):
+            headers = {"Content-Type": "application/json"}
+            if self.AI_PROVIDER != "OpenAI-compatible" or str(self.API_KEY or "").strip():
+                headers["Authorization"] = "Bearer " + self.API_KEY
             req = urllib2.Request(
                 self.API_URL.rstrip('/') + endpoint_path,
                 data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": "Bearer " + self.API_KEY
-                }
+                headers=headers
             )
             resp = urllib2.urlopen(req, timeout=self.AI_REQUEST_TIMEOUT)
             return json.loads(resp.read())
@@ -476,7 +480,7 @@ class BurpExtenderChunk7(object):
             "max_completion_tokens": self.MAX_TOKENS,
             "temperature": 0.0
         }
-        if self.AI_PROVIDER == "OpenRouter":
+        if self.AI_PROVIDER in ("OpenRouter", "OpenAI-compatible"):
             request_payload["max_tokens"] = request_payload.pop("max_completion_tokens")
         endpoint_path = "/chat/completions"
 
@@ -557,6 +561,8 @@ class BurpExtenderChunk7(object):
                     "max_completion_tokens": self.MAX_TOKENS,
                     "temperature": 0.0
                 }
+                if self.AI_PROVIDER == "OpenAI-compatible":
+                    retry_payload["max_tokens"] = retry_payload.pop("max_completion_tokens")
                 data = _openai_request(retry_payload, endpoint_path)
             elif (
                 ("not a chat model" in msg_l and "v1/chat/completions" in msg_l) or
