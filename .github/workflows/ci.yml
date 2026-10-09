@@ -26,6 +26,15 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Burp source compiles
         run: python -m py_compile burp/DoubleAgent.py burp/src/*.py
+      - uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+      - name: Jython and Swing Repeater compatibility
+        run: |
+          curl --fail --location --retry 3 --output "$RUNNER_TEMP/jython.jar" https://repo.maven.apache.org/maven2/org/python/jython-standalone/2.7.4/jython-standalone-2.7.4.jar
+          echo "1fba1769effcc8b19f5e10436bc8274a158ce988559f257927c24c73bb137f3c  $RUNNER_TEMP/jython.jar" | sha256sum --check
+          java -Djava.awt.headless=true -jar "$RUNNER_TEMP/jython.jar" -B tests/repeater_jython_smoke.py
       - name: Agent B tests
         working-directory: agent_b
         run: python -m unittest discover -s tests -v

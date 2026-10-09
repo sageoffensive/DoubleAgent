@@ -19,6 +19,7 @@ from .contract import build_contract, render_contract
 from .discovery import extract_application_surface, parse_seed_source, surface_fingerprint
 from .internet import REFERENCE_TOOL, prepare_reference
 from .policy import allow_get, allow_post, compact, signature
+from .readiness import ReadinessBlocked, SIGNED_IN, PUBLIC_APP, STOP, app_origin, captured_access, login_response
 from .skills import render_skill_prompt, selected_skills
 from .store import Store, redact_text, redact_value
 
@@ -46,7 +47,7 @@ Full App passive findings:
 Transport rule:
 - `/api/agent/queue/<id>/curl` is read-only: call it with double_agent_get. Never POST evidence or results to `/curl`.
 - For finding-validation items with a replayable queue curl, execute baseline, mutation and control with execute_queue_request.
-- For autonomous, risk-hunt or Try Harder items with no replayable curl, use send_burp_request for hand-built, exact in-scope requests. Unavailable target transports are blockers. The harness refreshes rejected authentication through the same scope-enforced API. Use Double Agent Burp actions for crawling, Scanner and other advertised capabilities.
+- For autonomous, risk-hunt or Try Harder items with no replayable curl, use send_burp_request for hand-built, exact in-scope requests. Unavailable target transports are blockers. The harness checks app access before Full App work and pauses rejected sessions for operator confirmation. Never ask for passwords or tokens in chat; ask the operator to sign in through Burp. Captured history and operator confirmation are not fresh live verification. Use Double Agent Burp actions for crawling, Scanner and other advertised capabilities.
 - Do not claim to have run a generated curl command and do not manually POST generated curl text to `/curl`.
 - A conclusive result needs at least two successful, fresh target responses after the queue claim so baseline and mutation/control are both evidenced.
 
@@ -821,6 +822,8 @@ def authentication_failed(response: Any) -> bool:
     except (TypeError, ValueError):
         status = 0
     if status in {401, 403}:
+        return True
+    if 200 <= status < 300 and login_response(response):
         return True
     if status not in {301, 302, 303, 307, 308}:
         return False
@@ -2085,6 +2088,8 @@ class Engine:
         self.model_reasoning_seen = False
         self.chat_thinking: bool | None = None
         self.target_url = ""
+        # Deliberately not checkpointed: restart/resume must check access again.
+        self.app_readiness: dict[str, dict[str, Any]] = {}
         self.assessment_plan: dict[str, Any] = {}
         self.assessment_inventory: dict[str, Any] = {}
         self.assessment_discovery: dict[str, Any] = {}
@@ -2481,6 +2486,7 @@ class Engine:
                 self.target_receipts = []
                 self.target_evidence = []
                 self.auth_retry_fingerprints = {}
+                self.app_readiness = {}
                 self.assessment_plan = {}
                 self.assessment_inventory = {}
                 self.assessment_discovery = {}
@@ -2603,6 +2609,8 @@ class Engine:
                 "headers": {"Accept": "application/json,text/xml,text/plain,*/*"},
                 "note": "coverage seed fetch",
             })
+            if _finished and isinstance(response, dict) and response.get("blocked"):
+                raise ReadinessBlocked(str(response.get("error", "App access is unconfirmed.")))
             if not isinstance(response, dict) or response.get("error"):
                 continue
             status_code = int(response.get("status_code", 0) or 0)
@@ -2646,6 +2654,10 @@ class Engine:
             if qid.startswith("approval-internet-"):
                 if answer not in {"Allow", "Deny"}:
                     raise ValueError("Choose Allow or Deny")
+            elif qid.startswith("approval-readiness-"):
+                pending = self.store.question(qid)
+                if not pending or answer not in pending["options"]:
+                    raise ValueError("Choose an access option above; don’t paste credentials into chat")
             elif qid.startswith("approval-") and answer not in {"Approve once", "Do not approve"}:
                 raise ValueError("Choose Approve once or Do not approve")
             if not self.store.answer(qid, answer):
@@ -2705,6 +2717,7 @@ class Engine:
             self.burp_prompt_loaded = False
             self.browseros_enabled = False
             self.target_url = ""
+            self.app_readiness = {}
             self.active_queue = None
             self.queue_fetch_mode = False
             self.contract = {}
@@ -2932,6 +2945,11 @@ class Engine:
         if self.queue_fetch_mode:
             try:
                 detail = self._bootstrap_queue(client)
+            except ReadinessBlocked as exc:
+                self._release_readiness_claim(client)
+                self.store.message("assistant", str(exc), {"harness_status": True})
+                self._set("stopped" if self.stop_event.is_set() else "blocked")
+                return
             except Exception as exc:
                 self.store.event("error", {"message": str(exc)})
                 self.store.message("assistant", f"I couldn’t start the Burp work item: {exc}", {"harness_status": True})
@@ -3700,6 +3718,10 @@ class Engine:
         recovered_target = payload_target_url(detail)
         if recovered_target:
             self.target_url = recovered_target
+        full_app = (str(detail.get("campaign_type", "")).lower() == "full_app_assessment" or
+                    "full_app_assessment" in str(detail.get("mode", "")).lower())
+        if full_app:
+            detail = {**detail, "harness_app_access": self._ensure_app_ready(client, self.target_url, force=True)}
         persistent = detail.get("persistent_agent_goal", {})
         if isinstance(persistent, dict) and persistent.get("required"):
             objective = str(persistent.get("objective", "")).strip()
@@ -4537,6 +4559,7 @@ class Engine:
                                 "note": f"safe application discovery ({state_name})",
                             })
                             if nested_finished:
+                                self.application_discovery_active = False
                                 return response, True
                             if not isinstance(response, dict) or response.get("error"):
                                 requests.append({"url": url, "state": state_name, "status": "failed", "detail": compact(response, 1000)})
@@ -5595,7 +5618,13 @@ class Engine:
                         self.store.event("tool", {"name": name, "state": "error", "result": result})
                         return result, False
                 allow_post(path, body)
+                readiness_url = ""
+                credentialed_request = False
+                if target_path:
+                    readiness_url, credentialed_request = self._guard_auth_payload(client, body)
                 try:
+                    if target_path and self.stop_event.is_set():
+                        raise ReadinessBlocked("Run stopped before sending the app request.")
                     result = (
                         client.request("POST", path, body, timeout=12)
                         if target_path and hasattr(client, "request")
@@ -5650,6 +5679,10 @@ class Engine:
                         "error": "Double Agent did not return a valid target-execution receipt.",
                         "response": compact(result, 2000),
                     }
+                if target_path and credentialed_request and authentication_failed(result):
+                    self.app_readiness.pop(app_origin(readiness_url), None)
+                    self._ensure_app_ready(client, readiness_url, auth_required=True, force=True, rejected=True)
+                    result["auth_retry_skipped"] = "Session rejected; operator confirmed access. No automatic replay was sent."
             elif name == "run_try_harder_campaign":
                 result, finished = self._run_try_harder_campaign(client)
                 if finished:
@@ -5696,8 +5729,6 @@ class Engine:
                             lines.append(f"Content-Length: {len(request_body.encode('utf-8'))}")
                         return "\r\n".join(lines) + "\r\n\r\n" + request_body
 
-                    receipt_start = len(self.target_receipts)
-                    evidence_start = len(self.target_evidence)
                     raw_request = raw_request_for(clean_headers)
                     result, nested_finished = self._tool(client, "double_agent_post", {
                         "path": "/api/agent/request",
@@ -5710,37 +5741,12 @@ class Engine:
                     })
                     if nested_finished:
                         return result, True
+                    if use_auth and authentication_failed(result) and not result.get("auth_retry_skipped"):
+                        self.app_readiness.pop(app_origin(url), None)
+                        self._ensure_app_ready(client, url, auth_required=True, force=True, rejected=True)
+                        result["auth_retry_skipped"] = "Session rejected; operator confirmed access. No automatic replay was sent."
                     # No direct/proxy curl fallback: a rejected or unavailable
                     # enforcement API is a blocker, never permission to bypass it.
-                    if use_auth and authentication_failed(result):
-                        clean_headers, refreshed_auth = apply_latest_auth_headers(
-                            client, parsed.hostname, clean_headers
-                        )
-                        retry_key = parsed.hostname.lower() + (parsed.path or "/")
-                        fingerprint = auth_material_fingerprint(refreshed_auth)
-                        previous_fingerprint = self.auth_retry_fingerprints.get(retry_key, "")
-                        if fingerprint and fingerprint == previous_fingerprint:
-                            result["auth_refresh_checked"] = True
-                            result["auth_retry_skipped"] = "Burp session material is unchanged since the prior retry for this route."
-                        elif fingerprint:
-                            self.auth_retry_fingerprints[retry_key] = fingerprint
-                            del self.target_receipts[receipt_start:]
-                            del self.target_evidence[evidence_start:]
-                            self.store.event("auth_refresh", {"host": parsed.hostname, "retry": "enforcement_api"})
-                            result, nested_finished = self._tool(client, "double_agent_post", {
-                                "path": "/api/agent/request",
-                                "body": {
-                                    "host": parsed.hostname, "port": port,
-                                    "https": parsed.scheme == "https",
-                                    "request": raw_request_for(clean_headers),
-                                    "comment": f"Agent: queue #{self.active_queue} - refreshed session",
-                                },
-                                "purpose": note,
-                            })
-                            if nested_finished:
-                                return result, True
-                            if isinstance(result, dict):
-                                result["auth_refreshed"] = True
 
             elif name == "get_goal":
                 result = self.store.active_goal() or {"status": "none"}
@@ -5772,6 +5778,7 @@ class Engine:
                             note,
                             args.get("query_parameters") if isinstance(args.get("query_parameters"), dict) else {},
                         )
+                        readiness_url, credentialed_request = self._guard_auth_payload(client, payload)
                         try:
                             result = client.post("/api/agent/request/http2", payload)
                         except HTTPError as http2_error:
@@ -5796,6 +5803,9 @@ class Engine:
                         receipt = target_receipt("/api/agent/request/http2", result)
                         if receipt:
                             self.target_receipts.append(receipt)
+                        if credentialed_request and authentication_failed(result.get("result", result)):
+                            self.app_readiness.pop(app_origin(readiness_url), None)
+                            self._ensure_app_ready(client, readiness_url, auth_required=True, force=True, rejected=True)
                     else:
                         commands = generated.get("commands", []) if isinstance(generated, dict) else []
                         command = ""
@@ -5832,6 +5842,11 @@ class Engine:
             elif name == "ask_user":
                 question = str(args.get("question", "What information should I use?"))
                 reason = str(args.get("reason", "The assessment needs user input."))
+                if re.search(r"\b(?:credentials?|password|log[ -]?in|sign[ -]?in|authentication|session token|api[ _-]?key|otp|mfa)\b", question + " " + reason, re.I):
+                    readiness = self._ensure_app_ready(client, self.target_url, auth_required=True,
+                                                       force=bool(self.app_readiness.get(app_origin(self.target_url), {}).get("login_not_required")))
+                    return {"answer": "App access confirmed; use captured Burp session material. Never request passwords in chat.",
+                            "app_readiness": readiness}, False
                 procedural_goal_request = "risk hunt goal" in (question + " " + reason).lower()
                 tracks_complete = bool(
                     self.assessment_test_progress
@@ -5963,6 +5978,12 @@ class Engine:
             self.store.event("tool", {"name": name, "state": "complete", "result": compact(result, 2500)})
             return result, False
         except Exception as exc:
+            if isinstance(exc, ReadinessBlocked):
+                self.application_discovery_active = False
+                self._release_readiness_claim(client)
+                self.store.message("assistant", str(exc), {"harness_status": True})
+                self._set("stopped" if self.stop_event.is_set() else "blocked")
+                return {"ok": False, "blocked": True, "error": str(exc)}, True
             if name == "run_application_discovery":
                 self.application_discovery_active = False
             data = exc.data if isinstance(exc, HTTPError) else None
@@ -5979,13 +6000,15 @@ class Engine:
             return {"ok": False, "error": "The active queue item is not a Try Harder campaign."}, False
 
         def probe(url: str, note: str, use_auth: bool = True) -> dict[str, Any]:
-            value, _ = self._tool(client, "send_burp_request", {
+            value, finished = self._tool(client, "send_burp_request", {
                 "url": url,
                 "method": "GET",
                 "headers": {"Accept": "*/*"},
                 "use_auth": use_auth,
                 "note": note,
             })
+            if finished and isinstance(value, dict) and value.get("blocked"):
+                raise ReadinessBlocked(str(value.get("error", "App access is unconfirmed.")))
             return value if isinstance(value, dict) else {"value": value}
 
         workspace = client.get("/api/agent/burp/workspace?compact=true")
@@ -6252,7 +6275,74 @@ class Engine:
         except Exception as exc:
             self.store.event("heartbeat", {"queue_id": self.active_queue, "error": str(exc)[:300]})
 
-    def _ask(self, question: str, reason: str, options: list[str], kind: str = "clarification", details: dict | None = None) -> str:
+    def _release_readiness_claim(self, client: DoubleAgent) -> None:
+        if not self.active_queue:
+            return
+        try:
+            client.post(f"/api/agent/queue/{self.active_queue}/release", {"reason": "App access check incomplete."})
+        except Exception:
+            self.store.event("app_readiness", {"release": "unavailable"})
+        finally:
+            self.active_queue = None
+
+    def _guard_auth_payload(self, client: DoubleAgent, body: dict) -> tuple[str, bool]:
+        http2 = "targetHostname" in body
+        scheme = "https" if body.get("usesHttps" if http2 else "https") else "http"
+        host = str(body.get("targetHostname" if http2 else "host", ""))
+        if ":" in host and not host.startswith("["):
+            host = f"[{host}]"
+        port = int(body.get("targetPort" if http2 else "port") or (443 if scheme == "https" else 80))
+        raw = str(body.get("request", "")).replace("\r\n", "\n")
+        first_line = raw.splitlines()[0].split() if raw else []
+        route = (str((body.get("pseudoHeaders") or {}).get(":path", "/")) if http2 else
+                 first_line[1] if len(first_line) >= 2 and first_line[1].startswith("/") else "/")
+        url = f"{scheme}://{host}:{port}{route}"
+        credentialed = (any(str(h).lower() in {"cookie", "authorization"} for h in (body.get("headers") or {})) if http2 else
+                        bool(re.search(r"^(?:Cookie|Authorization)\s*:", raw.split("\n\n", 1)[0], re.I | re.M)))
+        if credentialed:
+            self._ensure_app_ready(client, url, auth_required=True)
+        return url, credentialed
+
+    def _ensure_app_ready(self, client: DoubleAgent, url: str, *, auth_required: bool = False,
+                          force: bool = False, rejected: bool = False) -> dict[str, Any]:
+        if self.stop_event.is_set():
+            raise ReadinessBlocked("Run stopped before app access was confirmed.")
+        key = app_origin(url)
+        previous = self.app_readiness.get(key)
+        if not force and previous and (not auth_required or previous.get("authenticated") or previous.get("login_not_required")):
+            return previous
+        try:
+            evidence = captured_access(client, url)
+        except ReadinessBlocked:
+            raise
+        except Exception:
+            raise ReadinessBlocked("I couldn’t check app access through Burp. Reconnect Burp and try again.") from None
+        if evidence.get("authenticated") and not rejected:
+            self.app_readiness[key] = evidence
+            self.store.event("app_readiness", {"origin": key, **evidence})
+            return evidence
+        options = [SIGNED_IN] + ([] if auth_required else [PUBLIC_APP]) + [STOP]
+        question = ("The app rejected the session. Sign in through Burp, then confirm here."
+                    if rejected else f"Can you access {key} through Burp?")
+        reason = ("Captured history shows an app response, but doesn’t establish a working login. "
+                  if evidence.get("access") else "There isn’t a usable successful app response in captured history. ")
+        answer = self._ask(question, reason + "Open the app in your Burp browser and capture a successful page or protected request. "
+                           "Confirm only when access works. Don’t paste passwords or tokens into chat. "
+                           "This check reads Burp history and sends no app requests.", options,
+                           kind="readiness", heartbeat_client=client)
+        if answer not in options or answer == STOP or self.stop_event.is_set():
+            self.app_readiness.pop(key, None)
+            raise ReadinessBlocked("App access wasn’t confirmed. The assessment is paused.")
+        # Operator attestation is labelled honestly; never presented as live verification.
+        evidence = {"access": True, "authenticated": answer == SIGNED_IN, "source": "operator_confirmation"}
+        if answer == PUBLIC_APP:
+            evidence["login_not_required"] = True
+        self.app_readiness[key] = evidence
+        self.store.event("app_readiness", {"origin": key, **evidence})
+        return evidence
+
+    def _ask(self, question: str, reason: str, options: list[str], kind: str = "clarification", details: dict | None = None,
+             heartbeat_client: DoubleAgent | None = None) -> str:
         if self.stop_event.is_set():
             return "User stopped the run without answering."
         qid = self.store.ask(question, reason, options, kind, details=details)
@@ -6266,6 +6356,8 @@ class Engine:
                     return str(current["answer"])
                 if not current or current["status"] == "cancelled":
                     return "Question cancelled without approval."
+                if heartbeat_client is not None:
+                    self._heartbeat(heartbeat_client)
                 self.condition.wait(timeout=1)
         self.store.cancel_questions("Run stopped; no approval was given.")
         return "User stopped the run without answering."

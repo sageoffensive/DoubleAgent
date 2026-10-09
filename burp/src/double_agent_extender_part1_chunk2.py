@@ -34,7 +34,7 @@ class BurpExtenderChunk1Chunk2(object):
             self.stdout.println("[COLLABORATOR] Warning: Could not initialize Burp Collaborator: %s" % str(_collab_ex))
 
         # Version Information
-        self.VERSION = "3.1.0-beta.7"
+        self.VERSION = "3.1.0-beta.8"
         self.RELEASE_DATE = "2026-10-07"
         self.PRODUCT_NAME = "Double Agent"
         self.BUILD_ID = "F9246771-93EE-4346-BC61-FD2448B38147"

@@ -258,9 +258,7 @@ class BurpExtenderChunk1Chunk3(object):
                     table = e.getSource()
                     row = table.getSelectedRow()
                     if row >= 0:
-                        model_row = table.convertRowIndexToModel(row)
-                        url = table.getModel().getValueAt(model_row, 1)  # URL is col 1
-                        self.extender._navigate_to_url(str(url))
+                        self.extender._sendFindingToRepeater()
 
             def mousePressed(self, e):
                 self._maybeShowPopup(e)

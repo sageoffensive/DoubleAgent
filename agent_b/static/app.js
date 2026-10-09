@@ -432,11 +432,12 @@ function render(value) {
     questionKey = pending.id;
     question.classList.toggle('hidden', !(pending.options || []).length);
     const approval = pending.id.startsWith('approval-');
+    const readiness = pending.id.startsWith('approval-readiness-');
     question.innerHTML = pending.internet_request
       ? internetQuestion(pending.internet_request, pending.options || [])
-      : `<div class="eyebrow">${approval ? 'YOUR APPROVAL IS REQUIRED' : 'CHOOSE AN ANSWER'}</div><div>${
+      : `<div class="eyebrow">${readiness ? 'APP ACCESS' : approval ? 'YOUR APPROVAL IS REQUIRED' : 'CHOOSE AN ANSWER'}</div><div>${
       (pending.options || []).map(option => `<button data-answer="${esc(option)}">${esc(option)}</button>`).join('')
-    }</div>${approval ? '<p class="hint">Applies once to this action.</p>' : ''}`;
+    }</div>${approval && !readiness ? '<p class="hint">Applies once to this action.</p>' : ''}`;
     question.querySelectorAll('[data-answer]').forEach(button => {
       button.onclick = () => answer(pending.id, button.dataset.answer);
     });

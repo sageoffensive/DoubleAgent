@@ -195,6 +195,9 @@ class EngineGuardTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.engine = Engine(Store(Path(self.directory.name) / "store.sqlite3"))
+        # These tests exercise planning/transport after access was confirmed.
+        # The readiness boundary itself has independent tests in test_readiness.
+        self.engine.app_readiness["https://example.test:443"] = {"access": True, "authenticated": True, "source": "operator_confirmation"}
         self.engine.queue_fetch_mode = True
         self.client = FakeDoubleAgent()
 
@@ -998,7 +1001,7 @@ class EngineGuardTests(unittest.TestCase):
         self.assertEqual(headers["Accept"], "application/json")
         self.assertEqual(auth["recommended_auth"]["source_history_indices"], [42])
 
-    def test_auth_refresh_retry_uses_enforcement_api_and_keeps_one_receipt(self):
+    def test_auth_rejection_prompts_without_automatic_retry(self):
         class AuthRetryClient(FakeDoubleAgent):
             def get(self, path):
                 return {"recommended_auth": {"usable": True, "raw_header_lines": ["Cookie: session=fresh"]}}
@@ -1009,22 +1012,18 @@ class EngineGuardTests(unittest.TestCase):
                 return {"status_code": 401, "url": "https://example.test/private", "body": "unauthorized"}
         self.engine.active_queue = "7"
         client = AuthRetryClient()
-        with patch("subprocess.run", side_effect=AssertionError("Target subprocesses are forbidden")):
+        with patch("subprocess.run", side_effect=AssertionError("Target subprocesses are forbidden")), \
+                patch.object(self.engine, "_ensure_app_ready", return_value={"authenticated": True}) as check:
             result, finished = self.engine._tool(client, "send_burp_request", {
                 "url": "https://example.test/private", "headers": {"Cookie": "session=stale"},
             })
             self.assertEqual(len(self.engine.target_receipts), 1)
-            unchanged, _ = self.engine._tool(client, "send_burp_request", {
-                "url": "https://example.test/private", "headers": {"Cookie": "session=stale"},
-            })
         self.assertFalse(finished)
-        self.assertEqual(result["status_code"], 200)
-        self.assertTrue(result["auth_refreshed"])
-        self.assertEqual(len(client.posts), 3)
+        self.assertEqual(result["status_code"], 401)
+        self.assertEqual(len(client.posts), 1)
         self.assertTrue(all(path == "/api/agent/request" for path, _ in client.posts))
-        self.assertIn("Cookie: session=fresh", client.posts[1][1]["request"])
-        self.assertTrue(unchanged["auth_refresh_checked"])
-        self.assertIn("unchanged", unchanged["auth_retry_skipped"])
+        self.assertTrue(check.call_args.kwargs["rejected"])
+        self.assertIn("No automatic replay", result["auth_retry_skipped"])
 
     def test_deterministic_review_recognizes_cross_origin_redirect(self):
         review = deterministic_track_review(

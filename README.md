@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 3.1.0 beta 7" src="https://img.shields.io/badge/version-3.1.0--beta.7-ff9944">
+  <img alt="Version 3.1.0 beta 8" src="https://img.shields.io/badge/version-3.1.0--beta.8-ff9944">
   <img alt="License MIT" src="https://img.shields.io/badge/license-MIT-2ea44f">
   <img alt="Burp Suite" src="https://img.shields.io/badge/Burp%20Suite-Jython-f47b20">
   <img alt="Human in the loop" src="https://img.shields.io/badge/control-human--in--the--loop-ff9944">
@@ -138,7 +138,7 @@ Open [http://127.0.0.1:4310](http://127.0.0.1:4310).
 
 **Agent B macOS application — experimental work in progress**
 
-Download `Agent-B-macOS-arm64-v3.1.0-beta.7.zip` from the [beta release](https://github.com/sageoffensive/DoubleAgent/releases/tag/v3.1.0-beta.7), extract it, and move **Agent B.app** to Applications. This build targets Apple Silicon and includes Python. The release notes state its signing/notarization status and remaining validation limits; the harness remains experimental. Maintainers and developers can build it with:
+Download `Agent-B-macOS-arm64-v3.1.0-beta.8.zip` from the [beta release](https://github.com/sageoffensive/DoubleAgent/releases/tag/v3.1.0-beta.8), extract it, and move **Agent B.app** to Applications. This build targets Apple Silicon and includes Python. The release notes state its signing/notarization status and remaining validation limits; the harness remains experimental. Maintainers and developers can build it with:
 
 ```bash
 cd agent_b
@@ -163,6 +163,7 @@ A fresh install contains no connection and no API key. Use **Test connection** b
 2. Start Agent A's API from the **Agent AI** tab.
 3. Paste **Copy Agent B's Prompt** into Claude Code or Codex, or select **Connect to Burp** in the Agent B harness.
 4. Review the imported target, scope, capabilities, and safety state before asking the agent to test anything.
+5. For Full App work, Agent B checks captured access first. If login is uncertain, sign in through your Burp browser and confirm access; choose the public-app option when no login is needed. Never paste passwords or tokens into chat.
 
 The [Installation guide](https://github.com/sageoffensive/DoubleAgent/wiki/Installation) includes a complete walkthrough.
 
@@ -180,7 +181,7 @@ Regular chat gives you a place to review notes and screenshots, ask questions, a
 
 ![One-time internet access request](docs/images/agent-b-internet-permission.png)
 
-In regular chat, Agent B can propose a public-reference lookup. It shows a short summary with **Allow** / **Deny** and collapsed **Request details** explaining the destination, data sent or fetched, reason, and model sharing. Permission applies once; Deny, Stop, and restart prevent the pending retrieval. Supported references are OSV advisories, exact package/version advisory matches and selected public GitHub files at an explicit revision. Arbitrary URLs, redirects, credentials, crawling and code execution remain blocked. Burp's scope and safety checks still govern assessment traffic. See the [internet permission guide](docs/wiki/Research.md) and [release notes](docs/release-notes-v3.1.0-beta.7.md).
+In regular chat, Agent B can propose a public-reference lookup. It shows a short summary with **Allow** / **Deny** and collapsed **Request details** explaining the destination, data sent or fetched, reason, and model sharing. Permission applies once; Deny, Stop, and restart prevent the pending retrieval. Supported references are OSV advisories, exact package/version advisory matches and selected public GitHub files at an explicit revision. Arbitrary URLs, redirects, credentials, crawling and code execution remain blocked. Burp's scope and safety checks still govern assessment traffic. See the [internet permission guide](docs/wiki/Research.md) and [release notes](docs/release-notes-v3.1.0-beta.8.md).
 
 ### Bring your own model
 

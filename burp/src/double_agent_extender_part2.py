@@ -897,17 +897,79 @@ class BurpExtenderChunk2(object):
             self.stderr.println("[FINDINGS] Copy error: %s" % self._safe_ascii_text(e))
 
     def _sendFindingToRepeater(self):
-        """Send the selected finding's URL to Burp Repeater."""
+        """Snapshot the selected finding, then create its editable tab off the EDT."""
         try:
             row = self.findingsTable.getSelectedRow()
             if row < 0:
+                self.log_to_console("[FINDINGS] Select a finding to send to Repeater")
                 return
             model_row = self.findingsTable.convertRowIndexToModel(row)
-            url = str(self.findingsTable.getModel().getValueAt(model_row, 1) or "")
-            if url:
-                self._navigate_to_url(url)
+            with self.findings_lock_ui:
+                if model_row < 0 or model_row >= len(self.findings_list):
+                    return
+                finding = dict(self.findings_list[model_row])
+            worker = threading.Thread(target=self._send_finding_to_repeater, args=(finding,))
+            worker.daemon = True
+            worker.start()
         except Exception as e:
             self.stderr.println("[FINDINGS] Send to Repeater error: %s" % self._safe_ascii_text(e))
+
+    def _send_finding_to_repeater(self, finding):
+        """Create a tab only: preserve captured bytes and never open a browser."""
+        try:
+            from java.net import URL as JavaURL
+            url = unicode_text(finding.get("url", "")).strip()
+            parsed = JavaURL(url)
+            protocol = unicode_text(parsed.getProtocol()).lower()
+            host = unicode_text(parsed.getHost())
+            if protocol not in ("http", "https") or not host:
+                raise ValueError("Finding has no usable HTTP(S) target URL")
+            port = int(parsed.getPort())
+            if port <= 0:
+                port = 443 if protocol == "https" else 80
+            request_text = unicode_text(finding.get("request_data", ""))
+            request_bytes = None
+            source = "captured finding request"
+            url_starter = False
+            if request_text.strip():
+                request_bytes = self.helpers.stringToBytes(request_text)
+            else:
+                # Findings can originate outside Proxy history. History is a
+                # fallback, and only an exact URL/method match is acceptable.
+                wanted_method = unicode_text(finding.get("method", "")).upper()
+                for entry in reversed(self.callbacks.getProxyHistory() or []):
+                    try:
+                        info = self.helpers.analyzeRequest(entry)
+                        if unicode_text(info.getUrl()) != url:
+                            continue
+                        if wanted_method and unicode_text(info.getMethod()).upper() != wanted_method:
+                            continue
+                        candidate_bytes = entry.getRequest()
+                        service = entry.getHttpService()
+                        if candidate_bytes is None or len(candidate_bytes) == 0 or service is None:
+                            continue
+                        host, port = service.getHost(), int(service.getPort())
+                        protocol = unicode_text(service.getProtocol()).lower()
+                        request_bytes = candidate_bytes
+                        source = "exact Proxy history request"
+                        break
+                    except Exception:
+                        continue
+                if request_bytes is None or len(request_bytes) == 0:
+                    fallback = self._build_request_from_url(url)
+                    if not fallback:
+                        raise ValueError("No captured request or usable URL")
+                    request_bytes = self.helpers.stringToBytes(fallback["request_data"])
+                    source = "URL starter GET (no captured request available)"
+                    url_starter = True
+            label = self._safe_ascii_text(("URL starter: Finding %s" if url_starter else "Finding %s") %
+                                          unicode_text(finding.get("stable_id", "") or finding.get("title", "Double Agent")), 80)
+            self.callbacks.sendToRepeater(host, port, protocol == "https", request_bytes, label)
+            self.log_to_console("[FINDINGS] Repeater tab created from %s; no request sent" % source)
+            return True
+        except Exception as e:
+            self.log_to_console("[FINDINGS] Could not create Repeater tab: %s" % self._safe_ascii_text(e))
+            return False
 
     def _build_request_from_url(self, url):
         """Create a minimal replay request when a finding has URL but no captured request."""

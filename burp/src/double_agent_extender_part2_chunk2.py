@@ -820,6 +820,15 @@ class BurpExtenderChunk2Chunk2(object):
                     self.log_to_console("[AGENT] No selected queue item to send to Repeater")
                     return
                 qid = self.agent_queue[idx].get("id")
+            worker = threading.Thread(target=self._send_agent_queue_to_repeater, args=(qid,))
+            worker.daemon = True
+            worker.start()
+        except Exception as e:
+            self.stderr.println("[AGENT] Send selected queue to Repeater error: %s" % self._safe_ascii_text(e))
+
+    def _send_agent_queue_to_repeater(self, qid):
+        """Resolve the snapshotted work item without blocking Swing's event thread."""
+        try:
             api_view = AgentAPIHandler.__new__(AgentAPIHandler)
             api_view.extender = self
             item = api_view._get_queue_item_snapshot(qid)
@@ -828,8 +837,16 @@ class BurpExtenderChunk2Chunk2(object):
                 return
             findings_full = api_view._queue_findings_full(item)
             candidates = api_view._queue_target_candidates(item, findings_full)
+            if not candidates:
+                self.log_to_console("[AGENT] No request or URL is attached to queue #%s; no Repeater tab created" % qid)
+                return
             created = 0
             for candidate in candidates[:10]:
+                if not candidate.get("request_data") and candidate.get("url"):
+                    fallback = self._build_request_from_url(candidate["url"])
+                    if not fallback:
+                        continue
+                    candidate = dict(candidate, request_data=fallback["request_data"])
                 recipe = candidate.get("active_test_recipe", {}) or {}
                 built = api_view._raw_repeater_request(candidate, refresh_auth=True, note="")
                 if not built.get("ok"):
@@ -857,7 +874,10 @@ class BurpExtenderChunk2Chunk2(object):
                         tab_label
                     )
                     created += 1
-            self.log_to_console("[AGENT] Created %d Repeater tab(s) for queue #%s" % (created, qid))
+            if created:
+                self.log_to_console("[AGENT] Created %d Repeater tab(s) for queue #%s; no request sent" % (created, qid))
+            else:
+                self.log_to_console("[AGENT] Could not build a usable Repeater request for queue #%s" % qid)
         except Exception as e:
             self.stderr.println("[AGENT] Send selected queue to Repeater error: %s" % self._safe_ascii_text(e))
 

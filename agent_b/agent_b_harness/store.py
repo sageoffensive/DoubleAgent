@@ -214,7 +214,8 @@ class Store:
         return [self._event(row) for row in rows]
 
     def ask(self, question: str, reason: str, options: list[str], kind: str = "clarification", *, details: dict | None = None) -> str:
-        prefix = "approval-internet-" if kind == "internet" else "approval-" if kind == "approval" else "question-"
+        prefix = ("approval-internet-" if kind == "internet" else "approval-readiness-" if kind == "readiness"
+                  else "approval-" if kind == "approval" else "question-")
         qid = prefix + str(uuid.uuid4())
         question = redact_text(question)
         reason = redact_text(reason)

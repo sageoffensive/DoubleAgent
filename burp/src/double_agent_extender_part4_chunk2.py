@@ -988,59 +988,8 @@ class BurpExtenderChunk4Chunk2(object):
             return "snapshot_error=%s" % self._safe_ascii_text(e, 200)
 
     def _navigate_to_url(self, url):
-        """Navigate to a URL in Burp Suite by searching proxy history"""
-        try:
-            self.stdout.println("[FINDINGS] Navigating to: %s" % url[:80])
-
-            # Search proxy history for matching URL
-            history = self.callbacks.getProxyHistory()
-            if not history:
-                self.stdout.println("[FINDINGS] No proxy history available")
-                return
-
-            # Look for exact match first, then partial
-            best_match = None
-            for entry in reversed(history):  # Start from most recent
-                try:
-                    req = self.helpers.analyzeRequest(entry)
-                    entry_url = str(req.getUrl())
-                    if entry_url == url:
-                        best_match = entry
-                        break
-                    # Partial match: URL contains our target
-                    if url in entry_url or entry_url in url:
-                        if not best_match:
-                            best_match = entry
-                except:
-                    continue
-
-            if best_match:
-                # Send to Repeater
-                http_service = best_match.getHttpService()
-                request = best_match.getRequest()
-                if http_service and request:
-                    self.callbacks.sendToRepeater(
-                        http_service.getHost(),
-                        http_service.getPort(),
-                        http_service.getProtocol() == "https",
-                        request,
-                        "Double Agent Finding"
-                    )
-                    self.stdout.println("[FINDINGS] Sent to Repeater: %s" % url[:60])
-            else:
-                self.stdout.println("[FINDINGS] Request not found in proxy history")
-                # Try to open URL in browser as fallback
-                try:
-                    from java.awt import Desktop
-                    from java.net import URI
-                    if Desktop.isDesktopSupported():
-                        Desktop.getDesktop().browse(URI(url))
-                        self.stdout.println("[FINDINGS] Opened in browser")
-                except:
-                    pass
-
-        except Exception as e:
-            self.stderr.println("[FINDINGS] Navigation error: %s" % self._safe_ascii_text(e))
+        """Legacy URL-only handoff; create a tab without navigating or sending."""
+        return self._send_finding_to_repeater({"url": url})
 
     def _normalize_finding_key(self, title):
         """Extract significant words from a finding title for fuzzy dedup."""
