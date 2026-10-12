@@ -40,12 +40,15 @@ Copy **one** prompt into your coding agent. It will do the local setup and guide
 
 ```text
 Set up DoubleAgent for me: https://github.com/sageoffensive/DoubleAgent
-Use an existing checkout if available; otherwise clone the repository. Read
-its current README and installation instructions. Check this Mac meets the
-published app requirements. Use the ready-built ZIP in agent_b_mac; verify
+First ask me where to keep the DoubleAgent/Burp files and where to install
+Agent B.app (suggest /Applications or ~/Applications). Wait for my answer
+before downloading, cloning or moving files. If you find an existing
+checkout, offer to reuse it and confirm that choice with me. Use my chosen
+locations, then read the current README and installation instructions.
+Check this Mac meets the published app requirements. Use the ready-built ZIP in agent_b_mac; verify
 it against the matching release's SHA256SUMS, extract it and install Agent B
-in Applications. Preserve existing apps, settings and conversations; don't
-replace or restart an active instance. Keep Gatekeeper enabled.
+in my chosen app folder. Preserve existing apps, settings and conversations;
+don't replace or restart an active instance. Keep Gatekeeper enabled.
 
 Check Burp and Jython, then help me load agent_A_burp/DoubleAgent.py with
 its src folder intact. Start Agent A's API on loopback and open Agent B.
@@ -63,9 +66,11 @@ health, report anything still needing my input, and stop before assessment.
 ```text
 Set up DoubleAgent's local web interface for me:
 https://github.com/sageoffensive/DoubleAgent
-Use an existing checkout if available; otherwise clone the repository. Read
-its current README and installation instructions. Check Python 3.10+,
-Burp and Jython, then help me load agent_A_burp/DoubleAgent.py with its src
+First ask me which folder I want DoubleAgent installed in. Wait for my
+answer before downloading, cloning or moving files. If you find an existing
+checkout, offer to reuse it and confirm that choice with me. Use the folder
+I choose, then read the current README and installation instructions.
+Check Python 3.10+, Burp and Jython, then help me load agent_A_burp/DoubleAgent.py with its src
 folder intact and start Agent A's loopback API.
 
 From agent_b_web, use a supported Python to run:
@@ -86,9 +91,11 @@ one. Verify local service health and stop before assessment.
 ```text
 Help me set up the Burp extension from:
 https://github.com/sageoffensive/DoubleAgent
-Use an existing checkout if available; otherwise clone the repository. Read
-its current README and installation instructions. Check Burp and Jython,
-then help me load agent_A_burp/DoubleAgent.py with its src folder intact
+First ask me which folder I want DoubleAgent installed in. Wait for my
+answer before downloading, cloning or moving files. If you find an existing
+checkout, offer to reuse it and confirm that choice with me. Use the folder
+I choose, then read the current README and installation instructions.
+Check Burp and Jython, then help me load agent_A_burp/DoubleAgent.py with its src folder intact
 and start Agent A's API on 127.0.0.1:8777. Verify local service health.
 
 I want to use my existing coding agent, so don't install or start Agent B.
