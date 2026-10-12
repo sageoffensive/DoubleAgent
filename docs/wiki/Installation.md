@@ -58,7 +58,7 @@ Agent B uses the Python standard library and starts with no saved model connecti
 
 Instead of the browser launch above:
 
-1. Open [`agent_b_mac`](../../agent_b_mac/) and download its app ZIP. This folder contains only the packaged Mac app. Read the [beta.8 release notes](https://github.com/sageoffensive/DoubleAgent/releases/tag/v3.1.0-beta.8) for validation limits.
+1. Open [`agent_b_mac`](../../agent_b_mac/) and download its app ZIP. This folder contains only the packaged Mac app. Read the [beta.9 release notes](https://github.com/sageoffensive/DoubleAgent/releases/tag/v3.1.0-beta.9) for validation limits.
 2. Extract **Agent B.app**.
 3. Move it to **Applications**.
 4. Open the app.
@@ -67,7 +67,7 @@ The launcher uses its bundled, checksum-pinned Python runtime. Homebrew, Xcode a
 
 The default developer build is ad-hoc signed for local use. Developer ID signing, Apple notarization and clean-machine installation testing are distinct checks. Do not infer notarization from a valid signature; check the release notes. See [macOS release checklist](../macos-release.md).
 
-The `v3.1.0-beta.8` Apple Silicon release app is Developer ID-signed, notarized by Apple and includes a stapled ticket. Gatekeeper acceptance was verified locally. macOS can still ask for the normal first-launch confirmation for an app downloaded from the internet; this is not an unidentified-developer block. Clean-Mac UI installation testing remains outstanding.
+The `v3.1.0-beta.9` Apple Silicon release app is Developer ID-signed, notarized by Apple and includes a stapled ticket. Gatekeeper acceptance was verified locally. macOS can still ask for the normal first-launch confirmation for an app downloaded from the internet; this is not an unidentified-developer block. Clean-Mac UI installation testing remains outstanding.
 
 Developers can build it locally:
 

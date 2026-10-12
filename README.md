@@ -7,10 +7,10 @@ AI-assisted web security testing through Burp Suite. Agent A handles traffic and
 | Folder | What it contains | Start here |
 | --- | --- | --- |
 | [agent_A_burp](agent_A_burp/) | Agent A: the Burp extension | Load `DoubleAgent.py` in Burp |
-| [agent_b_mac](agent_b_mac/) | Agent B: the ready-to-run Mac app | [Download the app ZIP](https://github.com/sageoffensive/DoubleAgent/raw/refs/heads/main/agent_b_mac/Agent-B-macOS-arm64-v3.1.0-beta.8.zip) |
+| [agent_b_mac](agent_b_mac/) | Agent B: the ready-to-run Mac app | [Download the app ZIP](https://github.com/sageoffensive/DoubleAgent/raw/refs/heads/main/agent_b_mac/Agent-B-macOS-arm64-v3.1.0-beta.9.zip) |
 | [agent_b_web](agent_b_web/) | Agent B: source and local web interface | Run `./run.command` with Python 3.10+ |
 
-The Mac and web interfaces use the same Agent B harness. Choose whichever suits you. Agent B remains experimental; the current app is **v3.1.0-beta.8**, signed and notarized for **Apple Silicon, macOS 13+**. See the [release notes](https://github.com/sageoffensive/DoubleAgent/releases/tag/v3.1.0-beta.8) for validation limits.
+The Mac and web interfaces use the same Agent B harness. Choose whichever suits you. Agent B remains experimental; the current app is **v3.1.0-beta.9**, signed and notarized for **Apple Silicon, macOS 13+**. See the [release notes](https://github.com/sageoffensive/DoubleAgent/releases/tag/v3.1.0-beta.9) for validation limits.
 
 ## Get started
 

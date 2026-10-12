@@ -58,6 +58,8 @@ Agent B always requires a positive authoritative Burp scope decision before targ
 
 ## DoubleAgent connection
 
+**Connect to Burp** loads the operating contract and automatically enables read-only findings and queue context for chat. It captures state immediately, refreshes it on subsequent chat messages, and sends the bounded reference data to your selected model when you chat. You can disable it under **Settings → Run & scope → Notes & context**. Connection alone does not invoke a model, send target traffic, claim work or start assessment.
+
 The default API URL is:
 
 ```text

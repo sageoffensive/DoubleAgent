@@ -271,8 +271,8 @@ function render(value) {
   $('#bootstrap').classList.toggle('primary', !bootstrapped);
   $('#bootstrap').textContent = bootstrapped ? 'Burp context loaded' : 'Connect to Burp';
   $('#bootstrap').title = bootstrapped
-    ? 'Bootstrap already sent in this conversation'
-    : 'Load the Burp context for this conversation';
+    ? 'Testing context loaded; read-only findings are shared with your selected model when you chat'
+    : 'Load testing context and enable read-only findings in chat with your selected model';
   $('#fetch').title = bootstrapped ? 'Fetch the next Double Agent work item' : 'Connect to Burp first';
   $('#validate-a').title = bootstrapped ? 'Validate current Agent A findings' : 'Connect to Burp first';
   const targetKnown = Boolean(value.target_url);
@@ -281,9 +281,17 @@ function render(value) {
     : !targetKnown ? 'Fetch a target first so seed routes resolve'
     : 'Add OpenAPI/sitemap/URL routes to coverage and discovery';
   const bootstrapGuidance = $('#bootstrap-guidance');
-  bootstrapGuidance.textContent = bootstrapped
-    ? 'Burp context loaded. Choose a task below.'
-    : 'Connect to Burp to start assessment work.';
+  const chatSnapshot = value.notebook?.snapshot || {};
+  const chatFindingsAvailable = Boolean(value.notebook?.burp_context_enabled && chatSnapshot.findings);
+  bootstrapGuidance.textContent = !bootstrapped
+    ? 'Connect to Burp to read findings or start assessment work.'
+    : chatSnapshot.status === 'target_changed'
+      ? 'Target changed. Start a new conversation.'
+      : !value.notebook?.burp_context_enabled
+        ? 'Read-only chat context is off in Settings.'
+        : chatFindingsAvailable
+          ? 'Ask about findings, or choose a task below.'
+          : 'Findings unavailable. Send a message to retry.';
   bootstrapGuidance.classList.toggle('ready', bootstrapped);
   const activeSkills = value.active_skills || [];
   $('#active-skills').innerHTML = activeSkills.length

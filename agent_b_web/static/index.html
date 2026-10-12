@@ -141,7 +141,7 @@
           <p id="notebook-objective" class="hint">Add your objective, facts, questions and decisions.</p>
           <div id="notebook-notes" class="notebook-notes"></div>
           <label class="snapshot-choice"><input type="checkbox" id="burp-discussion-context"> Include read-only Burp context in chat</label>
-          <p class="hint">When enabled, a snapshot of findings and queue status is refreshed when you send a message and sent to your selected model. Notes and file references survive app restarts.</p>
+          <p class="hint">Connect to Burp enables this automatically. Findings and queue status are read without target traffic, refreshed when you send a message, and shared with your selected model. Turn it off to stop including them. Notes and file references survive app restarts.</p>
           <div class="snapshot-controls"><button type="button" id="refresh-discussion-context">Refresh snapshot</button><span id="snapshot-status" role="status" aria-live="polite">Burp context off</span></div>
           <div id="notebook-snapshot"></div>
           <div id="notebook-files"></div>
@@ -167,7 +167,7 @@
       <div class="modal-head"><h2 id="help-title">Help</h2><button type="button" id="close-help" class="icon" aria-label="Close help">×</button></div>
       <section><h3>Chat</h3><p>Type a message and press Enter. Use Shift + Enter for a new line. No mode to choose.</p></section>
       <section><h3>Files</h3><p>Use +, drag a file, or paste a screenshot when Agent B is idle.</p></section>
-      <section><h3>Burp work</h3><p>Connect to Burp, then choose a task from the sidebar. Messages during a run guide that work. Stop ends the run.</p></section>
+      <section><h3>Burp work</h3><p>Connect to Burp to discuss Agent A findings in chat. Read-only context is enabled automatically and shared with your selected model when you send a message. Choose a sidebar task to start assessment work; connecting alone sends no target traffic. Messages during a run guide that work. Stop ends the run.</p></section>
       <section><h3>App access</h3><p>Full App work checks captured Burp responses first. If access or login is uncertain, sign in through your Burp browser and confirm here. Choose “The app doesn’t need a login” for a public app. Never paste passwords or tokens into chat.</p></section>
       <section><h3>Questions &amp; approvals</h3><p>Pick an answer or reply in the message box. Approval requests require an explicit choice for that action.</p></section>
       <section><h3>Internet access</h3><p>Agent B asks before retrieving public reference data. Choose Allow or Deny. Expand Request details to see the destination, what is sent or fetched, and why. Permission applies once.</p></section>

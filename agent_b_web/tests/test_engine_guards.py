@@ -253,7 +253,7 @@ class EngineGuardTests(unittest.TestCase):
 
         messages = self.engine.store.messages(20)
         self.assertEqual(len(messages), 2)
-        self.assertIn("testing context", messages[-1]["content"])
+        self.assertIn("Testing context", messages[-1]["content"])
         self.assertTrue(self.engine.burp_prompt_loaded)
         self.assertEqual(self.engine.context[1]["role"], "user")
         self.assertIn("Current Agent B prompt", self.engine.context[1]["content"])

@@ -20,10 +20,15 @@ class SnapshotClient:
     def __init__(self, base):
         self.base = base
 
+    def get(self, path):
+        return self.request("GET", path)
+
     def request(self, method, path, **kwargs):
         self.calls.append((method, path))
         if self.fail and self.fail in path:
             raise RuntimeError("API_key=sensitive-provider-body")
+        if path == "/api/agent/prompt":
+            return {"prompt": "Current testing contract. " * 12, "browseros_enabled": False}
         if "workspace" in path:
             return {"scope": {"observed_urls": [self.target]}, "raw_cookie": "secret-cookie"}
         if path.startswith("/api/findings"):
@@ -85,6 +90,121 @@ class NotebookTests(unittest.TestCase):
             with self.subTest(update=update), self.assertRaises(ValueError):
                 self.engine.update_notebook(update)
         self.assertIn("Keep the release in beta", self.engine.notebook["decisions"])
+
+    def test_connect_enables_read_only_findings_and_grounds_first_chat(self):
+        self.save(objective="Review captured evidence")
+        checkpoint = {"state": "stopped", "active_queue": "7", "target_url": SnapshotClient.target}
+        self.store.save_checkpoint(checkpoint)
+        with patch("agent_b_harness.engine.DoubleAgent", SnapshotClient), patch("agent_b_harness.engine.Model", side_effect=AssertionError("Connecting must not call a model")):
+            result = self.engine.connect_burp()
+        self.assertTrue(result["findings_available"])
+        self.assertEqual(result["read_only_status"], "ready")
+        self.assertTrue(self.engine.notebook["burp_context_enabled"])
+        self.assertEqual(self.engine.notebook["objective"], "Review captured evidence")
+        self.assertEqual(self.store.load_checkpoint(), checkpoint)
+        self.assertIsNone(self.engine.thread)
+        self.assertIsNone(self.engine.active_queue)
+        self.assertEqual(self.engine.step, 0)
+        self.assertEqual(len(SnapshotClient.calls), 5)
+        self.assertTrue(all(method == "GET" for method, _ in SnapshotClient.calls))
+        self.assertEqual({path.split("?")[0] for _, path in SnapshotClient.calls},
+                         {"/api/agent/prompt", "/api/agent/burp/workspace", "/api/findings", "/api/agent/queue"})
+        with patch("agent_b_harness.engine.DoubleAgent", SnapshotClient):
+            prompt = self.discuss(self.engine, "Read Agent A findings")
+        self.assertIn("daf_example", prompt)
+        self.assertIn("Fixture candidate", prompt)
+        self.assertIn("Observed fixture response", prompt)
+        self.assertIn("captured_at", prompt)
+        self.assertEqual(len(SnapshotClient.calls), 8)
+        for secret in ("secret-raw-body", "secret-cookie", "secret-query", "secret-credential"):
+            self.assertNotIn(secret, prompt)
+
+    def test_connected_snapshot_survives_restart_but_can_be_disabled(self):
+        with patch("agent_b_harness.engine.DoubleAgent", SnapshotClient):
+            self.engine.connect_burp()
+        restarted = Engine(Store(self.path))
+        self.assertTrue(restarted.notebook["burp_context_enabled"])
+        self.assertFalse(restarted.burp_prompt_loaded)
+        with patch("agent_b_harness.engine.DoubleAgent", SnapshotClient):
+            prompt = self.discuss(restarted, "Read the findings after restarting")
+        self.assertIn("daf_example", prompt)
+        restarted.update_notebook({"revision": restarted.notebook["revision"], "burp_context_enabled": False})
+        with patch("agent_b_harness.engine.DoubleAgent", side_effect=AssertionError("Context was disabled")):
+            prompt = self.discuss(restarted, "Review only my notes")
+        reference = json.loads(json.loads(prompt)[1]["content"].split("\n", 1)[1])
+        self.assertEqual(reference["snapshot"], {"status": "disabled"})
+        self.assertEqual(restarted.notebook["snapshot"], {})
+        self.assertFalse(Engine(Store(self.path)).notebook["burp_context_enabled"])
+
+    def test_connect_does_not_merge_another_targets_findings(self):
+        with patch("agent_b_harness.engine.DoubleAgent", SnapshotClient):
+            self.engine.connect_burp()
+            SnapshotClient.target = "https://different.test/"
+            SnapshotClient.calls = []
+            result = self.engine.connect_burp()
+        self.assertEqual(result["read_only_status"], "target_changed")
+        self.assertFalse(result["findings_available"])
+        self.assertNotIn("findings", self.engine.notebook["snapshot"])
+        self.assertFalse(any(path.startswith("/api/findings") for _, path in SnapshotClient.calls))
+        self.assertEqual(self.engine.notebook["bound_target"], "https://example.test")
+        self.assertIn("new conversation", self.store.messages(1)[0]["content"])
+
+    def test_connect_reports_missing_findings_and_next_chat_retries(self):
+        SnapshotClient.fail = "findings"
+        with patch("agent_b_harness.engine.DoubleAgent", SnapshotClient):
+            result = self.engine.connect_burp()
+        self.assertEqual(result["read_only_status"], "partial")
+        self.assertFalse(result["findings_available"])
+        self.assertNotIn("findings", self.engine.notebook["snapshot"])
+        self.assertIn("could not be read", self.store.messages(1)[0]["content"])
+        SnapshotClient.fail = ""
+        with patch("agent_b_harness.engine.DoubleAgent", SnapshotClient):
+            prompt = self.discuss(self.engine, "Read Agent A findings again")
+        self.assertIn("Fixture candidate", prompt)
+        self.assertEqual(self.engine.notebook["snapshot"]["status"], "ready")
+
+    def test_connect_reports_unavailable_workspace_without_stale_findings(self):
+        with patch("agent_b_harness.engine.DoubleAgent", SnapshotClient):
+            self.engine.connect_burp()
+            SnapshotClient.fail = "workspace"
+            result = self.engine.connect_burp()
+        self.assertEqual(result["read_only_status"], "unavailable")
+        self.assertFalse(result["findings_available"])
+        self.assertNotIn("findings", self.engine.notebook["snapshot"])
+        self.assertNotIn("sensitive-provider-body", json.dumps(self.engine.notebook))
+
+    def test_failed_connect_does_not_enable_snapshot(self):
+        SnapshotClient.fail = "prompt"
+        with patch("agent_b_harness.engine.DoubleAgent", SnapshotClient), self.assertRaises(RuntimeError):
+            self.engine.connect_burp()
+        self.assertFalse(self.engine.notebook["burp_context_enabled"])
+        self.assertFalse(self.engine.burp_prompt_loaded)
+        self.assertFalse(self.store.collaboration()["burp_context_enabled"])
+
+    def test_connect_distinguishes_empty_findings_from_failed_read(self):
+        original = SnapshotClient.request
+        def empty(client, method, path, **kwargs):
+            if path.startswith("/api/findings"):
+                client.calls.append((method, path))
+                return {"findings": [], "total": 0}
+            return original(client, method, path, **kwargs)
+        with patch("agent_b_harness.engine.DoubleAgent", SnapshotClient), patch.object(SnapshotClient, "request", empty):
+            result = self.engine.connect_burp()
+        self.assertTrue(result["findings_available"])
+        self.assertEqual(result["read_only_status"], "ready")
+        self.assertEqual(self.engine.notebook["snapshot"]["findings"]["items"], [])
+        self.assertEqual(self.engine.notebook["snapshot"]["findings"]["reported_total"], 0)
+
+    def test_chat_start_during_connect_cannot_enable_snapshot(self):
+        from unittest.mock import Mock
+        def fetched():
+            self.engine.thread = Mock()
+            self.engine.thread.is_alive.return_value = True
+            return "Testing contract. " * 12, False, SnapshotClient.target
+        with patch.object(self.engine, "_fetch_burp_bootstrap", side_effect=fetched), self.assertRaisesRegex(ValueError, "Stop the current run"):
+            self.engine.connect_burp()
+        self.assertFalse(self.engine.burp_prompt_loaded)
+        self.assertFalse(self.engine.notebook["burp_context_enabled"])
 
     def test_snapshot_is_explicit_fixed_gets_with_sources_and_no_secrets(self):
         with self.assertRaises(ValueError):
