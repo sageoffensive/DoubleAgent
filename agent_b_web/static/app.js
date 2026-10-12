@@ -36,6 +36,7 @@ let settingsSection = 'models';
 let harnessOnline = false;
 let conversationScroll = 0;
 let followConversation = true;
+const dismissedConnectionOffers = new Set();
 
 function showNotice(message) {
   $('#ui-notice-text').textContent = message;
@@ -265,7 +266,6 @@ function render(value) {
   $('#clear').disabled = active || sending || pendingActions.has('clear');
   $('#stop').textContent = stopping ? 'Stopping…' : 'Stop current run';
   $('#fetch').disabled = active || !bootstrapped;
-  $('#validate-a').disabled = active || !bootstrapped || pendingActions.has('validate');
   $('#fetch').classList.toggle('primary', bootstrapped);
   $('#bootstrap').disabled = active || bootstrapped || pendingActions.has('bootstrap');
   $('#bootstrap').classList.toggle('primary', !bootstrapped);
@@ -274,7 +274,6 @@ function render(value) {
     ? 'Testing context loaded; read-only findings are shared with your selected model when you chat'
     : 'Load testing context and enable read-only findings in chat with your selected model';
   $('#fetch').title = bootstrapped ? 'Fetch the next Double Agent work item' : 'Connect to Burp first';
-  $('#validate-a').title = bootstrapped ? 'Validate current Agent A findings' : 'Connect to Burp first';
   const targetKnown = Boolean(value.target_url);
   $('#seed-surface').disabled = active || !bootstrapped || !targetKnown;
   $('#seed-surface').title = !bootstrapped ? 'Connect to Burp first'
@@ -423,7 +422,7 @@ function render(value) {
       return `
       <div class="message ${esc(message.role)} ${harnessMessage ? 'harness-status' : ''} ${thinking ? 'thinking' : ''}">
         <div class="meta">${speaker}</div>
-        <div class="bubble">${visibleMessage(content)}${meta.internet_request ? internetDetails(meta.internet_request) : message.role === 'assistant' && meta.question_id && meta.reason ? `<details class="question-reason"><summary>More context</summary><p>${esc(meta.reason)}</p></details>` : ''}${(meta.attachments || []).map(f => `<a class="attachment-download" href="/api/files/${encodeURIComponent(f.id)}" download>${f.mime.startsWith('image/') ? `<img class="attachment-thumbnail" src="/api/files/${encodeURIComponent(f.id)}/preview" alt="${esc(f.name)}">` : ''}${esc(f.name)} ↓</a>`).join('')}</div>
+        <div class="bubble">${visibleMessage(content)}${connectionChoices(message, transcript[transcript.length - 1]?.id)}${meta.internet_request ? internetDetails(meta.internet_request) : message.role === 'assistant' && meta.question_id && meta.reason ? `<details class="question-reason"><summary>More context</summary><p>${esc(meta.reason)}</p></details>` : ''}${(meta.attachments || []).map(f => `<a class="attachment-download" href="/api/files/${encodeURIComponent(f.id)}" download>${f.mime.startsWith('image/') ? `<img class="attachment-thumbnail" src="/api/files/${encodeURIComponent(f.id)}/preview" alt="${esc(f.name)}">` : ''}${esc(f.name)} ↓</a>`).join('')}</div>
       </div>`;
     });
 
@@ -433,6 +432,15 @@ function render(value) {
     renderedFeed = feedKey;
     updateScrollControl();
   }
+
+  timeline.querySelectorAll('[data-connection-offer]').forEach(offer => {
+    offer.classList.toggle('hidden', active || Boolean(value.pending_question) || !bootstrapped ||
+      value.notebook?.snapshot?.status === 'target_changed' || dismissedConnectionOffers.has(offer.dataset.connectionOffer));
+    offer.querySelectorAll('[data-connection-action]').forEach(button => {
+      button.disabled = pendingActions.has('validate') || sending || !harnessOnline;
+      button.onclick = () => chooseConnectionAction(button.dataset.connectionAction, offer.dataset.connectionOffer);
+    });
+  });
 
   const pending = value.pending_question;
   const question = $('#question');
@@ -727,16 +735,41 @@ $('#message').onkeydown = event => {
   }
 };
 $('#fetch').onclick = () => send('Fetch the Double Agent queue, run preflight, select the highest-value actionable item, and complete it using evidence-backed testing. Ask me in chat for any missing fixture or required approval.', true);
-$('#validate-a').onclick = async () => {
+function connectionChoices(message, lastMessageId) {
+  if (message.role !== 'assistant' || !message.metadata?.connection_offer || message.id !== lastMessageId) return '';
+  return `<div class="connection-choices" data-connection-offer="${esc(message.id)}"><button type="button" data-connection-action="verify">Verify findings</button><button type="button" data-connection-action="discuss">Discuss something else</button></div>`;
+}
+
+async function chooseConnectionAction(action, messageId) {
+  const active = ['starting', 'running', 'waiting', 'stopping'].includes(latestState.status);
+  const lastMessage = cache.messages[cache.messages.length - 1];
+  if (active || latestState.pending_question || !latestState.burp_prompt_loaded || !harnessOnline ||
+      latestState.notebook?.snapshot?.status === 'target_changed' || sending || pendingActions.has('validate') ||
+      dismissedConnectionOffers.has(String(messageId)) || String(lastMessage?.id) !== String(messageId) ||
+      !lastMessage?.metadata?.connection_offer) return;
+  if (action === 'discuss') {
+    dismissedConnectionOffers.add(String(messageId));
+    render(latestState);
+    $('#message').focus();
+    return;
+  }
+  if (action !== 'verify') return;
+  if (!latestState.settings?.model) { showNotice('Add a model connection in Settings before verifying findings.'); return; }
+  if (attachmentDrafts.length || uploading) { showNotice('Send or remove attached files before verifying findings.'); return; }
+  pendingActions.add('validate');
+  render(latestState);
   try {
-    // Queues Double Agent automated-testing for the current Agent A findings and
-    // fetches it, so Agent B claims a work item and can actually test through Burp.
+    // Only this explicit choice queues active verification. Connecting stays read-only.
     await api('/api/run/validate-findings', {method: 'POST', body: '{}'});
+    dismissedConnectionOffers.add(String(messageId));
     await poll();
   } catch (error) {
     showNotice(error.message);
+  } finally {
+    pendingActions.delete('validate');
+    render(latestState);
   }
-};
+}
 const seedDialog = $('#seed-dialog');
 $('#seed-surface').onclick = () => {
   const result = $('#seed-result');
@@ -1192,7 +1225,7 @@ $('#remove-model').onclick = async () => {
 };
 // Keep asynchronous actions locked across the periodic state refresh.
 for (const [selector, event, key] of [
-  ['#bootstrap', 'onclick', 'bootstrap'], ['#validate-a', 'onclick', 'validate'],
+  ['#bootstrap', 'onclick', 'bootstrap'],
   ['#confirm-new-conversation', 'onclick', 'clear'], ['#test-model', 'onclick', 'connection-test'],
   ['#remove-model', 'onclick', 'remove-model'], ['#settings-form', 'onsubmit', 'settings'],
   ['#model-form', 'onsubmit', 'model-save'], ['#skill-form', 'onsubmit', 'skill-save'],

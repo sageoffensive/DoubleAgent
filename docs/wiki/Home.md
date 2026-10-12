@@ -4,7 +4,7 @@
 
 Security teams want AI-assisted speed. Clients want proof that the model cannot quietly leave scope, take unreviewed action, or mark work complete without evidence.
 
-DoubleAgent is a safer, guided human-in-the-loop approach. It gives a security tester two coordinated agents while keeping the human as the authority:
+Agent B is DoubleAgent's main assessment experience, available on Mac and the web, with Agent A providing its Burp tools and evidence. DoubleAgent uses a guided human-in-the-loop approach. It gives a security tester two coordinated agents while keeping the human as the authority:
 
 **Agent A (Burp extension) → human hacker → Agent B (AI teammate)**
 

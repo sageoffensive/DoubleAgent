@@ -10,6 +10,7 @@ button.connected{border-color:#2b765c;color:var(--green);background:#102019}
 .target-link{display:block;margin-top:3px;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#8fc8ff;font-size:11px;text-decoration:none}.target-link:hover{color:#b7dcff;text-decoration:underline}
 .topbar-actions{display:flex;align-items:center;gap:10px;min-width:0}.target-link-main{display:block;max-width:min(44vw,560px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#9bd0ff;background:#101820;border:1px solid #28445c;border-radius:20px;padding:7px 12px;font-size:11px;text-decoration:none}.target-link-main:hover{color:#c6e6ff;border-color:#3b6484;background:#14212b}
 .message.harness-status{max-width:760px}.message.harness-status .meta{color:#8391a4}.message.harness-status .bubble{background:#10151a;border-color:#27313b;color:#b7c1cc;font-size:13px;padding:11px 14px}
+.connection-choices{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.connection-choices button{width:auto;margin:0;padding:8px 12px}
 
 /* Selectable methodology skills and reproducible run profiles. */
 aside{overflow-y:auto}.active-skills{display:flex;flex-wrap:wrap;gap:6px}.active-skills span{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:1px solid #315348;background:#11201b;color:#8fdbbb;border-radius:12px;padding:5px 8px;font-size:10px}.active-skills .muted-skill{border-color:#303741;background:#15191f;color:var(--muted)}

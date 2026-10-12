@@ -42,7 +42,7 @@ Questions appear in a dedicated card with choices and a free-text answer. Approv
 
 ## Agent A finding validation
 
-After bootstrap, use **Validate Agent A findings**. Agent B snapshots eligible findings, gathers linked evidence, and writes one persisted disposition per finding. Completion is blocked while linked findings remain unaccounted for.
+After **Connect to Burp**, Agent B reads the findings and asks whether to **Verify findings** or **Discuss something else**. Choose verification to start the assessment workflow; discussion keeps chat read-only. Agent B snapshots eligible findings, gathers linked evidence, and writes one persisted disposition per finding. Completion is blocked while linked findings remain unaccounted for.
 
 ## Duplicate review
 

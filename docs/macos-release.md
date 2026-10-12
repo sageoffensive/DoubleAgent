@@ -1,7 +1,7 @@
 # macOS release checklist
 
-Agent B is an experimental harness. Do not present an ad-hoc or unnotarized
-build as a frictionless public installer.
+Agent B is DoubleAgent's Mac assessment interface. Public installers must be
+Developer ID-signed, notarized and stapled.
 
 ## Build and verify
 
@@ -51,8 +51,9 @@ and [resolving signing/notarization issues](https://developer.apple.com/document
 - Test on each advertised CPU architecture and supported macOS version; record what was actually tested.
 
 The automated isolated-runtime smoke check is useful but does **not** replace
-the quarantined clean-Mac UI installation test. Keep a release labelled beta
-while this validation remains incomplete. Do not upload an app if notarization
+the quarantined clean-Mac UI installation test. Version labels do not replace
+validation: document untested installation paths, architectures and macOS versions
+in the release notes. Do not upload an app if notarization
 rejects it; inspect Apple's log first.
 
 ## Update the repository download

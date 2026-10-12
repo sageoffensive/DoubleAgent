@@ -1,4 +1,4 @@
 """Agent B teammate harness for DoubleAgent."""
 
-__version__ = "3.1.0b9"
-DISPLAY_VERSION = "v" + __version__.replace("b", "-beta.")
+__version__ = "3.2.0"
+DISPLAY_VERSION = "v" + __version__

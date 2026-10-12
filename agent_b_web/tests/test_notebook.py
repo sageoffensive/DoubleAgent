@@ -99,6 +99,10 @@ class NotebookTests(unittest.TestCase):
             result = self.engine.connect_burp()
         self.assertTrue(result["findings_available"])
         self.assertEqual(result["read_only_status"], "ready")
+        connection = self.store.messages(1)[0]
+        self.assertTrue(connection["metadata"]["connection_offer"])
+        self.assertIn("1 finding", connection["content"])
+        self.assertIn("verify Agent A's findings or discuss something else?", connection["content"])
         self.assertTrue(self.engine.notebook["burp_context_enabled"])
         self.assertEqual(self.engine.notebook["objective"], "Review captured evidence")
         self.assertEqual(self.store.load_checkpoint(), checkpoint)
@@ -157,6 +161,7 @@ class NotebookTests(unittest.TestCase):
         self.assertFalse(result["findings_available"])
         self.assertNotIn("findings", self.engine.notebook["snapshot"])
         self.assertIn("could not be read", self.store.messages(1)[0]["content"])
+        self.assertFalse(self.store.messages(1)[0]["metadata"]["connection_offer"])
         SnapshotClient.fail = ""
         with patch("agent_b_harness.engine.DoubleAgent", SnapshotClient):
             prompt = self.discuss(self.engine, "Read Agent A findings again")
@@ -194,6 +199,19 @@ class NotebookTests(unittest.TestCase):
         self.assertEqual(result["read_only_status"], "ready")
         self.assertEqual(self.engine.notebook["snapshot"]["findings"]["items"], [])
         self.assertEqual(self.engine.notebook["snapshot"]["findings"]["reported_total"], 0)
+        self.assertFalse(self.store.messages(1)[0]["metadata"]["connection_offer"])
+        self.assertIn("No findings were returned", self.store.messages(1)[0]["content"])
+
+    def test_connect_reports_sample_size_before_offering_verification(self):
+        original = SnapshotClient.request
+        def sampled(client, method, path, **kwargs):
+            result = original(client, method, path, **kwargs)
+            if path.startswith("/api/findings"):
+                result["total"] = 50
+            return result
+        with patch("agent_b_harness.engine.DoubleAgent", SnapshotClient), patch.object(SnapshotClient, "request", sampled):
+            self.engine.connect_burp()
+        self.assertIn("1 of 50 findings", self.store.messages(1)[0]["content"])
 
     def test_chat_start_during_connect_cannot_enable_snapshot(self):
         from unittest.mock import Mock

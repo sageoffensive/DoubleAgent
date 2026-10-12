@@ -21,6 +21,8 @@ SECRET_PATTERNS = (
 
 def redact_text(value: str) -> str:
     text = str(value)
+    text = re.sub(r"(?im)^(\s*(?:proxy-)?authorization|\s*set-cookie):[^\r\n]*", "[REDACTED]", text)
+    text = re.sub(r"(?i)((?:password|passwd|secret|access_token|refresh_token|session|sessionid)\s*[=:]\s*)[^\s&;,\x27\"{}\[\]<>]+", r"\1[REDACTED]", text)
     for index, pattern in enumerate(SECRET_PATTERNS):
         if index < 3:
             text = pattern.sub(lambda match: match.group(1) + "[REDACTED]", text)
@@ -131,6 +133,10 @@ class Store:
                   run_id TEXT NOT NULL,
                   data TEXT NOT NULL,
                   created REAL NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS hypotheses (
+                  scope TEXT NOT NULL, id TEXT NOT NULL, data TEXT NOT NULL,
+                  updated REAL NOT NULL, PRIMARY KEY(scope,id)
                 );
                 CREATE TABLE IF NOT EXISTS lessons (
                   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -286,6 +292,7 @@ class Store:
 
     def clear(self) -> None:
         with self.lock, self._connect() as db:
+            db.execute("DELETE FROM hypotheses")
             db.execute("DELETE FROM collaboration")
             db.execute("DELETE FROM discussion_messages")
             db.execute("DELETE FROM messages")
@@ -423,6 +430,16 @@ class Store:
              "detail": row["detail"], "hits": row["hits"], "updated": row["updated"]}
             for row in rows
         ]
+
+    def hypotheses(self, scope: str) -> list[dict[str, Any]]:
+        with self.lock, self._connect() as db:
+            rows = db.execute("SELECT data FROM hypotheses WHERE scope=? ORDER BY updated DESC", (scope,)).fetchall()
+        return [json.loads(row["data"]) for row in rows]
+
+    def save_hypothesis(self, scope: str, item: dict[str, Any]) -> None:
+        with self.lock, self._connect() as db:
+            db.execute("INSERT OR REPLACE INTO hypotheses(scope,id,data,updated) VALUES(?,?,?,?)",
+                       (scope, item["id"], json.dumps(redact_checkpoint_value(item)), time.time()))
 
     def active_goal(self) -> dict[str, Any] | None:
         with self.lock, self._connect() as db:

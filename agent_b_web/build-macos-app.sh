@@ -82,7 +82,7 @@ if [[ -n "$NOTARIZE_KEYCHAIN_PROFILE" ]]; then
   xcrun stapler validate "$APP"
   spctl --assess --type execute --verbose=2 "$APP"
 else
-  echo "NOT NOTARIZED: development/beta build only. Set NOTARIZE_KEYCHAIN_PROFILE for public distribution."
+  echo "NOT NOTARIZED: development build only. Set NOTARIZE_KEYCHAIN_PROFILE for public distribution."
 fi
 
 # Keep the last successful output recoverable until the maintainer removes it.

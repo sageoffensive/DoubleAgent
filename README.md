@@ -1,16 +1,16 @@
 # DoubleAgent
 
-AI-assisted web security testing through Burp Suite. Agent A handles traffic and evidence; Agent B is an optional chat harness for your chosen model.
+Agent B is your AI assessment teammate for Burp Suite. Connect your chosen model to investigate findings, test hypotheses and review captured evidence. Agent A is the Burp extension that executes target requests and enforces scope.
 
 ## Choose your component
 
 | Folder | What it contains | Start here |
 | --- | --- | --- |
-| [agent_A_burp](agent_A_burp/) | Agent A: the Burp extension | Load `DoubleAgent.py` in Burp |
-| [agent_b_mac](agent_b_mac/) | Agent B: the ready-to-run Mac app | [Download the app ZIP](https://github.com/sageoffensive/DoubleAgent/raw/refs/heads/main/agent_b_mac/Agent-B-macOS-arm64-v3.1.0-beta.9.zip) |
+| [agent_b_mac](agent_b_mac/) | Agent B: the ready-to-run Mac app | [Download Agent B](https://github.com/sageoffensive/DoubleAgent/releases/download/v3.2.0/Agent-B-macOS-arm64-v3.2.0.zip) |
 | [agent_b_web](agent_b_web/) | Agent B: source and local web interface | Run `./run.command` with Python 3.10+ |
+| [agent_A_burp](agent_A_burp/) | Agent A: Agent B's Burp extension | Load `DoubleAgent.py` in Burp |
 
-The Mac and web interfaces use the same Agent B harness. Choose whichever suits you. Agent B remains experimental; the current app is **v3.1.0-beta.9**, signed and notarized for **Apple Silicon, macOS 13+**. See the [release notes](https://github.com/sageoffensive/DoubleAgent/releases/tag/v3.1.0-beta.9) for validation limits.
+The Mac and web interfaces use the same Agent B harness. Choose whichever suits you. The current release is **v3.2.0**, signed and notarized for **Apple Silicon, macOS 13+**. See the [release notes](https://github.com/sageoffensive/DoubleAgent/releases/tag/v3.2.0) for validation limits.
 
 ## Get started
 
@@ -29,7 +29,7 @@ The Mac and web interfaces use the same Agent B harness. Choose whichever suits 
 
 For Mac installation, extract the ZIP from `agent_b_mac` and move **Agent B.app** to Applications. No separate Python installation is needed. The Mac folder contains only the packaged app; its build source lives in `agent_b_web/macos`.
 
-You can also use Agent A with Codex or Claude Code: paste Agent A's generated activation prompt into a fresh session. Agent B is optional.
+You can also connect an existing coding agent to Agent A using its generated activation prompt. Agent B provides the integrated chat, hypothesis registry, captured-evidence review and approval controls.
 
 ## Let your agent set it up
 
@@ -184,6 +184,8 @@ Agent B gives the model a limited toolset and checks target actions against Burp
 These controls help reduce scope creep and unsafe model actions. Configured model-provider calls have separate controls; this is not a host firewall or a sandbox for other applications. General-purpose harnesses retain their own shell and network permissions. [Compare harnesses](docs/harness-comparison.md).
 
 Both agents support local/OpenAI-compatible model servers. Agent B also supports OpenAI, OpenRouter, Anthropic and Bedrock, with credentials kept per connection.
+
+Agent B remembers hypotheses, tested mechanisms and blockers across restarts. Confirmed findings pass a separate review of captured Burp evidence, including a baseline, mutation and control; missing or mismatched evidence blocks confirmation. [Hypotheses and evidence review](agent_b_web/README.md#hypotheses-and-evidence-review).
 
 ## More information
 

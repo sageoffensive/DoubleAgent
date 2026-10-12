@@ -12,6 +12,7 @@ Double Agent traffic — so they run in the sandbox without network or sockets.
 
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -197,11 +198,27 @@ class IndependentVerifierTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.engine = Engine(Store(Path(self.directory.name) / "store.sqlite3"))
+        self.engine.target_url = "https://example.test/"
+        self.engine.run_id = "fixture-run"
+        self.engine.active_queue = "12"
+        self.claim = {"poc_request": "GET /?id=2 HTTP/1.1\r\nHost: example.test\r\n\r\n"}
+        for value in ("1", "2", "1"):
+            self.engine._capture_hypothesis_evidence(
+                f"GET /?id={value} HTTP/1.1\r\nHost: example.test\r\n\r\n",
+                {"status_code": 200, "url": "https://example.test/", "body": "fixture response"}, "test fixture")
+        self.evidence_ids = [e["id"] for e in self.engine._hypothesis_registry().get(self.engine.active_hypothesis_id)["observations"]]
 
     def tearDown(self):
         self.directory.cleanup()
 
     def _patch_reviewer(self, content):
+        try:
+            reply = json.loads(content)
+            if content in ('{"accept": true, "reason": "evidence is solid"}', '{"accept": false, "reason": "no control"}'):
+                reply.update(evidence_ids=self.evidence_ids, alternative_explanation="A benign response difference was considered")
+                content = json.dumps(reply)
+        except (ValueError, TypeError):
+            pass
         class FakeModel:
             def __init__(self, *a, **k):
                 self.thinking = None
@@ -213,20 +230,20 @@ class IndependentVerifierTests(unittest.TestCase):
 
     def test_accepts_when_verifier_says_accept(self):
         with self._patch_reviewer('{"accept": true, "reason": "evidence is solid"}'):
-            result = self.engine._independent_verifier("SQLi on id", {"poc": "..."}, reference="finding:12")
+            result = self.engine._independent_verifier("SQLi on id", self.claim, reference="finding:12")
         self.assertTrue(result["accept"])
         self.assertTrue(result["verified"])
         self.assertIn("finding:12", self.engine.verifier_reviews)
 
     def test_rejects_when_verifier_says_reject(self):
         with self._patch_reviewer('{"accept": false, "reason": "no control"}'):
-            result = self.engine._independent_verifier("weak claim", {"poc": "..."}, reference="finding:9")
+            result = self.engine._independent_verifier("weak claim", self.claim, reference="finding:9")
         self.assertFalse(result["accept"])
         self.assertEqual(self.engine.verifier_reviews["finding:9"]["reason"], "no control")
 
     def test_fails_closed_on_unparseable_reply(self):
         with self._patch_reviewer("I cannot produce JSON"):
-            result = self.engine._independent_verifier("x", {"poc": "..."}, reference="finding:1")
+            result = self.engine._independent_verifier("x", self.claim, reference="finding:1")
         self.assertFalse(result["accept"])
         self.assertFalse(result["verified"])
 
@@ -239,7 +256,7 @@ class IndependentVerifierTests(unittest.TestCase):
                 raise RuntimeError("sensitive provider response must not be persisted")
 
         with patch("agent_b_harness.engine.Model", BoomModel):
-            result = self.engine._independent_verifier("x", {"poc": "..."}, reference="finding:2")
+            result = self.engine._independent_verifier("x", self.claim, reference="finding:2")
         self.assertFalse(result["accept"])
         self.assertFalse(result["verified"])
         self.assertNotIn("sensitive provider", str(self.engine.store.events()))
@@ -259,7 +276,7 @@ class IndependentVerifierTests(unittest.TestCase):
         ]
         for reply in replies:
             with self.subTest(reply=reply), self._patch_reviewer(reply):
-                result = self.engine._independent_verifier("claim", {"evidence": "fixture"})
+                result = self.engine._independent_verifier("claim", self.claim)
                 self.assertFalse(result["accept"])
                 self.assertFalse(result["verified"])
 
@@ -296,10 +313,10 @@ class IndependentVerifierTests(unittest.TestCase):
             def complete(self, *a, **k):
                 self.active_at_review = engine.active_model is self
                 engine.stop_event.set()
-                return {"content": '{"accept": true, "reason": "ok"}'}
+                return {"content": json.dumps({"accept": True, "reason": "ok", "evidence_ids": [e["id"] for e in engine._hypothesis_registry().get(engine.active_hypothesis_id)["observations"]], "alternative_explanation": "Benign alternative was considered"})}
 
         with patch("agent_b_harness.engine.Model", CancelModel):
-            result = engine._independent_verifier("fixture", {})
+            result = engine._independent_verifier("fixture", self.claim)
         self.assertFalse(result["accept"])
         self.assertFalse(result["verified"])
         self.assertIsNone(engine.active_model)

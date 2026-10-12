@@ -31,6 +31,7 @@ def burp_fixture():
             calls.append(("GET", self.path))
             path = self.path.split("?", 1)[0]
             payloads = {
+                "/api/health": {"status": "ok"},
                 "/api/agent/prompt": {"prompt": "Synthetic read-only release fixture. " * 12},
                 "/api/agent/burp/workspace": {"scope": {"observed_urls": ["https://example.test/"]}},
                 "/api/findings": {"findings": [{"id": "daf_bundle_fixture", "title": "Captured fixture finding",
@@ -104,6 +105,7 @@ def main():
                 assert b'id="javascript-dialog"' in page
                 assert b'id="pane-conversation"' in page
                 assert b'id="tab-notebook"' not in page and b'id="tab-assessment"' not in page
+                assert b'id="validate-a"' not in page
             with urllib.request.urlopen(base + "/api/notebook", timeout=2) as reply:
                 notebook = json.load(reply)
             assert notebook["burp_context_enabled"] is False
@@ -130,6 +132,8 @@ def main():
             assert all(method == "GET" for method, _ in burp_calls)
             assert {path.split("?")[0] for _, path in burp_calls} == {
                 "/api/agent/prompt", "/api/agent/burp/workspace", "/api/findings", "/api/agent/queue"}
+            with urllib.request.urlopen(base + "/api/export", timeout=2) as reply:
+                assert b"Would you like me to verify Agent A's findings or discuss something else?" in reply.read()
             with urllib.request.urlopen(base + "/research.html", timeout=2) as reply:
                 page = reply.read()
                 assert reply.url == base + "/", "Legacy research page must return to chat"

@@ -128,6 +128,7 @@ class Handler(BaseHTTPRequestHandler):
                                ("Open questions", "questions"), ("Decisions", "decisions")):
                 sections.append("## " + title + "\n\n" + notebook[key])
             sections.append("## Recommendation decisions\n\n" + json.dumps(ENGINE.suggestions(), ensure_ascii=False, indent=2))
+            sections.append("## Hypothesis registry (observations, not authorization)\n\n" + json.dumps(ENGINE._hypothesis_summary(), ensure_ascii=False, indent=2))
             sections.append("## File references\n\n" + json.dumps(ENGINE.attachments.references(), ensure_ascii=False, indent=2))
             sections.append("## Last read-only snapshot\n\n" + json.dumps(notebook["snapshot"], ensure_ascii=False, indent=2))
             self.download("agent-b-notebook.md", "\n\n".join(sections).encode("utf-8"))
