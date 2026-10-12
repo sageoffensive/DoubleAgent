@@ -13,7 +13,7 @@ from javax.swing import SwingUtilities, JTable, JPanel
 from javax.swing.table import DefaultTableModel
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BURP_SRC = os.path.join(ROOT, "burp", "src")
+BURP_SRC = os.path.join(ROOT, "agent_A_burp", "src")
 sys.path.insert(0, BURP_SRC)
 import jev_duplicate_review as core
 

@@ -11,15 +11,15 @@ Thanks for helping improve DoubleAgent.
 ## Local checks
 
 ```bash
-node --check agent_b/static/app.js
+node --check agent_b_web/static/app.js
 python3 -m unittest discover -s tests -v
-(cd agent_b && python3 -m unittest discover -s tests -v)
+(cd agent_b_web && python3 -m unittest discover -s tests -v)
 ```
 
 For macOS app changes:
 
 ```bash
-cd agent_b
+cd agent_b_web
 ./build-macos-app.sh
 codesign --verify --deep --strict "dist/Agent B.app"
 ```

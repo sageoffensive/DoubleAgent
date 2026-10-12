@@ -105,7 +105,7 @@ class SettingsTransactionTests(unittest.TestCase):
         helper = load('double_agent_extender_part4.py', {'save_config'})
         helper.save_config.__func__.__globals__['json'] = json
         # Populate the actual persisted attributes without constructing Burp.
-        tree = ast.parse((Path(__file__).parents[1] / 'burp/src/double_agent_extender_part4.py').read_text())
+        tree = ast.parse((Path(__file__).parents[1] / 'agent_A_burp/src/double_agent_extender_part4.py').read_text())
         method = next(node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == 'save_config')
         for node in ast.walk(method):
             if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name) and node.value.id == 'self':

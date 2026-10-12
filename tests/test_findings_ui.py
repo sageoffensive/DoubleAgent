@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
 from test_duplicate_queue import load
-ROOT=Path(__file__).resolve().parents[1] / "burp" / "src"
+ROOT=Path(__file__).resolve().parents[1] / "agent_A_burp" / "src"
 
 class FindingsUiTests(unittest.TestCase):
     def helper(self):

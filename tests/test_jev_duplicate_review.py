@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-BURP_SRC = ROOT / "burp" / "src"
+BURP_SRC = ROOT / "agent_A_burp" / "src"
 sys.path.insert(0, str(BURP_SRC))
 
 from double_agent_jev import JevReviewMixin

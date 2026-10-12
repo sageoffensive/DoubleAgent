@@ -8,7 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
 
-ROOT = Path(__file__).resolve().parents[1] / "burp" / "src"
+ROOT = Path(__file__).resolve().parents[1] / "agent_A_burp" / "src"
 
 
 def load(filename, names):

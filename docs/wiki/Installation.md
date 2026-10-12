@@ -1,6 +1,6 @@
 # Installation
 
-DoubleAgent has two required halves: **Agent A in Burp** and **Agent B in a browser or macOS app**.
+Start with **Agent A in Burp**. Use the optional **Agent B Mac app or web harness**, or connect Codex/Claude Code with Agent A's generated activation prompt.
 
 ## What you need
 
@@ -13,22 +13,22 @@ DoubleAgent has two required halves: **Agent A in Burp** and **Agent B in a brow
 
 ## Step 1: install Agent A
 
-1. Download and extract `DoubleAgent-v3.1.0-beta.1.zip` from the beta release.
+1. [Download the current repository](https://github.com/sageoffensive/DoubleAgent/archive/refs/heads/main.zip) or clone it. The component folders are `agent_A_burp`, `agent_b_web`, and `agent_b_mac`.
 2. In Burp, open **Extensions → Settings → Python Environment**.
 3. Select your Jython standalone JAR.
 4. Open **Extensions → Installed → Add**.
 5. Choose **Python** and select:
 
    ```text
-   burp/DoubleAgent.py
+   agent_A_burp/DoubleAgent.py
    ```
 
 6. Confirm the **Double Agent** tab appears without an extension error.
 7. Open the **Agent AI** tab and start the Agent API.
 
-`DoubleAgent.py` automatically finds `burp/src/`. You do not need to select or move any of the internal files.
+`DoubleAgent.py` automatically finds `agent_A_burp/src/`. You do not need to select or move any of the internal files.
 
-If an unusual launcher cannot locate the source folder, set `DOUBLE_AGENT_EXTENSION_DIR` to the extracted `burp` folder before starting Burp.
+If an unusual launcher cannot locate the source folder, set `DOUBLE_AGENT_EXTENSION_DIR` to the extracted `agent_A_burp` folder before starting Burp.
 
 ## Step 2: enable PortSwigger MCP
 
@@ -46,19 +46,19 @@ Read [PortSwigger MCP integration](PortSwigger-MCP.md) for the architecture, ver
 From the extracted source:
 
 ```bash
-cd agent_b
+cd agent_b_web
 ./run.command
 ```
 
 Open [http://127.0.0.1:4310](http://127.0.0.1:4310).
 
-Agent B uses the Python standard library and starts with no saved model connection. Its local state lives under `agent_b/data/`, which is ignored by Git and should never be shared.
+Agent B uses the Python standard library and starts with no saved model connection. Its local state lives under `agent_b_web/data/`, which is ignored by Git and should never be shared.
 
 ## Step 3B: install Agent B on macOS
 
 Instead of the browser launch above:
 
-1. Download `Agent-B-macOS-arm64-v3.1.0-beta.1.zip` from the beta release and read its signing/notarization status.
+1. Open [`agent_b_mac`](../../agent_b_mac/) and download its app ZIP. This folder contains only the packaged Mac app. Read the [beta.8 release notes](https://github.com/sageoffensive/DoubleAgent/releases/tag/v3.1.0-beta.8) for validation limits.
 2. Extract **Agent B.app**.
 3. Move it to **Applications**.
 4. Open the app.
@@ -67,12 +67,12 @@ The launcher uses its bundled, checksum-pinned Python runtime. Homebrew, Xcode a
 
 The default developer build is ad-hoc signed for local use. Developer ID signing, Apple notarization and clean-machine installation testing are distinct checks. Do not infer notarization from a valid signature; check the release notes. See [macOS release checklist](../macos-release.md).
 
-The `v3.1.0-beta.1` Apple Silicon release app is Developer ID-signed, notarized by Apple and includes a stapled ticket. Gatekeeper acceptance was verified locally. macOS can still ask for the normal first-launch confirmation for an app downloaded from the internet; this is not an unidentified-developer block. Clean-Mac UI installation testing remains outstanding.
+The `v3.1.0-beta.8` Apple Silicon release app is Developer ID-signed, notarized by Apple and includes a stapled ticket. Gatekeeper acceptance was verified locally. macOS can still ask for the normal first-launch confirmation for an app downloaded from the internet; this is not an unidentified-developer block. Clean-Mac UI installation testing remains outstanding.
 
 Developers can build it locally:
 
 ```bash
-cd agent_b
+cd agent_b_web
 ./build-macos-app.sh
 codesign --verify --deep --strict "dist/Agent B.app"
 open "dist/Agent B.app"
@@ -92,9 +92,9 @@ The Agent A and Agent B health checks should return JSON. The MCP request should
 
 ## Step 5: connect the team
 
-1. Add and test a model under **Agent B → Settings → Add connection**.
+1. Add and test a model under **Agent B → Settings → Connections → Add connection**.
 2. Set the authorized target scope in Burp.
-3. Select **Send bootstrap** in Agent B.
+3. Select **Connect to Burp** in Agent B.
 4. Review the target and scope Agent B received.
 
 Continue with [Configuration](Configuration.md) or [Operator Workflows](Operator-Workflows.md).

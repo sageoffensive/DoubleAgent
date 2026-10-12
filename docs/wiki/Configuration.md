@@ -54,7 +54,7 @@ Use **Load models** in the connection editor to retrieve IDs from the server, th
 
 ## Scope enforcement
 
-Agent B always requires a positive authoritative Burp scope decision before target execution. Unknown and excluded scope cannot be approved. Models cannot authorize themselves, edit engagement permissions or change Burp configuration. All target execution uses Double Agent's guarded API; reload the updated extension in Burp before assessment. Model-initiated Scanner delegation is disabled; Scanner remains an operator-controlled Burp feature. See [Agent B's scope controls](../../agent_b/README.md#scope-enforcement).
+Agent B always requires a positive authoritative Burp scope decision before target execution. Unknown and excluded scope cannot be approved. Models cannot authorize themselves, edit engagement permissions or change Burp configuration. All target execution uses Double Agent's guarded API; reload the updated extension in Burp before assessment. Model-initiated Scanner delegation is disabled; Scanner remains an operator-controlled Burp feature. See [Agent B's scope controls](../../agent_b_web/README.md#scope-enforcement).
 
 ## DoubleAgent connection
 

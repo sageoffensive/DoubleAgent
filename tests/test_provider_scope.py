@@ -10,7 +10,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import sys
-BURP_SRC = Path(__file__).resolve().parents[1] / "burp" / "src"
+BURP_SRC = Path(__file__).resolve().parents[1] / "agent_A_burp" / "src"
 sys.path.insert(0, str(BURP_SRC))
 
 from double_agent_scope import validate_destination, validate_raw_destination, validate_request_path

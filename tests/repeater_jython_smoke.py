@@ -8,7 +8,7 @@ from java.lang import Runnable
 from javax.swing import SwingUtilities
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BURP_SRC = os.path.join(ROOT, "burp", "src")
+BURP_SRC = os.path.join(ROOT, "agent_A_burp", "src")
 if not os.path.isdir(BURP_SRC):
     BURP_SRC = ROOT
 sys.path.insert(0, BURP_SRC)

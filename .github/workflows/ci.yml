@@ -20,12 +20,12 @@ jobs:
           node-version: "22"
       - name: JavaScript syntax
         run: |
-          node --check agent_b/static/app.js
-          node agent_b/tests/test_source_review_ui.cjs
+          node --check agent_b_web/static/app.js
+          node agent_b_web/tests/test_source_review_ui.cjs
       - name: DoubleAgent tests
         run: python -m unittest discover -s tests -v
       - name: Burp source compiles
-        run: python -m py_compile burp/DoubleAgent.py burp/src/*.py
+        run: python -m py_compile agent_A_burp/DoubleAgent.py agent_A_burp/src/*.py
       - uses: actions/setup-java@v4
         with:
           distribution: "temurin"
@@ -36,7 +36,7 @@ jobs:
           echo "1fba1769effcc8b19f5e10436bc8274a158ce988559f257927c24c73bb137f3c  $RUNNER_TEMP/jython.jar" | sha256sum --check
           java -Djava.awt.headless=true -jar "$RUNNER_TEMP/jython.jar" -B tests/repeater_jython_smoke.py
       - name: Agent B tests
-        working-directory: agent_b
+        working-directory: agent_b_web
         run: python -m unittest discover -s tests -v
 
   macos-bundle:
@@ -44,9 +44,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build self-contained app (ad-hoc CI signature)
-        run: zsh agent_b/build-macos-app.sh
+        run: zsh agent_b_web/build-macos-app.sh
       - name: Test bundled runtime
-        working-directory: agent_b
+        working-directory: agent_b_web
         run: |
           "dist/Agent B.app/Contents/Resources/python/bin/python3" -E -s -B -m unittest discover -s tests -q
           "dist/Agent B.app/Contents/Resources/python/bin/python3" -E -s -B tests/smoke_macos_bundle.py "dist/Agent B.app"

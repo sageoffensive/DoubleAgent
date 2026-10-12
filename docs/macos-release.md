@@ -6,7 +6,7 @@ build as a frictionless public installer.
 ## Build and verify
 
 Build on the architecture being distributed (Apple Silicon or Intel).
-`agent_b/build-macos-app.sh` downloads pinned CPython 3.12.14, verifies its
+`agent_b_web/build-macos-app.sh` downloads pinned CPython 3.12.14, verifies its
 SHA-256 digest, includes runtime licenses and signs nested code before the app.
 An optional `PYTHON_RUNTIME_ARCHIVE` uses a cached archive with the same digest
 check. No system Python installation is needed to run the app.
@@ -14,7 +14,7 @@ check. No system Python installation is needed to run the app.
 For local development:
 
 ```sh
-cd agent_b
+cd agent_b_web
 ./build-macos-app.sh
 "dist/Agent B.app/Contents/Resources/python/bin/python3" -E -s -B -m unittest discover -s tests -q
 "dist/Agent B.app/Contents/Resources/python/bin/python3" -E -s -B tests/smoke_macos_bundle.py "dist/Agent B.app"
@@ -54,3 +54,15 @@ The automated isolated-runtime smoke check is useful but does **not** replace
 the quarantined clean-Mac UI installation test. Keep a release labelled beta
 while this validation remains incomplete. Do not upload an app if notarization
 rejects it; inspect Apple's log first.
+
+## Update the repository download
+
+Keep `agent_b_mac/` binary-only: one ZIP containing the signed, notarized and
+stapled app. Build sources remain under `agent_b_web/macos/`.
+
+After publishing and verifying a release, replace the previous ZIP in
+`agent_b_mac/` with that release's exact Mac ZIP. Check its SHA-256 against the
+published `SHA256SUMS`, then update the version and direct download link in the
+root README. Do not rebuild, re-sign or modify the release app during this copy.
+The source and Burp folders use the current repository layout; older release
+archives retain the layout documented in their own release notes.

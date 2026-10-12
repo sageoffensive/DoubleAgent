@@ -28,7 +28,7 @@ Agent A owns:
 - work queues and assessment state;
 - reporting and PortSwigger MCP transport.
 
-Burp loads one public entry point: `burp/DoubleAgent.py`. The implementation under `burp/src/` remains split into smaller modules because Jython compiles to JVM bytecode and very large modules can exceed the JVM method-size limit.
+Burp loads one public entry point: `agent_A_burp/DoubleAgent.py`. The implementation under `agent_A_burp/src/` remains split into smaller modules because Jython compiles to JVM bytecode and very large modules can exceed the JVM method-size limit.
 
 ## The human hacker: control plane
 

@@ -8,7 +8,7 @@ import urllib2
 import urlparse
 from javax.swing import JComboBox
 
-ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "burp", "src")
+ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "agent_A_burp", "src")
 sys.path.insert(0, ROOT)
 for name in ('double_agent_scope.py', 'double_agent_api_part1.py',
              'double_agent_api_part3_chunk2.py', 'double_agent_api_part4_chunk2.py',
