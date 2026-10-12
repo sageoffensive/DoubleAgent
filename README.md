@@ -33,7 +33,9 @@ You can also use Agent A with Codex or Claude Code: paste Agent A's generated ac
 
 ## Let your agent set it up
 
-Copy **one** prompt into your coding agent. It will do the local setup and guide you through any Burp steps it cannot perform.
+Copy **one** prompt into your coding agent. It will do the local setup and guide you through any Burp steps it cannot perform. After installation, it walks you through passive analysis and model selection.
+
+Recommended split: **Haiku** for fast, low-cost Agent A analysis, or **Sonnet** when you want more capability; **GLM or Opus** for Agent B's deeper reasoning. **Daybreak** is an option only with approved access and a compatible provider/transport—do not assume it works by entering that name. Check current [Claude model guidance](https://platform.claude.com/docs/en/models/overview), [GLM documentation](https://docs.z.ai/guides/llm/glm-5), and [Daybreak requirements](https://developers.openai.com/api/docs/guides/daybreak); choose exact IDs available to your account, with your budget and data-sharing requirements in mind.
 
 <details>
 <summary><strong>Mac app + Burp — easiest on Apple Silicon</strong></summary>
@@ -45,17 +47,42 @@ Agent B.app (suggest /Applications or ~/Applications). Wait for my answer
 before downloading, cloning or moving files. If you find an existing
 checkout, offer to reuse it and confirm that choice with me. Use my chosen
 locations, then read the current README and installation instructions.
-Check this Mac meets the published app requirements. Use the ready-built ZIP in agent_b_mac; verify
-it against the matching release's SHA256SUMS, extract it and install Agent B
+Check this Mac meets the published app requirements. Use the ready-built
+ZIP in agent_b_mac; verify it against the matching release's SHA256SUMS, extract it and install Agent B
 in my chosen app folder. Preserve existing apps, settings and conversations;
 don't replace or restart an active instance. Keep Gatekeeper enabled.
 
 Check Burp and Jython, then help me load agent_A_burp/DoubleAgent.py with
 its src folder intact. Start Agent A's API on loopback and open Agent B.
-Guide me through Settings → Connections and Connect to Burp. Have me enter
-any keys directly in Settings, never in chat or committed files. Use my
-existing model server; don't install or restart one. Verify local service
-health, report anything still needing my input, and stop before assessment.
+Verify local service health. Never request keys in chat or committed files.
+
+After installation, walk me through Agent A's passive analysis setup:
+Keep Analyze Burp Traffic off until the model and scope are configured.
+- Recommend Haiku for low-cost, fast analysis, or Sonnet for more capability.
+  Explain current provider pricing and ask which model/provider I prefer.
+- In Double Agent → Settings → AI Provider, guide me through the endpoint,
+  private key entry, exact model ID, Refresh and Test Connection. Explain
+  whether the check verified inference or only authentication/catalogue.
+- Ask for my authorized target and help me configure Burp's scope without
+  broadening existing scope on your own. Explain that captured traffic is
+  sent to the chosen model and incurs usage before enabling analysis.
+- Guide me to Analyze Burp Traffic on the main Double Agent panel. Show me
+  how to review analysis status, findings and Pause Analysis / Stop Analysis.
+  If I agree, verify analysis using one suitable, already-captured in-scope
+  response; don't generate new target traffic or invent findings.
+
+Then help me configure a separate, stronger model for Agent B:
+- Recommend GLM or Opus based on my budget, privacy needs and available API
+  access. Offer Daybreak only if my approved account and provider support
+  Agent B's transport; don't invent a model ID or promise compatibility.
+- Guide Settings → Connections → Add connection, Load models where supported,
+  the exact model ID, Test connection, and Connect to Burp. Keep each agent's
+  model selection separate. Never request keys in chat or committed files.
+- If I agree, use a harmless synthetic chat to verify inference. Don't claim
+  tool-call compatibility from a catalogue or ordinary chat; report that
+  separately. Use my existing server; don't install or restart one.
+Report what is verified and what still needs input. Stop before active
+assessment, crawling, Scanner, Full App or automatic queue execution.
 ```
 
 </details>
@@ -70,17 +97,43 @@ First ask me which folder I want DoubleAgent installed in. Wait for my
 answer before downloading, cloning or moving files. If you find an existing
 checkout, offer to reuse it and confirm that choice with me. Use the folder
 I choose, then read the current README and installation instructions.
-Check Python 3.10+, Burp and Jython, then help me load agent_A_burp/DoubleAgent.py with its src
-folder intact and start Agent A's loopback API.
+Check Python 3.10+, Burp and Jython, then help me load
+agent_A_burp/DoubleAgent.py with its src folder intact and start Agent A's loopback API.
 
 From agent_b_web, use a supported Python to run:
 python3 -B -m agent_b_harness.server
 Reuse a healthy existing instance instead of starting another. Keep the
-listener on loopback and open http://127.0.0.1:4310. Guide me through
-Settings → Connections and Connect to Burp. Have me enter keys directly
-in Settings, never in chat or committed files. Preserve existing settings
-and conversations. Use my existing model server; don't install or restart
-one. Verify local service health and stop before assessment.
+listener on loopback and open http://127.0.0.1:4310. Preserve existing
+settings and conversations. Never request keys in chat or committed files.
+Verify local service health.
+
+After installation, walk me through Agent A's passive analysis setup:
+Keep Analyze Burp Traffic off until the model and scope are configured.
+- Recommend Haiku for low-cost, fast analysis, or Sonnet for more capability.
+  Explain current provider pricing and ask which model/provider I prefer.
+- In Double Agent → Settings → AI Provider, guide me through the endpoint,
+  private key entry, exact model ID, Refresh and Test Connection. Explain
+  whether the check verified inference or only authentication/catalogue.
+- Ask for my authorized target and help me configure Burp's scope without
+  broadening existing scope on your own. Explain that captured traffic is
+  sent to the chosen model and incurs usage before enabling analysis.
+- Guide me to Analyze Burp Traffic on the main Double Agent panel. Show me
+  how to review analysis status, findings and Pause Analysis / Stop Analysis.
+  If I agree, verify analysis using one suitable, already-captured in-scope
+  response; don't generate new target traffic or invent findings.
+
+Then help me configure a separate, stronger model for Agent B:
+- Recommend GLM or Opus based on my budget, privacy needs and available API
+  access. Offer Daybreak only if my approved account and provider support
+  Agent B's transport; don't invent a model ID or promise compatibility.
+- Guide Settings → Connections → Add connection, Load models where supported,
+  the exact model ID, Test connection, and Connect to Burp. Keep each agent's
+  model selection separate. Never request keys in chat or committed files.
+- If I agree, use a harmless synthetic chat to verify inference. Don't claim
+  tool-call compatibility from a catalogue or ordinary chat; report that
+  separately. Use my existing server; don't install or restart one.
+Report what is verified and what still needs input. Stop before active
+assessment, crawling, Scanner, Full App or automatic queue execution.
 ```
 
 </details>
@@ -95,14 +148,30 @@ First ask me which folder I want DoubleAgent installed in. Wait for my
 answer before downloading, cloning or moving files. If you find an existing
 checkout, offer to reuse it and confirm that choice with me. Use the folder
 I choose, then read the current README and installation instructions.
-Check Burp and Jython, then help me load agent_A_burp/DoubleAgent.py with its src folder intact
-and start Agent A's API on 127.0.0.1:8777. Verify local service health.
+Check Burp and Jython, then help me load agent_A_burp/DoubleAgent.py with
+its src folder intact and start Agent A's API on 127.0.0.1:8777. Verify local service health.
 
-I want to use my existing coding agent, so don't install or start Agent B.
-Guide me to Agent A's generated activation prompt and have me paste it
-into a fresh agent session. Use that live operating contract rather than
-inventing tool instructions. Don't request credentials in chat, change
-my target scope, or send target traffic during setup. Report readiness
+After installation, walk me through Agent A's passive analysis setup:
+Keep Analyze Burp Traffic off until the model and scope are configured.
+- Recommend Haiku for low-cost, fast analysis, or Sonnet for more capability.
+  Explain current provider pricing and ask which model/provider I prefer.
+- In Double Agent → Settings → AI Provider, guide me through the endpoint,
+  private key entry, exact model ID, Refresh and Test Connection. Explain
+  whether the check verified inference or only authentication/catalogue.
+- Ask for my authorized target and help me configure Burp's scope without
+  broadening existing scope on your own. Explain that captured traffic is
+  sent to the chosen model and incurs usage before enabling analysis.
+- Guide me to Analyze Burp Traffic on the main Double Agent panel. Show me
+  how to review analysis status, findings and Pause Analysis / Stop Analysis.
+  If I agree, verify analysis using one suitable, already-captured in-scope
+  response; don't generate new target traffic or invent findings.
+
+Keep keys private in Settings and use my existing model server; don't
+install or restart one. I want to use my existing coding agent, so don't
+install or start Agent B. Guide me to Agent A's generated activation prompt
+and have me paste it into a fresh agent session. Use that live operating contract rather than
+inventing tool instructions. Don't request credentials in chat, broaden
+approved scope, or send target traffic during setup. Report readiness
 and any remaining manual steps; wait for my assessment instructions.
 ```
 
