@@ -5,8 +5,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
-from test_duplicate_queue import load
-ROOT=Path(__file__).resolve().parents[1] / "agent_A_burp" / "src"
+from test_duplicate_queue import load, ROOT
 
 class FindingsUiTests(unittest.TestCase):
     def helper(self):
@@ -27,14 +26,14 @@ class FindingsUiTests(unittest.TestCase):
         namespace={'RowFilter':object}
         exec(compile(ast.fix_missing_locations(ast.Module(body=[cls],type_ignores=[])),'filter','exec'),namespace)
         extender=self.helper()
-        extender.findings_list=[{'stable_id':'daf_a'}, {'stable_id':'daf_b','fp':True}, {'stable_id':'daf_c','agent_status':'false_positive'}]
+        extender.findings_list=[{'stable_id':'daf_a'}, {'stable_id':'daf_b','fp':True}, {'stable_id':'daf_c','agent_status':'false_positive'}, {'stable_id':'daf_dup','agent_status':'duplicate'}]
         extender.findings_lock_ui=threading.RLock()
         extender._show_fp_findings=False
         filter_=namespace['FPRowFilter'](extender)
-        entries=[SimpleNamespace(getIdentifier=lambda index=i: index) for i in [2,0,1]]
-        self.assertEqual([filter_.include(e) for e in entries],[False,True,False])
+        entries=[SimpleNamespace(getIdentifier=lambda index=i: index) for i in [2,0,1,3]]
+        self.assertEqual([filter_.include(e) for e in entries],[False,True,False,False])
         extender._show_fp_findings=True
-        self.assertEqual([filter_.include(e) for e in entries],[True,True,True])
+        self.assertEqual([filter_.include(e) for e in entries],[True,True,True,True])
         extender._show_fp_findings=False
         extender.findings_list[1]['fp']=False
         self.assertTrue(filter_.include(entries[2]))

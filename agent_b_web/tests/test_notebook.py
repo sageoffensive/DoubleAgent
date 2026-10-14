@@ -63,7 +63,7 @@ class NotebookTests(unittest.TestCase):
             engine.thread.join(3)
             self.assertFalse(engine.thread.is_alive())
             args = model.return_value.complete.call_args.args
-            self.assertEqual([t["function"]["name"] for t in args[1]], ["request_public_reference"])
+            self.assertEqual([t["function"]["name"] for t in args[1]], ["request_public_reference", "read_burp", "run_burp_task"])
             self.assertEqual(args[3], "auto")
             return json.dumps(args[0], ensure_ascii=False)
 
@@ -78,7 +78,7 @@ class NotebookTests(unittest.TestCase):
         self.assertIn("retained reference fact", prompt)
         self.assertIn("Review the retained notes", prompt)
         self.assertEqual(len(restarted.store.discussion_messages()), 4)
-        self.assertEqual(restarted.discussion_context[0]["attachments"], [file["id"]])
+        self.assertEqual(restarted.conversation_context[0]["attachments"], [file["id"]])
         self.assertEqual(self.path.stat().st_mode & 0o777, 0o600)
 
     def test_notes_are_redacted_validated_and_revision_checked(self):
@@ -102,7 +102,7 @@ class NotebookTests(unittest.TestCase):
         connection = self.store.messages(1)[0]
         self.assertTrue(connection["metadata"]["connection_offer"])
         self.assertIn("1 finding", connection["content"])
-        self.assertIn("verify Agent A's findings or discuss something else?", connection["content"])
+        self.assertIn("verify Agent A's findings, or what else would you like me to do?", connection["content"])
         self.assertTrue(self.engine.notebook["burp_context_enabled"])
         self.assertEqual(self.engine.notebook["objective"], "Review captured evidence")
         self.assertEqual(self.store.load_checkpoint(), checkpoint)
@@ -344,7 +344,7 @@ class NotebookTests(unittest.TestCase):
         legacy.message("assistant", "Assessment output must stay separate")
         recovered = Engine(Store(legacy_path))
         self.assertEqual(len(recovered.store.discussion_messages()), 2)
-        self.assertNotIn("Assessment output", json.dumps(recovered.discussion_context))
+        self.assertNotIn("Assessment output", json.dumps(recovered.conversation_context))
         self.assertEqual(len(Engine(Store(legacy_path)).store.discussion_messages()), 2)
 
     def test_decision_changes_are_received_at_the_next_discussion_boundary(self):

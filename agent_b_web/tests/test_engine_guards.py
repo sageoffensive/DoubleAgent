@@ -285,13 +285,13 @@ class EngineGuardTests(unittest.TestCase):
         self.assertEqual(self.engine.target_url, "")
         self.assertEqual(self.engine.context, [{"role": "system", "content": CHAT_SYSTEM}])
 
-    def test_regular_chat_has_no_assessment_tools_or_context(self):
+    def test_chat_offers_tools_without_using_burp_for_a_greeting(self):
         self.engine.clear()
         with patch("agent_b_harness.engine.Model") as model, patch("agent_b_harness.engine.DoubleAgent", side_effect=AssertionError("No Burp call expected")):
             model.return_value.complete.return_value = {"content": "Hello!"}
             self.engine._run("Hello")
             args = model.return_value.complete.call_args.args
-            self.assertEqual([t["function"]["name"] for t in args[1]], ["request_public_reference"])
+            self.assertEqual([t["function"]["name"] for t in args[1]], ["request_public_reference", "read_burp", "run_burp_task"])
             self.assertEqual(args[3], "auto")
             self.assertEqual(args[0][0]["content"], CHAT_SYSTEM)
         self.assertEqual(self.engine.state, "completed")
@@ -523,6 +523,48 @@ class EngineGuardTests(unittest.TestCase):
         self.assertEqual(detail["id"], 9)
         self.assertEqual(self.engine.active_queue, "9")
         self.assertEqual(client.posts, [])
+
+    def test_resume_reclaims_saved_item_after_burp_restarts(self):
+        self.engine.resume_requested = True
+        self.engine.resume_queue_id = "9"
+        self.engine.duplicate_review_snapshot = {"queue_id": "9"}
+
+        class RestartedClient:
+            def __init__(self):
+                self.posts = []
+
+            def get(self, path):
+                if path == "/api/agent/queue":
+                    return {"queue": [{"id": 0, "status": "pending"}, {"id": 9, "status": "pending"}]}
+                if path == "/api/agent/queue/9":
+                    return {"id": 9, "status": "pending", "summary": "Saved duplicate review"}
+                raise AssertionError("Resume must not read an unrelated item: " + path)
+
+            def post(self, path, body):
+                self.posts.append(path)
+                return {"ok": True}
+
+        client = RestartedClient()
+        detail = self.engine._bootstrap_queue(client)
+        self.assertEqual(detail["id"], 9)
+        self.assertEqual(client.posts, ["/api/agent/queue/9/claim"])
+        self.assertIn("harness_resume", detail)
+
+    def test_resume_missing_saved_item_refuses_unrelated_pending_work(self):
+        self.engine.resume_requested = True
+        self.engine.resume_queue_id = "9"
+
+        class MissingClient:
+            def get(self, path):
+                if path == "/api/agent/queue":
+                    return {"queue": [{"id": 0, "status": "pending"}]}
+                raise AssertionError(path)
+
+            def post(self, path, body):
+                raise AssertionError("Missing saved work must not claim another item")
+
+        with self.assertRaisesRegex(ValueError, "refusing to select unrelated work"):
+            self.engine._bootstrap_queue(MissingClient())
 
     def test_send_burp_request_builds_scoped_raw_request_and_records_receipt(self):
         self.engine.active_queue = "7"

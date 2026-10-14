@@ -106,12 +106,12 @@ class CollaborationTests(unittest.TestCase):
         Engine(self.store)
         self.assertEqual(self.store.question(qid)["status"], "cancelled")
 
-    def test_discuss_cannot_silently_steer_an_assessment(self):
+    def test_legacy_discussion_flag_does_not_block_guidance(self):
         self.engine.burp_prompt_loaded = True
         self.engine.thread = type("LiveWorker", (), {"is_alive": lambda self: True})()
-        with self.assertRaisesRegex(ValueError, "assessment is running"):
-            self.engine.chat("Explain these notes", discussion=True)
-        self.assertEqual(self.engine.steering, [])
+        result = self.engine.chat("Explain these notes", discussion=True)
+        self.assertTrue(result["steering"])
+        self.assertEqual(self.engine.steering, ["Explain these notes"])
 
     def test_suggestion_decisions_survive_recreation(self):
         self.engine.route_recommendations = [{"subject": "Clarify requirements", "route": "needs-info", "rationale": "Context missing"}]
@@ -134,10 +134,10 @@ class CollaborationTests(unittest.TestCase):
             self.assertFalse(self.engine.thread.is_alive())
             self.assertEqual(self.engine.state, "completed")
             args = model.return_value.complete.call_args.args
-            self.assertEqual([t["function"]["name"] for t in args[1]], ["request_public_reference"])
+            self.assertEqual([t["function"]["name"] for t in args[1]], ["request_public_reference", "read_burp", "run_burp_task"])
             self.assertEqual(args[3], "auto")
             self.assertIn("reference material", json.dumps(args[0]))
-            self.assertEqual(self.engine.discussion_context[0]["attachments"], [item["id"]])
+            self.assertEqual(self.engine.conversation_context[0]["attachments"], [item["id"]])
             self.assertNotIn("base64", json.dumps(self.store.messages()))
 
     def test_image_capability_roundtrip_preserves_other_settings(self):

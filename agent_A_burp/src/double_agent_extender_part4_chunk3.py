@@ -324,7 +324,7 @@ class BurpExtenderChunk4Chunk3(object):
 
     def _finding_hidden_from_normal_view(self, finding):
         return bool(finding.get("fp", False)) or self._agent_status_value(
-            finding.get("agent_status", "")) == "false_positive"
+            finding.get("agent_status", "")) in ("false_positive", "duplicate")
 
     def _prune_already_covered_findings(self):
         """Remove findings already covered by completed work from the active list."""

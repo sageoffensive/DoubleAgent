@@ -90,13 +90,18 @@ def build_contract(
             "This is a read-and-classify task: send no target traffic and run no scanners.",
             "A shared CWE or host alone is not a duplicate; do not merge distinct issues.",
             "Refer to findings only by their exact #ID.",
+            "The operator authorized this review and evidence-backed duplicate writes; do not ask to reconfirm continuation.",
+            "Keep related-but-distinct and uncertain findings visible.",
         ]
         contract["done_when"] = [
             "A complete comparison table with at least two findings and no unresolved linked IDs was supplied.",
             "Every genuine duplicate is recorded with triage_finding (status=duplicate, duplicate_of, evidence match).",
             "finish includes every reviewed immutable ID and Double Agent accepts the final queue result.",
         ]
-        contract["escalate_when"] = ["Two findings look related but distinct and the operator should decide."]
+        contract["escalate_when"] = [
+            "Original evidence needed to compare a specific candidate pair is unavailable.",
+            "The operator's instructions conflict with the supplied comparison population.",
+        ]
         contract["deliverable"] = "Duplicate verdicts written back to Double Agent."
     elif kind == "investigation":
         subject = str(detail.get("subject", "") or request).strip()

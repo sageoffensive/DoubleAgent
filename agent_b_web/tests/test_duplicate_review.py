@@ -36,6 +36,7 @@ class DuplicateReviewTests(unittest.TestCase):
         self.engine.active_queue = "0"
         self.engine._duplicate_review_active = True
         self.assertEqual(self.engine._prepare_duplicate_review(detail()), "")
+        self.engine._remember_finding_labels(detail())
     def tearDown(self):
         self.directory.cleanup()
 
@@ -65,6 +66,29 @@ class DuplicateReviewTests(unittest.TestCase):
         model.complete.assert_not_called()
         self.assertEqual(self.engine.state, "blocked")
         self.assertIn("No duplicate review was completed", self.engine.store.messages(1)[0]["content"])
+
+    def test_optional_thinking_recovers_after_truncation_without_overriding_user_preference(self):
+        for preference in (None, True, False):
+            with self.subTest(preference=preference):
+                model = Mock()
+                self.engine.burp_prompt_loaded = True
+                self.engine.chat_thinking = preference
+                observed = []
+                def reply(*args):
+                    triage_schema = next(tool["function"] for tool in args[1] if tool["function"]["name"] == "triage_finding")
+                    self.assertTrue({"duplicate_of", "duplicate_evidence_match"}.issubset(triage_schema["parameters"]["required"]))
+                    self.assertEqual(triage_schema["parameters"]["properties"]["status"]["enum"], ["duplicate"])
+                    observed.append(model.thinking)
+                    if len(observed) == 1:
+                        return {"role": "assistant", "content": "", "finish_reason": "length"}
+                    return {"role": "assistant", "content": "", "tool_calls": [{"id": "finish", "function": {
+                        "name": "finish", "arguments": json.dumps({"status": "completed", "summary": "Compared all findings; no duplicates.", "reviewed_finding_ids": ["daf_a", "daf_b"]})}}]}
+                model.complete.side_effect = reply
+                self.engine.active_queue = "0"
+                self.engine.resume_requested = False
+                with patch("agent_b_harness.engine.config.effective_connections", return_value=[{"id": Config().model, "supports_thinking": True}]):
+                    self.run_with_model(model, detail())
+                self.assertEqual(observed, [preference, False if preference is None else preference])
 
     def test_stalled_review_keeps_claim_and_does_not_submit_completion(self):
         model = Mock()
@@ -153,6 +177,57 @@ class DuplicateReviewTests(unittest.TestCase):
         self.assertIsNot(result.get("ok"), False)
         self.assertEqual(self.engine.finding_verdict_updates["daf_b"]["duplicate_of"], "daf_a")
 
+    def test_hidden_duplicate_receipt_is_accepted_but_fp_hidden_receipt_is_not(self):
+        args = {"finding_id": "daf_b", "status": "duplicate", "duplicate_of": "daf_a",
+                "rationale": "Same endpoint and parameter with matching evidence.",
+                "duplicate_evidence_match": "Matching endpoint, parameter and root cause."}
+        for receipt in ({"id": "daf_b", "hidden": True, "status": "false_positive"},
+                        {"id": "daf_other", "hidden": True, "status": "duplicate"}):
+            result, _ = self.engine._tool(Client({"finding": receipt}), "triage_finding", args)
+            self.assertFalse(result["ok"])
+        result, _ = self.engine._tool(Client({"finding": {"id": "daf_b", "hidden": True,
+                                                       "deleted": False, "status": "duplicate"}}), "triage_finding", args)
+        self.assertIsNot(result.get("ok"), False)
+        self.assertEqual(self.engine.finding_verdict_updates["daf_b"]["duplicate_of"], "daf_a")
+
+    def test_displayed_numbers_resolve_only_against_the_active_review(self):
+        client = Client({"finding": {"id": "daf_b", "hidden": True, "status": "duplicate"}})
+        result, _ = self.engine._tool(client, "triage_finding", {
+            "finding_id": "#9", "duplicate_of": "8", "status": "duplicate",
+            "rationale": "Same endpoint and affected parameter with matching proof.",
+            "duplicate_evidence_match": "Matching endpoint, parameter and root cause."})
+        self.assertIsNot(result.get("ok"), False)
+        self.assertEqual(client.posts[0][0], "/api/findings/daf_b/triage")
+        self.assertEqual(client.posts[0][1]["duplicate_of"], "daf_a")
+        self.assertEqual(self.engine.finding_verdict_updates["daf_b"]["duplicate_of"], "daf_a")
+
+    def test_unlinked_and_self_duplicate_display_numbers_are_rejected(self):
+        self.engine._remember_finding_labels({"id": "daf_outside", "legacy_numeric_id": 77})
+        client = Client()
+        for finding_id, canonical in (("#77", "#8"), ("#9", "#77"), ("#8", "#8"), ("#0", "#8")):
+            result, _ = self.engine._tool(client, "triage_finding", {
+                "finding_id": finding_id, "duplicate_of": canonical, "status": "duplicate",
+                "rationale": "Same endpoint and affected parameter with matching proof.",
+                "duplicate_evidence_match": "Matching endpoint, parameter and root cause."})
+            self.assertFalse(result["ok"])
+        self.assertEqual(client.posts, [])
+
+    def test_recovery_pages_include_trusted_display_numbers(self):
+        page, _ = self.engine._tool(Client(), "get_duplicate_review_page", {"offset": 0})
+        self.assertEqual([row["display_id"] for row in page["findings_to_compare"]], ["#8", "#9"])
+
+    def test_review_completion_resolves_display_numbers_but_requires_every_finding(self):
+        client = Client()
+        result, _ = self.engine._tool(client, "finish", {"status": "completed", "summary": "Compared the complete table.",
+                                                       "reviewed_finding_ids": ["#8", "#77"]})
+        self.assertFalse(result["ok"])
+        self.assertEqual(client.posts, [])
+        result, finished = self.engine._tool(client, "finish", {"status": "completed", "summary": "Compared the complete table.",
+                                                              "reviewed_finding_ids": ["#8", "9"]})
+        self.assertTrue(result["ok"])
+        self.assertTrue(finished)
+        self.assertEqual(client.posts[0][1]["duplicate_review"]["reviewed_finding_ids"], ["daf_a", "daf_b"])
+
     def test_blocked_finish_never_posts_completed_review(self):
         client = Client()
         result, finished = self.engine._tool(client, "finish", {"status": "blocked", "summary": "Evidence missing"})
@@ -229,6 +304,28 @@ class DuplicateReviewTests(unittest.TestCase):
         for current in [dict(detail(), finding_ids=['daf_a', 'daf_other']),
                         dict(detail(), findings=detail()['findings'][:1])]:
             self.assertTrue(self.engine._prepare_duplicate_review(current))
+
+    def test_complete_index_survives_compaction_and_updates_accepted_pairs(self):
+        rows = [{"id": "daf_" + str(i), "stable_id": "daf_" + str(i), "legacy_numeric_id": i,
+                 "title": "Finding " + str(i), "url": "https://example.test/" + str(i),
+                 "detail": "Evidence detail " * 100} for i in range(35)]
+        payload = {"id": 0, "finding_ids": [row["id"] for row in rows], "findings": rows}
+        self.assertEqual(self.engine._prepare_duplicate_review(payload), "")
+        self.engine._remember_finding_labels(payload)
+        messages = [{"role": "system", "content": "Task contract"},
+                    {"role": "user", "content": json.dumps(payload)},
+                    {"role": "assistant", "tool_calls": [{"id": "read", "function": {"name": "get_duplicate_review_page", "arguments": '{"offset":0}'}}]},
+                    {"role": "tool", "tool_call_id": "read", "content": "Old evidence " * 5000}]
+        messages = compact_model_history(messages, {}, 28000)
+        messages = self.engine._with_duplicate_review_index(messages)
+        index = json.loads(messages[-1]["content"].split("\n", 1)[1])
+        self.assertEqual([row["id"] for row in index["findings"]], payload["finding_ids"])
+        self.assertEqual(index["findings"][-1]["display_id"], "#34")
+        self.engine.finding_verdict_updates = {"daf_34": {"duplicate_of": "daf_0"}}
+        messages = self.engine._with_duplicate_review_index(messages)
+        self.assertEqual(sum(m.get("name") == "duplicate-review-finding-index" for m in messages), 1)
+        index = json.loads(messages[-1]["content"].split("\n", 1)[1])
+        self.assertEqual(index["accepted_duplicates"], [{"id": "daf_34", "duplicate_of": "daf_0"}])
 
     def test_recovery_denies_outside_claim_and_invalid_offsets_without_client_calls(self):
         client = Client()

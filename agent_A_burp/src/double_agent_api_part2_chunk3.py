@@ -73,6 +73,27 @@ class AgentAPIChunk2Chunk3(object):
             "detail_endpoint": "/api/agent/queue/%d" % qid,
         })
 
+    def _handle_queue_duplicate_review(self):
+        """Create the same evidence-only duplicate review used by Burp's UI."""
+        try:
+            body = self._read_body()
+        except Exception as exc:
+            self._send_json(400, {"error": str(exc)})
+            return
+        if not isinstance(body, dict):
+            self._send_json(400, {"error": "body must be an object"})
+            return
+        if len(self.extender._duplicate_review_finding_ids()) < 2:
+            self._send_json(409, {"error": "At least two visible findings are required for duplicate review"})
+            return
+        context = self._limit_text(body.get("context", ""), 4000)
+        qid = self.extender._enqueueDuplicateReview(requested_by="api", user_context=context)
+        if qid is None:
+            self._send_json(500, {"error": "failed to queue duplicate review"})
+            return
+        self._send_json(201, {"status": "queued", "id": qid, "source": "duplicate_review",
+                              "detail_endpoint": "/api/agent/queue/%d" % qid})
+
     def _handle_queue_risk_hunt(self):
         """Queue automated active testing from API."""
         try:

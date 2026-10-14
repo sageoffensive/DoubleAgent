@@ -270,6 +270,8 @@ class AgentAPIChunk1(object):
                 self._handle_create_finding()
             elif path == "/api/agent/queue/finding":
                 self._handle_queue_finding()
+            elif path == "/api/agent/queue/duplicate-review":
+                self._handle_queue_duplicate_review()
             elif path in ("/api/agent/queue/automated-testing", "/api/agent/queue/risk-hunt"):
                 self._handle_queue_risk_hunt()
             elif path == "/api/agent/queue/full-app-assessment":

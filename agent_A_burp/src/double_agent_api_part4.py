@@ -552,12 +552,14 @@ class AgentAPIChunk4(object):
             return "Duplicate review requires the complete linked comparison population and every reviewed immutable ID."
         with self.extender.findings_lock_ui:
             present = set([str(finding.get("stable_id", "")) for finding in self.extender.findings_list])
+            hidden_duplicates = set([str(finding.get("stable_id", "")) for finding in self.extender.findings_list
+                                     if finding.get("agent_status") == "duplicate"])
             deleted_duplicates = set([str(entry.get("stable_id", ""))
                                       for entry in getattr(self.extender, "finding_audit_log", []) or []
                                       if entry.get("event") == "deleted" and entry.get("reason") == "duplicate"])
         if refs - present - deleted_duplicates:
             return "Some linked findings are unresolved; queue a new duplicate review before completing it."
-        if not refs.intersection(present):
+        if not refs.intersection(present - hidden_duplicates):
             return "Duplicate review must retain a canonical finding."
         return ""
 

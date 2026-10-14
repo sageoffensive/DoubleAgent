@@ -138,7 +138,7 @@ class BurpExtenderChunk1Chunk3(object):
         self.findingsStatsLabel = JLabel("Reportable: 0 | Crit: 0 | High: 0 | Medium: 0 | Low: 0 | Info: 0")
         self.findingsStatsLabel.setFont(Font("Monospaced", Font.BOLD, 11))
         self._showFPBtn = JButton("Show hidden (0)")
-        self._showFPBtn.setToolTipText("Show retained false positives. Deleted duplicates are removed, not hidden.")
+        self._showFPBtn.setToolTipText("Show retained false positives and duplicates, including their original evidence.")
         self._showFPBtn.setFont(Font("Monospaced", Font.PLAIN, 11))
         self._showFPBtn.setFocusPainted(False)
         self._showFPBtn.addActionListener(lambda e: self._toggleShowFP())

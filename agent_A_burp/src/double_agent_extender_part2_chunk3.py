@@ -148,9 +148,9 @@ class BurpExtenderChunk2Chunk3(object):
         self._focus_agent_tab()
         return qid
 
-    def _enqueueDuplicateReview(self, requested_by="ui"):
+    def _enqueueDuplicateReview(self, requested_by="ui", user_context=""):
         """Queue a read-only duplicate-review work item for Agent B. Agent B marks
-        genuine same-issue Agent A findings as duplicate using its configured
+        genuine same-issue Agent A findings as hidden duplicates using its configured
         model; no target traffic is sent."""
         if self.agent_server is None:
             self.stdout.println("[AGENT] Server not running, starting now...")
@@ -182,6 +182,7 @@ class BurpExtenderChunk2Chunk3(object):
                     "CWE or host alone is not a duplicate; do not merge related-but-distinct issues. Call finish when done."
                 ),
                 "source": "duplicate_review",
+                "operator_request": user_context[:4000],
                 "browser_verify": False,
                 "duplicate_review": {
                     "objective": "Mark genuine duplicates among Agent A findings; keep the canonical finding. No active testing.",

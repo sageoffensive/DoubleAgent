@@ -108,6 +108,9 @@ class ContractTests(unittest.TestCase):
         contract = build_contract("duplicate_review")
         joined = " ".join(contract["constraints"]).lower()
         self.assertIn("no target traffic", joined)
+        self.assertIn("do not ask to reconfirm", joined)
+        self.assertIn("uncertain findings visible", joined)
+        self.assertNotIn("related but distinct", " ".join(contract["escalate_when"]))
 
     def test_investigation_contract_uses_subject(self):
         contract = build_contract("investigation", {"subject": "IDOR on /api/orders"}, autonomy="guided")

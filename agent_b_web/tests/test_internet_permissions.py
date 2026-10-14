@@ -93,8 +93,8 @@ class InternetPermissionTests(unittest.TestCase):
         self.finish()
         self.fetch.assert_not_called()
         self.assertIsNone(self.store.pending())
-        self.assertEqual(self.model.complete.call_args_list[1].args[1], [])
-        self.assertEqual(self.model.complete.call_args_list[1].args[3], 'none')
+        self.assertEqual([tool["function"]["name"] for tool in self.model.complete.call_args_list[1].args[1]], ["read_burp", "run_burp_task"])
+        self.assertEqual(self.model.complete.call_args_list[1].args[3], 'auto')
 
     def test_only_exact_allow_or_deny_answers_are_accepted(self):
         self.start(); q = self.pending()

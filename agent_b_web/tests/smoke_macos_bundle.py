@@ -34,7 +34,7 @@ def burp_fixture():
                 "/api/health": {"status": "ok"},
                 "/api/agent/prompt": {"prompt": "Synthetic read-only release fixture. " * 12},
                 "/api/agent/burp/workspace": {"scope": {"observed_urls": ["https://example.test/"]}},
-                "/api/findings": {"findings": [{"id": "daf_bundle_fixture", "title": "Captured fixture finding",
+                "/api/findings": {"findings": [{"id": "daf_bundle_fixture", "legacy_numeric_id": 3, "title": "Captured fixture finding",
                     "url": "https://example.test/", "evidence_preview": "Synthetic captured evidence"}], "total": 1},
                 "/api/agent/queue": {"queue": []},
             }
@@ -133,7 +133,7 @@ def main():
             assert {path.split("?")[0] for _, path in burp_calls} == {
                 "/api/agent/prompt", "/api/agent/burp/workspace", "/api/findings", "/api/agent/queue"}
             with urllib.request.urlopen(base + "/api/export", timeout=2) as reply:
-                assert b"Would you like me to verify Agent A's findings or discuss something else?" in reply.read()
+                assert b"Would you like me to verify Agent A's findings, or what else would you like me to do?" in reply.read()
             with urllib.request.urlopen(base + "/research.html", timeout=2) as reply:
                 page = reply.read()
                 assert reply.url == base + "/", "Legacy research page must return to chat"

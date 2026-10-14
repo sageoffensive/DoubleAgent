@@ -19,6 +19,9 @@ class AgentAPIChunk1Chunk3(object):
             "confidence": f.get("confidence", ""),
             "ai_confidence": f.get("ai_confidence", 0),
             "fp": bool(f.get("fp", False)),
+            "hidden": self.extender._finding_hidden_from_normal_view(f),
+            "duplicate_of": f.get("duplicate_of", ""),
+            "duplicate_evidence_match": f.get("duplicate_evidence_match", ""),
             "agent_status": f.get("agent_status", "untouched"),
             "agent_status_display": self.extender._agent_status_display(f),
             "agent_display_status": f.get("agent_display_status", ""),
@@ -747,13 +750,13 @@ class AgentAPIChunk1Chunk3(object):
         duplicate_of = unicode_text(body.get("duplicate_of", "") or "").strip()
         evidence_match = unicode_text(body.get("duplicate_evidence_match", "") or body.get("evidence_match", "") or "").strip()
         if len(rationale.strip()) < 20:
-            return "status=duplicate deletes the finding and requires a specific rationale based on actual finding data"
+            return "status=duplicate hides the finding and requires a specific rationale based on actual finding data"
         if not duplicate_of and len(evidence_match) < 20:
             return "status=duplicate requires duplicate_of or duplicate_evidence_match showing matching endpoint/parameter/root cause/evidence"
         return None
 
     def _triage_status_deletes_finding(self, status):
-        return status in ("duplicate", "already_covered")
+        return status == "already_covered"
 
     def _finding_update_precondition(self, reference, finding, body):
         stable_id = self.extender._ensure_finding_stable_id(finding)
@@ -805,17 +808,19 @@ class AgentAPIChunk1Chunk3(object):
         if len(rationale) > 2000:
             rationale = rationale[:2000] + "... [truncated]"
 
+        if status == "duplicate":
+            duplicate_error = self._duplicate_triage_error(body, rationale)
+            if duplicate_error:
+                return {"id": self.extender._ensure_finding_stable_id(finding),
+                        "legacy_numeric_id": legacy_numeric_id, "status": status,
+                        "error": duplicate_error, "hidden": False, "deleted": False}
+            finding["duplicate_of"] = str(body.get("duplicate_of", "") or "")
+            finding["duplicate_evidence_match"] = unicode_text(body.get("duplicate_evidence_match", body.get("evidence_match", "")) or "")[:2000]
+        else:
+            finding.pop("duplicate_of", None)
+            finding.pop("duplicate_evidence_match", None)
+
         if self._triage_status_deletes_finding(status):
-            if status == "duplicate":
-                duplicate_error = self._duplicate_triage_error(body, rationale)
-                if duplicate_error:
-                    return {
-                        "id": self.extender._ensure_finding_stable_id(finding),
-                        "legacy_numeric_id": legacy_numeric_id,
-                        "status": "duplicate",
-                        "error": duplicate_error,
-                        "deleted": False
-                    }
             for fp_key in self.extender._get_fp_keys_for_finding(
                 finding.get("url", ""), finding.get("title", ""), finding.get("source", ""),
                 finding.get("cwe", ""), finding.get("detail", ""), finding.get("evidence", ""),
@@ -910,6 +915,8 @@ class AgentAPIChunk1Chunk3(object):
             "status": status,
             "priority": priority,
             "severity": severity,
+            "duplicate_of": finding.get("duplicate_of", ""),
+            "duplicate_evidence_match": finding.get("duplicate_evidence_match", ""),
             "recipe_updated": isinstance(body.get("active_test_recipe", None), dict),
             "previous_recipe": previous_recipe if isinstance(body.get("active_test_recipe", None), dict) else {},
             "new_recipe": finding.get("active_test_recipe", {}) if isinstance(body.get("active_test_recipe", None), dict) else {},
@@ -921,6 +928,10 @@ class AgentAPIChunk1Chunk3(object):
             "legacy_numeric_id": legacy_numeric_id,
             "version": finding.get("version", 1),
             "severity": finding.get("severity", ""),
+            "hidden": self.extender._finding_hidden_from_normal_view(finding),
+            "deleted": False,
+            "duplicate_of": finding.get("duplicate_of", ""),
+            "duplicate_evidence_match": finding.get("duplicate_evidence_match", ""),
             "status": finding.get("agent_status", ""),
             "priority": finding.get("agent_priority", ""),
             "rationale": finding.get("agent_rationale", ""),

@@ -248,7 +248,7 @@ class CapturedEvidenceTests(unittest.TestCase):
             def __init__(self): self.posts = []
             def post(self, path, body):
                 self.posts.append((path, dict(body)))
-                return {"ok": True, "id": "12"}
+                return {"ok": True, "id": "12", "stable_id": "daf_abc12345", "legacy_numeric_id": 12}
             def get(self, path):
                 return {"id": "12", "title": "Private record exposed", "url": "https://app.test/records"}
         client = Client()
@@ -265,6 +265,7 @@ class CapturedEvidenceTests(unittest.TestCase):
         self.assertEqual(json.loads(body["response_data"])["response_snippet"], "Comparison record")
         self.assertNotIn("MODEL INVENTED RESPONSE", json.dumps(body))
         self.assertNotIn("evidence_ids", body)
+        self.assertEqual(self.engine.finding_display_ids["daf_abc12345"], "#12")
         with patch("agent_b_harness.engine.Model", Reviewer):
             triage, finished = self.engine._tool(client, "triage_finding", {"finding_id": "12", "status": "valid",
                 "rationale": "The captured comparison record proves private data exposure", "poc_request": self.claim["poc_request"]})

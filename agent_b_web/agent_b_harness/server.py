@@ -104,7 +104,7 @@ class Handler(BaseHTTPRequestHandler):
             stream_after = int(query.get("stream_after", ["0"])[0])
             self.json({
                 **ENGINE.public(stream_after),
-                "messages": STORE.messages(150),
+                "messages": ENGINE.present_messages(STORE.messages(150)),
                 "events": STORE.events(after, 250),
                 "health": ENGINE.health(),
             })
@@ -171,7 +171,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.json(ENGINE.refresh_discussion_snapshot())
                 return
             if parsed.path == "/api/chat":
-                self.json(ENGINE.chat(str(body.get("message", "")), body.get("thinking"), body.get("attachments", []), body.get("discussion") is True), 202)
+                self.json(ENGINE.chat(str(body.get("message", "")), body.get("thinking"), body.get("attachments", [])), 202)
                 return
             if parsed.path == "/api/run/validate-findings":
                 self.json(ENGINE.validate_findings(), 202)

@@ -345,7 +345,8 @@ function render(value) {
   if (value.status === 'waiting') activityLabel = 'Waiting for your answer';
   else if (stopping) activityLabel = 'Stopping';
   else if (active) {
-    if (streamChannel === 'Thinking') activityLabel = 'Thinking';
+    if (['Reading Burp evidence', 'Reviewing Burp evidence', 'Starting your Burp task'].includes(streamChannel)) activityLabel = streamChannel;
+    else if (streamChannel === 'Thinking') activityLabel = 'Thinking';
     else if (streamChannel === 'Model commentary') activityLabel = 'Planning next action';
     else if (streamChannel === 'Response') activityLabel = 'Writing response';
     else if (streamChannel === 'Tool call') activityLabel = 'Choosing a tool';
@@ -556,7 +557,7 @@ $('#notebook-form').onsubmit = async event => {
   try {
     await api('/api/notebook', {method: 'POST', body: JSON.stringify({...Object.fromEntries(new FormData(event.target)), revision: notebookRevision})});
     notebookDialog.close();
-    composerStatus('Notebook saved for future discussions.');
+    composerStatus('Notes saved.');
     await poll();
   } catch (error) { $('#notebook-save-status').textContent = error.message; }
   finally { notebookSaving = false; button.disabled = false; }
@@ -592,20 +593,20 @@ function renderSuggestions(items) {
     <strong>${esc(s.subject || 'Recommendation')}</strong><span class="suggestion-state">${esc(s.route)} · ${esc(s.confidence || 'unrated')} confidence · ${esc(s.decision)}</span>
     <p>${esc(s.rationale)}</p><p>${esc(s.next_step || '')}</p>
     ${s.evidence?.length ? `<details><summary>Supporting evidence</summary><pre>${esc(JSON.stringify(s.evidence, null, 2))}</pre></details>` : ''}
-    <div class="suggestion-actions"><button data-discuss="${esc(s.id)}">Discuss</button><button data-decision="saved" data-id="${esc(s.id)}">Save</button><button data-decision="${s.decision === 'dismissed' ? 'open' : 'dismissed'}" data-id="${esc(s.id)}">${s.decision === 'dismissed' ? 'Restore' : 'Dismiss'}</button></div></article>`).join('');
+    <div class="suggestion-actions"><button data-ask-recommendation="${esc(s.id)}">Ask about this</button><button data-decision="saved" data-id="${esc(s.id)}">Save</button><button data-decision="${s.decision === 'dismissed' ? 'open' : 'dismissed'}" data-id="${esc(s.id)}">${s.decision === 'dismissed' ? 'Restore' : 'Dismiss'}</button></div></article>`).join('');
   $('#suggestions').querySelectorAll('[data-decision]').forEach(button => {
     button.onclick = async () => {
       try { await api('/api/suggestions/decide', {method: 'POST', body: JSON.stringify({id: button.dataset.id, decision: button.dataset.decision})}); await poll(); }
       catch (error) { composerStatus(error.message); }
     };
   });
-  $('#suggestions').querySelectorAll('[data-discuss]').forEach(button => {
+  $('#suggestions').querySelectorAll('[data-ask-recommendation]').forEach(button => {
     button.onclick = () => {
       if (['starting', 'running', 'waiting', 'stopping'].includes(latestState.status)) {
-        composerStatus('Finish or stop the current run before starting a separate discussion.'); return;
+        composerStatus('Wait for the current response or send your directions in chat.'); return;
       }
-      const s = items.find(item => item.id === button.dataset.discuss);
-      $('#message').value = `Let's discuss recommendation ${s.id}: ${s.subject || ''}. Explain its supporting evidence, uncertainty, alternatives and missing information.`;
+      const s = items.find(item => item.id === button.dataset.askRecommendation);
+      $('#message').value = `Help me with recommendation ${s.id}: ${s.subject || ''}. Explain its supporting evidence, uncertainty, alternatives and missing information.`;
       updateComposer();
       $('#message').focus();
     };
@@ -685,9 +686,7 @@ async function send(message, assessment = false) {
   updateComposer();
   $('#composer button[type="submit"]').disabled = true;
   try {
-    const active = ['starting', 'running', 'waiting'].includes(latestState.status);
-    const discussion = !assessment && (!active || latestState.discussion_mode || !latestState.burp_prompt_loaded);
-    await api('/api/chat', {method: 'POST', body: JSON.stringify({message, thinking: null, discussion, attachments: assessment ? [] : attachmentDrafts.map(f => f.id)})});
+    await api('/api/chat', {method: 'POST', body: JSON.stringify({message, thinking: null, attachments: assessment ? [] : attachmentDrafts.map(f => f.id)})});
     if (!assessment) {
       if ($('#message').value === sentDraft) $('#message').value = '';
       attachmentDrafts = attachmentDrafts.filter(file => !sentAttachments.includes(file.id));
@@ -737,7 +736,7 @@ $('#message').onkeydown = event => {
 $('#fetch').onclick = () => send('Fetch the Double Agent queue, run preflight, select the highest-value actionable item, and complete it using evidence-backed testing. Ask me in chat for any missing fixture or required approval.', true);
 function connectionChoices(message, lastMessageId) {
   if (message.role !== 'assistant' || !message.metadata?.connection_offer || message.id !== lastMessageId) return '';
-  return `<div class="connection-choices" data-connection-offer="${esc(message.id)}"><button type="button" data-connection-action="verify">Verify findings</button><button type="button" data-connection-action="discuss">Discuss something else</button></div>`;
+  return `<div class="connection-choices" data-connection-offer="${esc(message.id)}"><button type="button" data-connection-action="verify">Verify findings</button><button type="button" data-connection-action="message">Give another task</button></div>`;
 }
 
 async function chooseConnectionAction(action, messageId) {
@@ -747,7 +746,7 @@ async function chooseConnectionAction(action, messageId) {
       latestState.notebook?.snapshot?.status === 'target_changed' || sending || pendingActions.has('validate') ||
       dismissedConnectionOffers.has(String(messageId)) || String(lastMessage?.id) !== String(messageId) ||
       !lastMessage?.metadata?.connection_offer) return;
-  if (action === 'discuss') {
+  if (action === 'message') {
     dismissedConnectionOffers.add(String(messageId));
     render(latestState);
     $('#message').focus();

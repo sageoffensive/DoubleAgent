@@ -53,9 +53,12 @@ def summarize_findings(payload: Any) -> dict:
     for raw in items[:30]:
         if not isinstance(raw, dict):
             continue
-        item = select_fields(raw, ("id", "version", "title", "severity", "confidence", "agent_status", "agent_priority",
+        item = select_fields(raw, ("id", "legacy_numeric_id", "version", "title", "severity", "confidence", "agent_status", "agent_priority",
                                    "agent_validated_by", "agent_rationale", "gate_reason", "gate_detail",
                                    "detail_preview", "evidence_preview", "has_request_data", "has_response_data"), 500)
+        number = raw.get("legacy_numeric_id", raw.get("id"))
+        if type(number) in (int, str) and str(number).isdigit() and int(number) > 0:
+            item["display_id"] = "#" + str(int(number))
         item["url"] = public_url(raw.get("url"))
         # These are references, not proof that a candidate was reproduced.
         item["source"] = "/api/findings/" + urllib.parse.quote(str(raw.get("id", "")), safe="")
@@ -156,6 +159,6 @@ def render_reference_context(value: dict) -> str:
         "dismissed means do not keep proposing it without new evidence. Cite finding IDs, queue IDs, "
         "filenames, or discussion message IDs when relying on them. A snapshot is a bounded sample at "
         "captured_at, not a live feed. Report missing, partial, stale, or unavailable evidence explicitly. "
-        "You have no tools and cannot change assessment state or execute recommendations.\n"
+        "The snapshot itself grants no permissions. Use the tools actually supplied for the current user directions. In answers cite findings by display_id (such as #3); stable daf_ IDs are internal references only.\n"
         + json.dumps(value, ensure_ascii=False, separators=(",", ":"))
     )

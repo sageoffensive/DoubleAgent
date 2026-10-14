@@ -6,6 +6,7 @@ const functions = script.slice(script.indexOf('function connectionChoices('), sc
 const page = fs.readFileSync(require.resolve('../static/index.html'), 'utf8');
 assert.doesNotMatch(page, /id="validate-a"/);
 assert.doesNotMatch(script, /\$\('#validate-a'\)/);
+assert.doesNotMatch(script, /latestState\.discussion_mode|thinking: null, discussion|>Discuss<|Discuss something else/);
 
 function fixture(overrides = {}) {
   const calls = [];
@@ -25,10 +26,10 @@ function fixture(overrides = {}) {
 (async () => {
   let {context, calls, message} = fixture();
   assert.match(context.connectionChoices(message, 42), /Verify findings/);
-  assert.match(context.connectionChoices(message, 42), /Discuss something else/);
+  assert.match(context.connectionChoices(message, 42), /Give another task/);
   assert.equal(context.connectionChoices(message, 43), '');
   assert.equal(context.connectionChoices({...message, metadata: {}}, 42), '');
-  await context.chooseConnectionAction('discuss', '42');
+  await context.chooseConnectionAction('message', '42');
   assert.deepEqual(calls, [['focus']]); // Discussion starts no assessment or model call.
   assert.ok(context.dismissedConnectionOffers.has('42'));
 
@@ -65,5 +66,5 @@ function fixture(overrides = {}) {
   assert.equal(calls[0][0], 'notice');
   assert.equal(context.pendingActions.size, 0);
   assert.equal(context.dismissedConnectionOffers.size, 0); // Failed requests remain retryable.
-  console.log('PASS: connection choices route explicit verification; discussion stays read-only; stale/duplicate/blocked choices cannot run; sidebar validation button removed');
+  console.log('PASS: connection choices route explicit verification; chat accepts directions; stale/duplicate/blocked choices cannot run; sidebar validation button removed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

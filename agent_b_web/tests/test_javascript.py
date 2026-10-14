@@ -110,7 +110,7 @@ class JavaScriptAnalysisTests(unittest.TestCase):
                 engine.thread.join(3)
                 self.assertFalse(engine.thread.is_alive())
                 args = model.return_value.complete.call_args.args
-                self.assertEqual([t["function"]["name"] for t in args[1]], ["request_public_reference"])
+                self.assertEqual([t["function"]["name"] for t in args[1]], ["request_public_reference", "read_burp", "run_burp_task"])
                 self.assertEqual(args[3], "auto")
                 self.assertEqual(engine.state, "completed")
                 self.assertEqual("Offline JavaScript analysis" in json.dumps(args[0]), bool(selected))

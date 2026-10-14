@@ -19,7 +19,7 @@ GET_PREFIXES = (
 POST_PATTERNS = (
     r"^/api/findings(?:/[^/]+/(?:triage|poc-repeater))?$",
     r"^/api/findings/triage$",
-    r"^/api/agent/queue/(?:finding|automated-testing|risk-hunt|full-app-assessment|try-harder)$",
+    r"^/api/agent/queue/(?:finding|duplicate-review|automated-testing|risk-hunt|full-app-assessment|try-harder)$",
     r"^/api/agent/queue/[^/]+/(?:claim|release|result|heartbeat|repeater)$",
     r"^/api/agent/queue/[^/]+/campaign/step$",
     r"^/api/agent/results/[^/]+/amend$",

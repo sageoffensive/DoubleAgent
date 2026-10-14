@@ -57,7 +57,7 @@
         <div id="connection-guidance" class="connection-guidance hidden"><span>Add a model connection to start a conversation.</span><button type="button" id="setup-connection">Add connection</button></div>
       <details id="suggestions-panel" class="suggestions-panel hidden">
         <summary>Ideas &amp; recommendations <span id="suggestion-count"></span></summary>
-        <p class="hint">Suggestions are for your review. Saving or discussing one does not authorize an action.</p>
+        <p class="hint">Suggestions are for your review. Saving a suggestion does not authorize an action. Give Agent B directions in chat.</p>
         <div id="suggestions"></div>
       </details>
       <div id="timeline" class="timeline" aria-label="Conversation"></div>
@@ -166,7 +166,7 @@
       <div class="modal-head"><h2 id="help-title">Help</h2><button type="button" id="close-help" class="icon" aria-label="Close help">×</button></div>
       <section><h3>Chat</h3><p>Type a message and press Enter. Use Shift + Enter for a new line. No mode to choose.</p></section>
       <section><h3>Files</h3><p>Use +, drag a file, or paste a screenshot when Agent B is idle.</p></section>
-      <section><h3>Burp work</h3><p>Connect to Burp to discuss Agent A findings in chat. Read-only context is enabled automatically and shared with your selected model when you send a message. Choose a sidebar task to start assessment work; connecting alone sends no target traffic. Messages during a run guide that work. Stop ends the run.</p></section>
+      <section><h3>Burp work</h3><p>Connect to Burp, then tell Agent B what you need in chat: review evidence, test a finding or assess the app. It uses the scoped Burp tools for your directions. Connecting alone sends no target traffic. Messages during a run guide that work. Findings use the same # numbers shown in Burp. Stop ends the run.</p></section>
       <section><h3>App access</h3><p>Full App work checks captured Burp responses first. If access or login is uncertain, sign in through your Burp browser and confirm here. Choose “The app doesn’t need a login” for a public app. Never paste passwords or tokens into chat.</p></section>
       <section><h3>Questions &amp; approvals</h3><p>Pick an answer or reply in the message box. Approval requests require an explicit choice for that action.</p></section>
       <section><h3>Internet access</h3><p>Agent B asks before retrieving public reference data. Choose Allow or Deny. Expand Request details to see the destination, what is sent or fetched, and why. Permission applies once.</p></section>
