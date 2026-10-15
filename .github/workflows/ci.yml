@@ -23,6 +23,7 @@ jobs:
           node --check agent_b_web/static/app.js
           node agent_b_web/tests/test_source_review_ui.cjs
           node agent_b_web/tests/test_connection_ui.cjs
+          node agent_b_web/tests/test_composer_ui.cjs
       - name: DoubleAgent tests
         run: python -m unittest discover -s tests -v
       - name: Burp source compiles

@@ -33,20 +33,21 @@
         <div class="eyebrow">ACTIVE SKILLS</div>
         <div id="active-skills" class="active-skills"><span>Loading…</span></div>
       </section>
+      </div>
+      <div class="sidebar-actions">
       <section class="sidebar-workflows">
         <div class="eyebrow">BURP WORK</div>
         <button id="bootstrap" class="primary">Connect to Burp</button>
         <p id="bootstrap-guidance" class="control-guidance">For Burp work, start here. Regular chat works without it.</p>
         <button id="fetch" disabled>Fetch Burp queue</button>
         <button id="seed-surface" disabled>Seed coverage</button>
-        <button id="stop" disabled>Stop current run</button>
       </section>
-      </div>
       <section class="sidebar-utilities" aria-label="Conversation and settings">
         <button id="clear">New conversation</button>
         <button id="settings">Settings</button>
         <button id="help">Help</button>
       </section>
+      </div>
       <footer><span class="app-version" aria-label="Agent B version">{{AGENT_B_VERSION}}</span> · Traffic is executed by Burp and governed by its scope and safety gates.</footer>
     </aside>
 
@@ -72,14 +73,22 @@
         </details>
       </section>
       <div id="question" class="question hidden" role="region" aria-label="Agent B needs your input"></div>
-      <form id="composer">
+      <form id="composer" aria-label="Message composer">
+        <div id="attachment-list" class="attachment-list hidden"></div>
+        <textarea id="message" rows="1" aria-label="Message to Agent B" placeholder="Work with Agent B…"></textarea>
         <div class="composer-toolbar">
-          <button type="button" id="attach-files" aria-label="Attach files" title="Attach files">+</button>
+          <div class="composer-tools">
+            <button type="button" id="attach-files" class="composer-icon" aria-label="Attach files" title="Attach files"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg></button>
+            <span id="composer-scope" class="composer-scope" role="status"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m10 2 6 2.5v5c0 3.5-3 6.2-6 8-3-1.8-6-4.5-6-8v-5L10 2Z"/><path d="m7.5 9.5 1.7 1.7 3.5-3.5"/></svg><span id="composer-scope-label">Burp scope</span></span>
+          </div>
+          <div class="composer-actions">
+            <button type="button" id="composer-model" class="composer-model" title="Choose a model in Connections"><span id="composer-model-label">Choose model</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m5 6 3 3 3-3"/></svg></button>
+            <label id="composer-thinking" class="composer-thinking hidden"><span class="sr-only">Thinking preference</span><select id="thinking-choice" aria-label="Thinking preference"><option value="auto">Thinking auto</option><option value="on">Thinking on</option><option value="off">Thinking off</option></select></label>
+            <button id="send-message" type="submit" class="composer-icon composer-send" aria-label="Send message" title="Send message"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 15V5m-4 4 4-4 4 4"/></svg><span id="send-label" class="sr-only">Send message</span></button>
+            <button id="stop" type="button" class="composer-icon composer-stop hidden" aria-label="Stop current run" title="Stop current run" disabled><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="5" y="5" width="10" height="10" rx="2"/></svg><span class="sr-only">Stop current run</span></button>
+          </div>
           <input type="file" id="file-picker" class="hidden" multiple accept=".js,.jsx,.mjs,.txt,.md,.csv,.json,.log,.xml,.yaml,.yml,.png,.jpg,.jpeg,.webp">
         </div>
-        <div id="attachment-list" class="attachment-list hidden"></div>
-        <textarea id="message" rows="2" aria-label="Message to Agent B" placeholder="Message Agent B…"></textarea>
-        <button type="submit" aria-label="Send">Send</button>
         <p id="composer-status" class="composer-help" role="status" aria-live="polite"></p>
       </form>
     </main>
@@ -259,17 +268,6 @@
     </div>
   </dialog>
 
-  <dialog id="stop-run-dialog" class="confirm-dialog" aria-labelledby="stop-run-dialog-heading">
-    <div class="confirm-body">
-      <div class="eyebrow">STOP CURRENT RUN</div>
-      <h2 id="stop-run-dialog-heading">Stop Agent B?</h2>
-      <p>The current model request will be cancelled. Agent B may take a while to release the connection and finish stopping.</p>
-      <div class="modal-actions">
-        <button type="button" id="cancel-stop-run">Keep running</button>
-        <button type="button" id="confirm-stop-run" class="danger">Stop run</button>
-      </div>
-    </div>
-  </dialog>
   <script src="/app.js"></script>
 </body>
 </html>

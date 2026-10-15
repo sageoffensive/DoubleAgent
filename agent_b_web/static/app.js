@@ -90,11 +90,16 @@ $('#jump-latest').onclick = () => {
 function updateComposer() {
   const active = ['starting', 'running', 'waiting', 'stopping'].includes(latestState.status);
   const approval = latestState.pending_question?.id.startsWith('approval-');
+  const stopping = latestState.status === 'stopping' || pendingActions.has('stop');
+  const hasDraft = Boolean($('#message').value.trim() || attachmentDrafts.length);
   const blocked = latestState.status === 'stopping' || approval || !harnessOnline || !latestState.settings?.model || (active && attachmentDrafts.length > 0);
   const button = $('#composer button[type="submit"]');
-  button.disabled = blocked || uploading || sending || !($('#message').value.trim() || attachmentDrafts.length);
-  button.textContent = sending ? 'Sending…' : 'Send';
-  button.setAttribute('aria-label', 'Send');
+  button.disabled = blocked || stopping || uploading || sending || !hasDraft;
+  button.classList.toggle('hidden', active && (!hasDraft || Boolean(approval)));
+  button.classList.toggle('is-sending', sending);
+  const sendLabel = sending ? 'Sending…' : active ? 'Send guidance' : 'Send message';
+  $('#send-label').textContent = sendLabel;
+  button.setAttribute('aria-label', sendLabel);
   button.title = approval ? 'Choose an approval option above'
     : latestState.status === 'stopping' ? 'Wait for the run to stop'
     : active && attachmentDrafts.length ? 'Remove attachments or wait for the current response'
@@ -104,11 +109,46 @@ function updateComposer() {
     : 'Send message';
   $('#attach-files').disabled = active || Boolean(latestState.pending_question) || !harnessOnline || uploading || sending;
   $('#connection-guidance').classList.toggle('hidden', Boolean(latestState.settings?.model));
-  $('#composer').classList.toggle('hidden', Boolean(approval));
-  $('#message').placeholder = latestState.pending_question ? 'Reply to Agent B…' : 'Message Agent B…';
+  $('#message').readOnly = Boolean(approval) || stopping;
+  $('#message').placeholder = approval ? 'Choose an approval option above…' : latestState.pending_question ? 'Reply to Agent B…' : 'Work with Agent B…';
+  const stop = $('#stop');
+  stop.classList.toggle('hidden', !active);
+  stop.disabled = !active || stopping;
+  stop.classList.toggle('is-stopping', stopping);
+  stop.setAttribute('aria-label', stopping ? 'Stopping run' : 'Stop current run');
+  stop.title = stopping ? 'Stopping…' : 'Stop current run';
+  const option = modelOption(latestState.settings?.model);
+  $('#composer-model-label').textContent = option?.label || latestState.settings?.model || 'Choose model';
+  $('#composer-model').disabled = active || sending;
+  $('#composer-model').title = active ? 'The current model is fixed for this run' : 'Choose a model in Connections';
+  const thinking = $('#thinking-choice');
+  if (thinking.dataset.model !== latestState.settings?.model) {
+    thinking.value = 'auto';
+    thinking.dataset.model = latestState.settings?.model || '';
+  }
+  $('#composer-thinking').classList.toggle('hidden', !option?.supports_thinking);
+  thinking.disabled = active || sending;
+  const scope = $('#composer-scope');
+  const burpConnected = harnessOnline && latestState.health?.double_agent?.ok;
+  const scopeGuard = latestState.health?.double_agent?.detail?.scope_enforcement;
+  const scopeEnforced = burpConnected && latestState.scope_enforcement?.enabled === true && scopeGuard?.version === 1 && scopeGuard?.fail_closed === true;
+  const scopeLabel = scopeEnforced ? 'Scope enforced' : burpConnected ? 'Scope unavailable' : 'Burp offline';
+  if ($('#composer-scope-label').textContent !== scopeLabel) $('#composer-scope-label').textContent = scopeLabel;
+  scope.classList.toggle('is-unavailable', !scopeEnforced);
+  scope.title = scopeEnforced ? 'Target requests go through Burp and its scope gates. Model-provider connections are separate.' : 'Connect to the updated Burp extension before sending target requests.';
+  scope.setAttribute('aria-label', scopeLabel);
   $('#question').querySelectorAll('button').forEach(option => { option.disabled = sending; });
 }
-$('#message').addEventListener('input', updateComposer);
+function resizeComposer() {
+  const input = $('#message');
+  input.style.height = 'auto';
+  input.style.height = `${Math.min(input.scrollHeight, 180)}px`;
+}
+function thinkingPreference() {
+  if (!modelOption(latestState.settings?.model)?.supports_thinking) return null;
+  return ({on: true, off: false})[$('#thinking-choice').value] ?? null;
+}
+$('#message').addEventListener('input', () => { resizeComposer(); updateComposer(); });
 
 
 function composerStatus(text) { $('#composer-status').textContent = text; }
@@ -262,9 +302,7 @@ function render(value) {
 
   const active = ['starting', 'running', 'waiting', 'stopping'].includes(value.status);
   $('#run-dot').className = `dot ${value.status === 'running' ? 'ok' : active ? 'warn' : ''}`;
-  $('#stop').disabled = !active || stopping;
   $('#clear').disabled = active || sending || pendingActions.has('clear');
-  $('#stop').textContent = stopping ? 'Stopping…' : 'Stop current run';
   $('#fetch').disabled = active || !bootstrapped;
   $('#fetch').classList.toggle('primary', bootstrapped);
   $('#bootstrap').disabled = active || bootstrapped || pendingActions.has('bootstrap');
@@ -686,7 +724,7 @@ async function send(message, assessment = false) {
   updateComposer();
   $('#composer button[type="submit"]').disabled = true;
   try {
-    await api('/api/chat', {method: 'POST', body: JSON.stringify({message, thinking: null, attachments: assessment ? [] : attachmentDrafts.map(f => f.id)})});
+    await api('/api/chat', {method: 'POST', body: JSON.stringify({message, thinking: thinkingPreference(), attachments: assessment ? [] : attachmentDrafts.map(f => f.id)})});
     if (!assessment) {
       if ($('#message').value === sentDraft) $('#message').value = '';
       attachmentDrafts = attachmentDrafts.filter(file => !sentAttachments.includes(file.id));
@@ -698,6 +736,7 @@ async function send(message, assessment = false) {
     composerStatus(error.message);
   } finally {
     sending = false;
+    resizeComposer();
     updateComposer();
   }
 }
@@ -718,6 +757,7 @@ async function answer(id, response, fromComposer = false) {
     composerStatus(error.message);
   } finally {
     sending = false;
+    resizeComposer();
     updateComposer();
   }
 }
@@ -801,28 +841,27 @@ $('#seed-form').onsubmit = async event => {
   }
 };
 
-const stopRunDialog = $('#stop-run-dialog');
-$('#stop').onclick = () => stopRunDialog.showModal();
-$('#cancel-stop-run').onclick = () => stopRunDialog.close();
-stopRunDialog.addEventListener('cancel', event => {
-  event.preventDefault();
-  stopRunDialog.close();
-});
-$('#confirm-stop-run').onclick = async () => {
-  stopRunDialog.close();
-  const stopButton = $('#stop');
-  stopButton.disabled = true;
-  stopButton.textContent = 'Waiting for model to stop…';
+async function stopRun() {
+  if (pendingActions.has('stop') || !['starting', 'running', 'waiting'].includes(latestState.status)) return;
+  pendingActions.add('stop');
+  const previousStatus = latestState.status;
+  latestState.status = 'stopping';
+  updateComposer();
   $('#run-state').textContent = 'Waiting for model to stop…';
   try {
     await api('/api/run/stop', {method: 'POST', body: '{}'});
     await poll();
   } catch (error) {
-    stopButton.disabled = false;
-    stopButton.textContent = 'Stop current run';
+    if (latestState.status === 'stopping') latestState.status = previousStatus;
+    $('#run-state').textContent = 'Stop failed · retry';
     showNotice(error.message);
+  } finally {
+    pendingActions.delete('stop');
+    updateComposer();
   }
-};
+}
+$('#stop').onclick = stopRun;
+$('#composer-model').onclick = () => openSettings('models').catch(error => showNotice(error.message));
 $('#bootstrap').onclick = async () => {
   $('#bootstrap').disabled = true;
   try {
