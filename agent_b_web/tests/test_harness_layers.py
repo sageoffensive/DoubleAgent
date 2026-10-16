@@ -26,7 +26,7 @@ from agent_b_harness.config import (
     effective_autonomy,
 )
 from agent_b_harness.contract import build_contract, render_contract
-from agent_b_harness.engine import Engine, is_investigation
+from agent_b_harness.engine import Engine, assessment_thinking, finding_validation_result, is_investigation
 from agent_b_harness.store import Store
 
 
@@ -131,6 +131,28 @@ class ContractTests(unittest.TestCase):
         self.assertIn("done_when", text)
         self.assertIn("escalate_when", text)
 
+    def test_single_finding_auto_thinking_is_brief_without_overriding_operator(self):
+        self.assertIs(assessment_thinking(None, True, "finding_validation", 1), False)
+        self.assertIsNone(assessment_thinking(None, True, "finding_validation", 2))
+        self.assertIsNone(assessment_thinking(None, True, "full_app", 1))
+        self.assertIsNone(assessment_thinking(None, False, "finding_validation", 1))
+        self.assertIs(assessment_thinking(True, True, "finding_validation", 1), True)
+        self.assertIs(assessment_thinking(False, True, "finding_validation", 1), False)
+
+    def test_large_finding_and_verdict_keep_decisive_fields_visible(self):
+        finding = {"id": "daf_example", "legacy_numeric_id": 15, "title": "Example",
+                   "url": "https://app.test/login", "request_data_preview": "GET /login HTTP/1.1",
+                   "response_data_preview": "x" * 4000, "active_test_recipe": {"baseline_request": "y" * 6000}}
+        view = finding_validation_result("get_linked_finding", finding, {})
+        self.assertEqual(view["request_data_preview"], "GET /login HTTP/1.1")
+        self.assertEqual(view["legacy_numeric_id"], 15)
+        self.assertNotIn("active_test_recipe", view)
+        self.assertLess(len(json.dumps(view)), 9000)
+        update = {"15": {"agent_status": "needs_investigation"}}
+        verdict = finding_validation_result("triage_finding", {"finding": {"response_data": "z" * 12000}}, update, "15")
+        self.assertEqual(verdict["status"], "needs_investigation")
+        self.assertTrue(verdict["accepted"])
+
 
 class InvestigationDetectionTests(unittest.TestCase):
     def test_investigation_prefixes_match(self):
@@ -149,6 +171,40 @@ class TraceAndLessonStoreTests(unittest.TestCase):
 
     def tearDown(self):
         self.directory.cleanup()
+
+    def test_saved_validation_verdict_is_not_written_twice(self):
+        engine = Engine(self.store)
+        engine.contract = {"kind": "finding_validation"}
+        engine.finding_verdict_updates = {"15": {"agent_status": "needs_investigation"}}
+        client = FakeDoubleAgent()
+        result, finished = engine._tool(client, "triage_finding", {
+            "finding_id": "15", "status": "needs_investigation", "rationale": "A different rationale long enough to write"})
+        self.assertTrue(result["already_recorded"])
+        self.assertFalse(finished)
+        self.assertEqual(client.posts, [])
+
+    def test_transport_failure_limit_blocks_more_validation_traffic(self):
+        engine = Engine(self.store)
+        engine.contract = {"kind": "finding_validation"}
+        engine.linked_finding_total = 1
+        engine.active_queue = "0"
+        class Client(FakeDoubleAgent):
+            def post(self, path, body):
+                self.posts.append((path, body))
+                return {"status_code": 400, "url": "https://app.test/login", "headers": [], "body": "Bad Request"}
+        client = Client()
+        arguments = {"path": "/api/agent/request", "body": {
+            "host": "app.test", "port": 443, "https": True,
+            "request": "GET /login HTTP/1.1\r\nHost: app.test\r\n\r\n"}}
+        for attempt in range(3):
+            result, finished = engine._tool(client, "double_agent_post", arguments)
+            self.assertEqual(result["status_code"], 400)
+            self.assertEqual(engine.validation_bad_transport_attempts, attempt + 1)
+        result, finished = engine._tool(client, "double_agent_post", arguments)
+        self.assertFalse(result["ok"])
+        self.assertIn("needs_investigation", result["directive"])
+        self.assertFalse(finished)
+        self.assertEqual(len(client.posts), 3)
 
     def test_trace_roundtrips_and_redacts(self):
         run_id = self.store.save_trace({

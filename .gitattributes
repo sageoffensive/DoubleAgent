@@ -1,0 +1,2 @@
+# Preserve upstream license bytes, including their original whitespace.
+agent_b_web/static/vendor/DOMPurify-LICENSE-MPL -whitespace

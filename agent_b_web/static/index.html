@@ -72,6 +72,18 @@
           <pre id="model-stream" aria-label="Live thinking and model activity">No model output yet.</pre>
         </details>
       </section>
+      <details id="team-panel" class="team-panel hidden">
+        <summary aria-label="Team activity and throughput">
+          <span class="team-heading"><i id="team-dot" class="activity-dot"></i><strong id="team-state" role="status" aria-live="polite">Subagents ready</strong></span>
+          <small id="team-counts"></small>
+          <span class="team-rate"><span>Aggregate TPS</span><strong id="team-tps">—</strong></span>
+        </summary>
+        <div class="team-body">
+          <p id="throughput-summary" class="hint"></p>
+          <div id="subagent-activity" class="subagent-activity hidden" aria-label="Subagent activity"></div>
+          <p id="throughput-basis" class="hint">Completed-request average · lead, subagents and evidence reviewer. Server-reported output tokens; overlapping model time counts once.</p>
+        </div>
+      </details>
       <div id="question" class="question hidden" role="region" aria-label="Agent B needs your input"></div>
       <form id="composer" aria-label="Message composer">
         <div id="attachment-list" class="attachment-list hidden"></div>
@@ -140,6 +152,15 @@
       <fieldset><legend>Scope enforcement · always on</legend><p class="hint">Model-initiated target requests require a positive Burp scope decision. Outside or unavailable scope is blocked without an override. Models cannot approve actions or change engagement permissions. Requests use Double Agent's enforcement API. Scanner delegation remains under operator control.</p></fieldset>
       <label>Double Agent URL<input name="double_agent_url" placeholder="http://127.0.0.1:8777"></label>
       <div class="grid2"><label>Maximum steps<input name="max_steps" type="number" min="1" max="120"></label><label>Maximum output tokens<input name="max_output_tokens" type="number" min="512" max="32768"></label></div>
+      <fieldset class="subagent-settings"><legend>Subagents</legend>
+        <label class="snapshot-choice"><input type="checkbox" name="subagents_enabled" id="subagents-enabled"> Use subagents</label>
+        <p class="hint">Parallel evidence review and planning. Agent B keeps control of testing, approvals and finding changes. More workers use more model capacity and API requests.</p>
+        <div id="subagent-controls">
+          <label>Maximum concurrent subagents<input name="max_subagents" type="number" min="1" max="16" step="1" value="4"></label>
+          <span class="hint">Saved connections · work is spread across your selection. Leave empty to use Agent B’s current connection.</span>
+          <div id="subagent-connections" class="subagent-connections"></div>
+        </div>
+      </fieldset>
       <p class="hint">Each saved connection keeps its own credential. Secrets stay in the local settings file with owner-only permissions and are never returned to this page.</p>
       <div class="context-settings">
       <details id="notebook-panel" class="notebook-panel">
@@ -179,7 +200,7 @@
       <section><h3>App access</h3><p>Full App work checks captured Burp responses first. If access or login is uncertain, sign in through your Burp browser and confirm here. Choose “The app doesn’t need a login” for a public app. Never paste passwords or tokens into chat.</p></section>
       <section><h3>Questions &amp; approvals</h3><p>Pick an answer or reply in the message box. Approval requests require an explicit choice for that action.</p></section>
       <section><h3>Internet access</h3><p>Agent B asks before retrieving public reference data. Choose Allow or Deny. Expand Request details to see the destination, what is sent or fetched, and why. Permission applies once.</p></section>
-      <section><h3>Settings</h3><p>Manage connections, skills, and scope. Notes, context, and exports are under Run &amp; scope. Target requests remain governed by Burp scope checks.</p></section>
+      <section><h3>Settings</h3><p>Manage connections, skills, and scope. Enable subagents under Run &amp; scope, choose saved model connections and set the maximum concurrent workers. Independent evidence reviews and planning run in parallel; Agent B reviews their proposals and retains testing, approvals and finding changes. Worker progress is under Thinking &amp; activity. Stop cancels the lead and all workers. Notes, context, and exports are under Run &amp; scope. Target requests remain governed by Burp scope checks.</p></section>
       <div class="modal-actions"><button type="button" id="done-help">Got it</button></div>
     </div>
   </dialog>
@@ -268,6 +289,9 @@
     </div>
   </dialog>
 
+  <script src="/vendor/marked.umd.js"></script>
+  <script src="/vendor/purify.min.js"></script>
+  <script src="/chat.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

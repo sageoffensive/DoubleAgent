@@ -276,11 +276,8 @@ function esc(value) {
   })[character]);
 }
 
-function visibleMessage(value) {
-  const message = String(value ?? '');
-  const formatted = text => esc(text).replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
-  if (message.length <= 1800) return formatted(message);
-  return `<details class="full-response"><summary aria-label="Toggle full response"><span class="response-preview">${formatted(message.slice(0, 1600))}…</span><span class="response-toggle">Read full response · ${message.length.toLocaleString()} characters</span></summary><div>${formatted(message)}</div></details>`;
+function visibleMessage(value, markdown = true) {
+  return window.AgentBChat?.render(value, {markdown}) || `<div class="chat-plain">${esc(value)}</div>`;
 }
 
 function render(value) {
@@ -461,7 +458,7 @@ function render(value) {
       return `
       <div class="message ${esc(message.role)} ${harnessMessage ? 'harness-status' : ''} ${thinking ? 'thinking' : ''}">
         <div class="meta">${speaker}</div>
-        <div class="bubble">${visibleMessage(content)}${connectionChoices(message, transcript[transcript.length - 1]?.id)}${meta.internet_request ? internetDetails(meta.internet_request) : message.role === 'assistant' && meta.question_id && meta.reason ? `<details class="question-reason"><summary>More context</summary><p>${esc(meta.reason)}</p></details>` : ''}${(meta.attachments || []).map(f => `<a class="attachment-download" href="/api/files/${encodeURIComponent(f.id)}" download>${f.mime.startsWith('image/') ? `<img class="attachment-thumbnail" src="/api/files/${encodeURIComponent(f.id)}/preview" alt="${esc(f.name)}">` : ''}${esc(f.name)} ↓</a>`).join('')}</div>
+        <div class="bubble">${visibleMessage(content, message.role === 'assistant')}${connectionChoices(message, transcript[transcript.length - 1]?.id)}${meta.internet_request ? internetDetails(meta.internet_request) : message.role === 'assistant' && meta.question_id && meta.reason ? `<details class="question-reason"><summary>More context</summary><p>${esc(meta.reason)}</p></details>` : ''}${(meta.attachments || []).map(f => `<a class="attachment-download" href="/api/files/${encodeURIComponent(f.id)}" download>${f.mime.startsWith('image/') ? `<img class="attachment-thumbnail" src="/api/files/${encodeURIComponent(f.id)}/preview" alt="${esc(f.name)}">` : ''}${esc(f.name)} ↓</a>`).join('')}</div>
       </div>`;
     });
 
@@ -501,6 +498,7 @@ function render(value) {
     question.classList.add('hidden');
   }
   renderSuggestions(value.route_recommendations || []);
+  renderSubagents(value.subagents || {}, value.throughput || {}, value);
   renderNotebook(value.notebook || {}, active);
   updateComposer();
   if (workspace === 'conversation' && keepFollowing) requestAnimationFrame(() => {
@@ -969,8 +967,13 @@ async function openSettings(section = settingsSection) {
   select.innerHTML = options.map(option => `<option value="${esc(option.id)}">${esc(option.label)}</option>`).join('');
   $('#bedrock-model-list').innerHTML = (value.bedrock_model_suggestions || []).map(id => `<option value="${esc(id)}"></option>`).join('');
   for (const element of $('#settings-form').elements) {
-    if (element.name && element.name !== 'selected_skill' && value[element.name] != null) element.value = value[element.name];
+    if (element.name && element.name !== 'selected_skill' && value[element.name] != null) {
+      if (element.type === 'checkbox') element.checked = value[element.name] === true;
+      else element.value = value[element.name];
+    }
   }
+  $('#subagent-connections').innerHTML = options.map(option => `<label class="snapshot-choice"><input type="checkbox" name="subagent_connection" value="${esc(option.id)}"${(value.subagent_connections || []).includes(option.id) ? ' checked' : ''}> ${esc(option.label)}</label>`).join('') || '<p class="hint">Add a connection first.</p>';
+  updateSubagentControls();
   select.value = value.model;
   $('#legacy-model-url').value = value.model_url || '';
   renderSkillOptions(value.selected_skills || []);
@@ -981,6 +984,44 @@ async function openSettings(section = settingsSection) {
   if (section === 'models' && !modelOptions.length) $('#add-model').focus();
 }
 const helpDialog = $('#help-dialog');
+function renderSubagents(value, throughput = {}, state = {}) {
+  const panel = $('#subagent-activity');
+  const jobs = value.jobs || [];
+  const counts = value.counts || jobs.reduce((out, job) => { out[job.status] = (out[job.status] || 0) + 1; return out; }, {});
+  const active = value.active || 0;
+  const enabled = Boolean(state.settings?.subagents_enabled);
+  const runActive = ['starting', 'running', 'waiting', 'stopping'].includes(state.status);
+  const team = $('#team-panel');
+  team.classList.toggle('hidden', !enabled && !jobs.length && !throughput.requests && !runActive);
+  team.classList.toggle('is-working', Boolean(value.running));
+  const problems = (counts.failed || 0) + (counts.blocked || 0) + (counts.inconclusive || 0);
+  team.classList.toggle('has-problems', Boolean(problems));
+  $('#team-dot').className = `activity-dot ${value.running ? 'active' : jobs.length ? 'complete' : ''}`;
+  $('#team-state').textContent = value.running ? (active ? `${active} / ${value.maximum} subagents working` : 'Starting subagents')
+    : jobs.length ? (runActive ? 'Subagents finished · lead working' : 'Subagent results ready')
+    : runActive ? (enabled ? 'Lead only · subagents available' : 'Lead working') : enabled ? 'Subagents ready' : 'Model activity finished';
+  $('#team-counts').textContent = jobs.length ? `${counts.queued || 0} queued · ${counts.completed || 0} finished${problems ? ` · ${problems} need review` : ''}${counts.cancelled ? ` · ${counts.cancelled} cancelled` : ''}` : '0 subagents active';
+  const rate = throughput.aggregate_tps;
+  $('#team-tps').textContent = typeof rate === 'number' && Number.isFinite(rate) ? rate.toFixed(1)
+    : throughput.state === 'unavailable' ? 'Unavailable' : throughput.requests ? 'Awaiting usage' : '—';
+  $('#team-tps').title = throughput.definition || 'Server-reported output tokens / shared model request wall time. Completed requests only; no token estimates.';
+  const pending = throughput.active_requests || 0;
+  $('#throughput-summary').textContent = `${(throughput.output_tokens || 0).toLocaleString()} reported output tokens · ${(throughput.model_wall_seconds || 0).toFixed(1)}s shared model time · ${throughput.reported_requests || 0} / ${throughput.finished_requests || 0} finished requests reported usage${pending ? ` · ${pending} model request${pending === 1 ? '' : 's'} in flight` : ''}${throughput.missing_usage ? ' · Aggregate unavailable: missing server usage.' : ''}`;
+  $('#throughput-basis').textContent = 'Completed-request average · lead, subagents and evidence reviewer. Includes prefill and network time. Overlapping calls count once; in-flight calls are excluded until finished.';
+  panel.classList.toggle('hidden', !jobs.length);
+  panel.innerHTML = jobs.map(job => {
+    const usage = throughput.actors?.[`subagent-${job.id}`];
+    const speed = usage?.aggregate_tps;
+    const metric = typeof speed === 'number' && Number.isFinite(speed) ? `${speed.toFixed(1)} TPS avg`
+      : usage?.missing_usage ? 'Usage unavailable' : usage?.active_requests ? 'Awaiting usage' : '';
+    return `<div class="worker-row ${job.status === 'running' ? 'worker-active' : ''}"><span><i class="worker-dot"></i>${esc(job.title)}<small>${esc(modelOption(job.connection)?.label || job.connection)}${metric ? ` · ${esc(metric)}` : ''}</small></span><strong>${esc(job.phase || job.status)}</strong></div>`;
+  }).join('');
+  if (value.running) $('#model-stream-state').textContent = `${value.active || 0} / ${value.maximum} subagents working`;
+}
+function updateSubagentControls() {
+  $('#subagent-controls').classList.toggle('hidden', !$('#subagents-enabled').checked);
+}
+$('#subagents-enabled').onchange = updateSubagentControls;
 $('#help').onclick = () => { closeNavigation(); helpDialog.showModal(); };
 $('#close-help').onclick = $('#done-help').onclick = () => helpDialog.close();
 $('#settings').onclick = () => { closeNavigation(); openSettings().catch(error => showNotice(error.message)); };
@@ -1013,14 +1054,16 @@ $('#settings-form').onsubmit = async event => {
   event.preventDefault();
   const body = {};
   for (const [key, value] of new FormData(event.target).entries()) {
-    if (key === 'selected_skill') continue;
+    if (['selected_skill', 'subagent_connection', 'subagents_enabled'].includes(key)) continue;
     if (value !== '' || (!key.includes('token') && !key.includes('key'))) {
-      body[key] = ['max_steps', 'max_output_tokens'].includes(key) ? Number(value) : value;
+      body[key] = ['max_steps', 'max_output_tokens', 'max_subagents'].includes(key) ? Number(value) : value;
     }
   }
   body.model_url = $('#legacy-model-url').value;
   delete body.legacy_model_url;
   body.selected_skills = [...event.target.querySelectorAll('input[name="selected_skill"]:checked')].map(input => input.value);
+  body.subagents_enabled = $('#subagents-enabled').checked;
+  body.subagent_connections = [...event.target.querySelectorAll('input[name="subagent_connection"]:checked')].map(input => input.value);
   try {
     await api('/api/settings', {method: 'POST', body: JSON.stringify(body)});
     dialog.close();

@@ -162,6 +162,9 @@ class Config:
     custom_models: tuple = ()
     removed_connections: tuple = ()
     autonomy: str = "auto"
+    subagents_enabled: bool = False
+    max_subagents: int = 4
+    subagent_connections: tuple[str, ...] = ()
 
     def public(self) -> dict[str, Any]:
         value = asdict(self)
@@ -238,6 +241,9 @@ EDITABLE = {
     "custom_models",
     "removed_connections",
     "autonomy",
+    "subagents_enabled",
+    "max_subagents",
+    "subagent_connections",
 }
 
 
@@ -580,6 +586,13 @@ def load() -> Config:
         value["model"] = "cyberstrike" if "cyberstrike" in connection_ids else connection_ids[0]
     value["max_steps"] = min(max(value["max_steps"], 1), 120)
     value["max_output_tokens"] = min(max(value["max_output_tokens"], 512), 32768)
+    value["subagents_enabled"] = value.get("subagents_enabled") is True
+    try:
+        value["max_subagents"] = min(16, max(1, int(value.get("max_subagents", 4))))
+    except (TypeError, ValueError):
+        value["max_subagents"] = 4
+    workers = value.get("subagent_connections", ())
+    value["subagent_connections"] = tuple(dict.fromkeys(str(item) for item in workers)) if isinstance(workers, (tuple, list)) else ()
     if str(value.get("autonomy", "auto")).lower() not in AUTONOMY_LEVELS:
         value["autonomy"] = "auto"
     else:
@@ -598,6 +611,18 @@ def effective_output_tokens(max_output_tokens: int, provider: str) -> int:
 
 
 def save(update: dict[str, Any]) -> Config:
+    if "subagents_enabled" in update and not isinstance(update["subagents_enabled"], bool):
+        raise ValueError("Subagents enabled must be true or false")
+    if "max_subagents" in update and (type(update["max_subagents"]) is not int or not 1 <= update["max_subagents"] <= 16):
+        raise ValueError("Maximum subagents must be a whole number from 1 to 16")
+    if "subagent_connections" in update:
+        worker_ids = update["subagent_connections"]
+        if not isinstance(worker_ids, list) or len(worker_ids) > 16 or any(not isinstance(item, str) for item in worker_ids):
+            raise ValueError("Choose up to 16 saved subagent connections")
+        stored = _stored()
+        available = {entry["id"] for entry in effective_connections(_normalize_custom_models(stored.get("custom_models", ())), stored.get("removed_connections", ()))}
+        if set(worker_ids) - available:
+            raise ValueError("A selected subagent connection is unavailable; choose a saved connection")
     current = _stored()
     current.pop("double_agent_token", None)
     old_model = current.get("model")

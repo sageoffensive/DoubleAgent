@@ -404,9 +404,16 @@ class Model:
         self.thinking: bool | None = None
         self._lock = threading.RLock()
         self._connection: http.client.HTTPConnection | None = None
+        self.telemetry = None
+        self.telemetry_actor = "lead"
+        self.telemetry_connection = ""
+        self._metric_request = None
+        self._cancelled = threading.Event()
+        self._stream_options_supported = True
 
     def cancel(self) -> None:
         """Interrupt an in-flight local model request."""
+        self._cancelled.set()
         with self._lock:
             connection = self._connection
         if connection is None:
@@ -484,6 +491,31 @@ class Model:
         on_delta: Callable[[dict[str, Any]], None] | None = None,
         tool_choice: str = "auto",
     ) -> dict[str, Any]:
+        self._cancelled.clear()
+        meter = self.telemetry
+        ident = meter.begin(self.telemetry_actor, self.telemetry_connection) if meter else None
+        self._metric_request = ident
+        status = "failed"
+        try:
+            result = self._complete_impl(messages, tools, on_delta, tool_choice)
+            status = "cancelled" if self._cancelled.is_set() else "completed"
+            return result
+        finally:
+            if meter:
+                meter.finish(ident, "cancelled" if self._cancelled.is_set() else status)
+            self._metric_request = None
+
+    def _observe_usage(self, usage: Any) -> None:
+        if self.telemetry and self._metric_request:
+            self.telemetry.usage(self._metric_request, usage)
+
+    def _complete_impl(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        on_delta: Callable[[dict[str, Any]], None] | None = None,
+        tool_choice: str = "auto",
+    ) -> dict[str, Any]:
         if not self.key and self.provider != "openai_compatible":
             raise RuntimeError("Model API key is not configured")
         if self._is_bedrock():
@@ -501,6 +533,8 @@ class Model:
             "tool_choice": tool_choice,
             "stream": True,
         }
+        if self._stream_options_supported:
+            request["stream_options"] = {"include_usage": True}
         if self.provider == "openai":
             request["max_completion_tokens"] = self.output
         else:
@@ -551,6 +585,10 @@ class Model:
                     value = json.loads(raw) if raw.strip() else {}
                 except ValueError:
                     value = {"error": raw}
+                if (response.status == 400 and "stream_options" in request and not self._cancelled.is_set()
+                        and any(field in json.dumps(value).lower() for field in ("stream_options", "include_usage"))):
+                    self._stream_options_supported = False
+                    return self._complete_impl(messages, tools, on_delta, tool_choice)
                 raise HTTPError(response.status, value)
             content_type = response.getheader("Content-Type", "").lower()
             if "text/event-stream" not in content_type:
@@ -562,6 +600,7 @@ class Model:
                 choices = value.get("choices", []) if isinstance(value, dict) else []
                 if not choices or not isinstance(choices[0], dict):
                     raise RuntimeError("Model returned no choices")
+                self._observe_usage(value.get("usage"))
                 message = choices[0].get("message", {})
                 if not isinstance(message, dict):
                     raise RuntimeError("Model returned an invalid message")
@@ -597,6 +636,8 @@ class Model:
                     frame = json.loads(line)
                 except ValueError:
                     continue
+                if isinstance(frame, dict):
+                    self._observe_usage(frame.get("usage"))
                 choices = frame.get("choices", []) if isinstance(frame, dict) else []
                 choice = choices[0] if choices and isinstance(choices[0], dict) else {}
                 delta = choice.get("delta", {}) if isinstance(choice, dict) else {}
@@ -690,6 +731,7 @@ class Model:
             except ValueError as exc:
                 raise RuntimeError("Anthropic returned invalid JSON") from exc
             message = _from_anthropic_response(value)
+            self._observe_usage(value.get("usage"))
             message["finish_reason"] = value.get("stop_reason")
             if on_delta:
                 on_delta({"message": message, "streamed": False, "finish_reason": value.get("stop_reason")})
@@ -749,6 +791,7 @@ class Model:
             except ValueError as exc:
                 raise RuntimeError("Bedrock returned invalid JSON") from exc
             message = _from_bedrock_response(value)
+            self._observe_usage(value.get("usage"))
             message["finish_reason"] = value.get("stopReason")
             if on_delta:
                 on_delta({"message": message, "streamed": False, "finish_reason": value.get("stopReason")})
